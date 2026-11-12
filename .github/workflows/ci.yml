@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
-      - run: pytest
+      - run: python -m pytest
       - run: ruff check app tests
       - run: bandit -q -r app
 
