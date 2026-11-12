@@ -1,0 +1,39 @@
+﻿services:
+  backend:
+    build:
+      context: ./backend
+    env_file:
+      - .env
+    environment:
+      APP_ENV: development
+      FRONTEND_ORIGIN: http://localhost:3001
+      ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+    ports:
+      - "127.0.0.1:8001:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8001
+        NEXT_PUBLIC_CONTACT_EMAIL: sarvasettyrevanth.66@gmail.com
+        NEXT_PUBLIC_OPERATOR_NAME: Sarvasetty Revanth Kumar
+        NEXT_PUBLIC_SITE_URL: http://localhost:3001
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped

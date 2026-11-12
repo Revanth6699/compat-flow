@@ -1,0 +1,28 @@
+.env
+.env.*
+!.env.example
+!.env.test
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.sqlite3
+
+# Temporary CSV test files
+*_test.csv
+test_*.csv
+/test file.csv

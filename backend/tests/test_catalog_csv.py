@@ -135,3 +135,45 @@ def test_malformed_csv_quoting_rejected():
 
     with pytest.raises(Exception):
         parse_catalog_csv(content)
+
+def test_structured_error_for_duplicate_sku():
+    content = VALID_HEADER + (
+        "SKU-1,Brake Pad,Maker A,BP-100,Brakes,,\n"
+        "SKU-1,Oil Filter,Maker A,OF-200,Filters,,\n"
+    )
+
+    result = parse_catalog_csv(content)
+
+    error = result.row_errors[0]
+
+    assert error.row_number == 3
+    assert error.field == "sku"
+    assert error.error_code == "DUPLICATE_SKU_IN_FILE"
+
+
+def test_structured_error_for_invalid_field():
+    content = VALID_HEADER + (
+        "SKU-1,,Maker A,BP-100,Brakes,,\n"
+    )
+
+    result = parse_catalog_csv(content)
+
+    assert any(
+        error.row_number == 2
+        and error.field == "name"
+        for error in result.row_errors
+    )
+
+
+def test_structured_error_for_column_count_mismatch():
+    content = VALID_HEADER + (
+        "SKU-1,Brake Pad,Maker A,BP-100,Brakes,EXTRA\n"
+    )
+
+    result = parse_catalog_csv(content)
+
+    error = result.row_errors[0]
+
+    assert error.row_number == 2
+    assert error.field is None
+    assert error.error_code == "COLUMN_COUNT_MISMATCH"

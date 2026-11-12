@@ -1,0 +1,4 @@
+sku,name,manufacturer,part_number,category,compatibility,replacement_sku
+BRK-100,Front Brake Pad,Northstar Parts,NS-BP100,Brakes,VEHICLE-001,
+FLT-210,Oil Filter,Northstar Parts,NS-OF210,Filters,ENGINE-22,
+BRK-099,Legacy Brake Pad,Northstar Parts,NS-BP099,Brakes,VEHICLE-001,BRK-100
