@@ -128,7 +128,7 @@ def require_verified_supabase_email(identity: SupabaseIdentity) -> None:
     confirmed_at = user_data.get("email_confirmed_at")
     returned_email = str(user_data.get("email", "")).strip().lower()
     if not confirmed_at or returned_email != identity.email:
-        raise HTTPException(status_code=403, detail="Verify your email address before accepting an invitation.")
+        raise HTTPException(status_code=403, detail="Verify your email address before continuing.")
 
 
 
