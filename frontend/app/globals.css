@@ -691,3 +691,30 @@ small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs)
   border-color: #24527D !important;
   transform: translateY(-2px);
 }
+
+
+/* Secondary actions on every page: prevent primary navy fill from leaking through */
+.button.button-secondary {
+  background: #FFFFFF !important;
+  background-image: none !important;
+  color: #24527D !important;
+  border: 1px solid #CBD5E1 !important;
+  box-shadow: none;
+}
+.button.button-secondary:hover:not(:disabled) {
+  background: #F1F5F9 !important;
+  color: #193F63 !important;
+  border-color: #24527D !important;
+  transform: translateY(-2px);
+}
+.button.button-secondary:active:not(:disabled) {
+  background: #E8EEF4 !important;
+  transform: translateY(0);
+}
+.button.button-secondary:disabled {
+  background: #F8FAFC !important;
+  color: #8994A1 !important;
+  border-color: #E2E8F0 !important;
+  opacity: 1;
+  cursor: not-allowed;
+}
