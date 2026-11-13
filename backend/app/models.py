@@ -14,6 +14,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -268,6 +269,7 @@ class Subscription(Base):
     __table_args__ = (
         Index("ix_subscriptions_org_status", "organization_id", "status"),
         Index("ix_subscriptions_user_status", "user_id", "status"),
+        Index("uq_subscriptions_one_current_per_org", "organization_id", unique=True, postgresql_where=text("status IN ('active', 'trialing')")),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

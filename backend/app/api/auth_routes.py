@@ -122,6 +122,11 @@ class InvitationResponse(BaseModel):
 def get_me(current: AuthenticatedUser = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = current.profile
     subscription, plan = get_active_plan(current, db)
+    resolved_account_type = "enterprise" if plan and plan.code == "enterprise" else "subscriber" if plan else "demo"
+    if profile.account_type != resolved_account_type:
+        profile.account_type = resolved_account_type
+        db.commit()
+        db.refresh(profile)
     return CurrentUserResponse(
         id=profile.id,
         auth_user_id=current.identity.auth_user_id,
@@ -129,7 +134,7 @@ def get_me(current: AuthenticatedUser = Depends(get_current_user), db: Session =
         email=profile.email,
         role=profile.role,
         is_active=profile.is_active,
-        account_type=("enterprise" if plan and plan.code == "enterprise" else "subscriber" if plan else "demo"),
+        account_type=resolved_account_type,
         plan_code=plan.code if plan else None,
         subscription_status=subscription.status if subscription else None,
     )
