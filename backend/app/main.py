@@ -89,7 +89,7 @@ app.add_middleware(
 # Vercel preview URLs are deployment-specific. Permit only this project's
 # team-owned preview hostname pattern in staging; production remains exact-origin.
 staging_preview_origin_regex = (
-    r"https://compat-flow-web(?:-[a-z0-9-]+)?-revanth-fbe6\\.vercel\\.app"
+    r"https://compat-flow-web(?:-[a-z0-9-]+)?-revanth-fbe6\.vercel\.app"
     if settings.app_env.lower() == "staging"
     else None
 )
