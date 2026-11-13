@@ -23,7 +23,7 @@ async function createPkceChallenge() {
   const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
   const verifier = base64Url(verifierBytes);
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-  sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
+  localStorage.setItem(PKCE_VERIFIER_KEY, verifier);
   return base64Url(new Uint8Array(digest));
 }
 function config() {
@@ -60,10 +60,10 @@ export function subscribeAuth(listener: () => void) {
 }
 export function getAuthSnapshot() { return { user: currentUser, accessToken, loading: false }; }
 export async function exchangeCodeForSession(code: string) {
-  const verifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
+  const verifier = localStorage.getItem(PKCE_VERIFIER_KEY);
   if (!verifier) throw new Error("The sign-in verification session is missing or expired. Request a new email link.");
   const session = await authRequest<AuthSession>("token?grant_type=pkce", { auth_code: code, code_verifier: verifier });
-  sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+  localStorage.removeItem(PKCE_VERIFIER_KEY);
   applySession(session);
   return session.user;
 }
@@ -86,11 +86,11 @@ export async function signUp(email: string, password: string, redirectPath = "/w
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+    localStorage.removeItem(PKCE_VERIFIER_KEY);
     throw new Error(data.msg || data.message || data.error_description || "Could not create the account.");
   }
   if (data.access_token && data.refresh_token && data.user) {
-    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+    localStorage.removeItem(PKCE_VERIFIER_KEY);
     applySession(data as AuthSession);
   }
   return data as { user?: AuthUser; access_token?: string };
@@ -107,7 +107,7 @@ export async function requestPasswordReset(email: string) {
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+    localStorage.removeItem(PKCE_VERIFIER_KEY);
     throw new Error(data.msg || data.message || "Could not send the password reset email.");
   }
 }
