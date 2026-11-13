@@ -46,6 +46,7 @@ class User(Base):
         UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
     )
+    auth_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), unique=True, index=True)
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     password_hash: Mapped[str | None] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(32), default="member")
@@ -205,3 +206,28 @@ class ImportRowError(Base):
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class UserInvitation(Base):
+    __tablename__ = "user_invitations"
+    __table_args__ = (Index("ix_user_invitations_org_email", "organization_id", "email"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    invited_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    expires_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    accepted_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+    __table_args__ = (UniqueConstraint("role", "permission", name="uq_role_permission"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    permission: Mapped[str] = mapped_column(String(100), nullable=False)
