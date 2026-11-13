@@ -79,12 +79,10 @@ export async function signUp(email: string, password: string, redirectPath = "/w
   const codeChallenge = await createPkceChallenge();
   const signupUrl = new URL(`${url}/auth/v1/signup`);
   signupUrl.searchParams.set("redirect_to", redirectTo);
-  signupUrl.searchParams.set("code_challenge", codeChallenge);
-  signupUrl.searchParams.set("code_challenge_method", "s256");
   const response = await fetch(signupUrl.toString(), {
     method: "POST",
     headers: { apikey: config().key, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: email.trim().toLowerCase(), password, data: {} }),
+    body: JSON.stringify({ email: email.trim().toLowerCase(), password, data: {}, code_challenge: codeChallenge, code_challenge_method: "s256" }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -103,11 +101,9 @@ export async function requestPasswordReset(email: string) {
   const codeChallenge = await createPkceChallenge();
   const recoveryUrl = new URL(`${url}/auth/v1/recover`);
   recoveryUrl.searchParams.set("redirect_to", redirectTo);
-  recoveryUrl.searchParams.set("code_challenge", codeChallenge);
-  recoveryUrl.searchParams.set("code_challenge_method", "s256");
   const response = await fetch(recoveryUrl.toString(), {
     method: "POST", headers: { apikey: key, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    body: JSON.stringify({ email: email.trim().toLowerCase(), code_challenge: codeChallenge, code_challenge_method: "s256" }),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
