@@ -49,7 +49,7 @@ function applySession(session: AuthSession) {
   currentUser = session.user;
   accessTokenExpiresAt = session.expires_at ?? (Date.now() / 1000 + (session.expires_in ?? 3600));
   if (typeof window !== "undefined") {
-    sessionStorage.setItem(STORAGE_KEY, session.refresh_token);
+    localStorage.setItem(STORAGE_KEY, session.refresh_token);
     window.dispatchEvent(new Event("compatflow-auth-change"));
   }
   notify();
@@ -140,7 +140,7 @@ export async function signOut() {
   const token = accessToken;
   accessToken = null; currentUser = null;
   if (typeof window !== "undefined") {
-    sessionStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
     window.dispatchEvent(new Event("compatflow-auth-change"));
   }
   notify();
@@ -150,20 +150,20 @@ export async function signOut() {
 }
 export async function restoreSession() {
   if (typeof window === "undefined") return;
-  const refreshToken = sessionStorage.getItem(STORAGE_KEY);
+  const refreshToken = localStorage.getItem(STORAGE_KEY);
   if (!refreshToken) return;
   try {
     const session = await authRequest<AuthSession>("token?grant_type=refresh_token", { refresh_token: refreshToken });
     applySession(session);
   } catch {
-    sessionStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEY);
     accessToken = null; currentUser = null; notify();
   }
 }
 export function setSessionFromCallback(session: AuthSession) { applySession(session); }
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (accessToken && accessTokenExpiresAt < Date.now() / 1000 + 60) {
-    const refreshToken = sessionStorage.getItem(STORAGE_KEY);
+    const refreshToken = localStorage.getItem(STORAGE_KEY);
     if (refreshToken) {
       const refreshed = await authRequest<AuthSession>("token?grant_type=refresh_token", { refresh_token: refreshToken });
       applySession(refreshed);
