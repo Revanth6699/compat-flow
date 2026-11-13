@@ -26,6 +26,7 @@
   --radius-lg: 14px;
   --shadow: 0 12px 36px rgba(23, 54, 93, .08);
   --ease: 180ms ease;
+  --font-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -34,7 +35,7 @@ body {
   margin: 0;
   background: var(--page);
   color: var(--ink);
-  font-family: Manrope, "Avenir Next", Avenir, Arial, sans-serif;
+  font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
@@ -51,8 +52,8 @@ button { cursor: pointer; }
 }
 .skip-link:focus { left: 8px; }
 h1, h2, h3, h4, .editorial-heading {
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-weight: 700;
   letter-spacing: -.035em;
 }
 p { margin-top: 0; }
@@ -93,7 +94,7 @@ p { margin-top: 0; }
   justify-content: space-between; gap: 28px;
 }
 .brand {
-  color: var(--navy); font-family: Manrope, Arial, sans-serif;
+  color: var(--navy); font-family: var(--font-sans);
   font-size: 22px; font-weight: 800; letter-spacing: -.07em;
 }
 .brand-mark { color: var(--teal); }
@@ -166,7 +167,7 @@ p { margin-top: 0; }
 .home-visual-body { padding: 22px; }
 .home-visual-metric {
   margin: 3px 0 5px; color: var(--navy);
-  font-family: "Iowan Old Style", Georgia, serif; font-size: 42px; line-height: 1.1;
+  font-family: var(--font-sans); font-size: 42px; font-weight: 750; line-height: 1.1;
 }
 .home-visual-caption { color: var(--muted); font-size: 11px; }
 .home-visual-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 22px 0; }
