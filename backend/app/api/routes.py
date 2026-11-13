@@ -14,6 +14,8 @@ from app.schemas import (
     HealthResponse,
     ImportPreviewResponse,
     ImportPreviewRowErrorResponse,
+    ImportIssueCategoryResponse,
+    ImportFieldMetricResponse,
     ProductResponse,
     ProductCreateRequest,
     SupplierCreateRequest,
@@ -92,7 +94,25 @@ async def preview_catalog_import(file: UploadFile = File(...)):
         total_rows=result.total_rows,
         valid_rows=result.valid_count,
         invalid_rows=result.invalid_count,
+        validation_pass_rate=result.validation_pass_rate,
+        data_quality_score=result.data_quality_score,
+        total_issues=result.critical_issues + result.warning_issues,
+        critical_issues=result.critical_issues,
+        warning_issues=result.warning_issues,
         errors=result.errors[:50],
+        issue_categories=[
+            ImportIssueCategoryResponse(category=category, count=count)
+            for category, count in result.issue_categories
+        ],
+        field_metrics=[
+            ImportFieldMetricResponse(
+                field=metric.field,
+                populated=metric.populated,
+                missing=metric.missing,
+                completeness_pct=metric.completeness_pct,
+            )
+            for metric in result.field_metrics
+        ],
         preview=result.preview,
         row_errors=[
             ImportPreviewRowErrorResponse(
@@ -100,6 +120,9 @@ async def preview_catalog_import(file: UploadFile = File(...)):
                 field=error.field,
                 error_code=error.error_code,
                 message=error.message,
+                severity=error.severity,
+                category=error.category,
+                recommendation=error.recommendation,
             )
             for error in result.row_errors[:50]
         ],
