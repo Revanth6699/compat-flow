@@ -2,6 +2,14 @@ name: Staging database migration status
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - feature/backend-auth-authorization
+    paths:
+      - .github/workflows/staging-migration-status.yml
+      - backend/migrations/**
+      - backend/alembic.ini
+      - backend/migrations/env.py
 
 permissions:
   contents: read
