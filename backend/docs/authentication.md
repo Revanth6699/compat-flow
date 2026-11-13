@@ -51,3 +51,27 @@ Run this only through a trusted database administration session. Never expose a 
 5. Test invite, verify-email, accept, expiry, reuse, revoke, and cross-organization access before enabling protected product workflows.
 
 The existing public CSV preview endpoint remains public for now. Persistent catalog import remains disabled. This PR does not yet add tenant-scoped product routes or organization membership across multiple organizations.
+
+
+## Tenant isolation and catalog permissions
+
+The internal account currently belongs to one organization. The organization context is derived from the authenticated `users` row. Catalog and supplier endpoints never accept an organization ID from the caller.
+
+- `GET /api/v1/products`: requires `catalog:read`; returns only products owned by the caller's organization (maximum 500 per response).
+- `GET /api/v1/products/{product_id}`: requires `catalog:read`; foreign-organization IDs return 404.
+- `POST /api/v1/products`: requires `catalog:write`; the organization ID is assigned server-side, and an optional supplier must belong to the same organization.
+- `GET /api/v1/suppliers`: requires `supplier:read`; returns only suppliers owned by the caller's organization.
+- `POST /api/v1/suppliers`: requires `supplier:write`; the organization ID is assigned server-side.
+
+The migration seeds database-backed role permissions:
+
+| Role | Catalog read | Catalog write | Supplier read | Supplier write |
+| --- | --- | --- | --- | --- |
+| owner | Yes | Yes | Yes | Yes |
+| admin | Yes | Yes | Yes | Yes |
+| member | Yes | Yes | Yes | Yes |
+| viewer | Yes | No | Yes | No |
+
+Database composite foreign keys additionally prevent products from referencing another organization's supplier, compatibility records from referencing another organization's product, and import jobs from referencing another organization's supplier. The migration checks existing data first and aborts with an explicit error if it finds cross-organization relationships.
+
+Public CSV preview remains stateless and public. Persistent catalog import remains disabled. These catalog endpoints are the first protected persistent operations; future catalog routes must use the same server-derived organization scope and permission dependency.
