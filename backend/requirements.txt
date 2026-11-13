@@ -12,3 +12,4 @@ packaging>=24.2,<27
 pytest>=8.0,<10
 httpx>=0.27,<1
 PyJWT[crypto]>=2.10,<3
+email-validator>=2.2,<3
