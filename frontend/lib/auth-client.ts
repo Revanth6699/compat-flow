@@ -49,9 +49,10 @@ export async function signIn(email: string, password: string) {
   applySession(session);
   return session.user;
 }
-export async function signUp(email: string, password: string) {
+export async function signUp(email: string, password: string, redirectPath = "/workspace") {
   const { url } = config();
-  const redirectTo = `${window.location.origin}/auth/callback`;
+  const safeNext = redirectPath.startsWith("/") && !redirectPath.startsWith("//") ? redirectPath : "/workspace";
+  const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
   const response = await fetch(`${url}/auth/v1/signup?redirect_to=${encodeURIComponent(redirectTo)}`, {
     method: "POST",
     headers: { apikey: config().key, "Content-Type": "application/json" },
