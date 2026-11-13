@@ -5,7 +5,7 @@ from uuid import uuid4, UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -135,16 +135,25 @@ def create_invitation(
     email = str(payload.email).strip().lower()
     if current.profile.role != "owner" and payload.role == "admin":
         raise HTTPException(status_code=403, detail="Only an organization owner can invite administrators.")
-    existing = db.scalar(
-        select(User).where(
-            User.organization_id == current.profile.organization_id,
-            User.email == email,
-        )
-    )
+    existing = db.scalar(select(User).where(func.lower(User.email) == email))
     if existing:
-        raise HTTPException(status_code=409, detail="This email already has access to the organization.")
+        raise HTTPException(
+            status_code=409,
+            detail="This email is already linked to a CompatFlow organization and cannot join another organization.",
+        )
 
     now = datetime.now(timezone.utc)
+    pending = db.scalar(
+        select(UserInvitation.id).where(
+            UserInvitation.organization_id == current.profile.organization_id,
+            func.lower(UserInvitation.email) == email,
+            UserInvitation.accepted_at.is_(None),
+            UserInvitation.revoked_at.is_(None),
+            UserInvitation.expires_at > now,
+        )
+    )
+    if pending:
+        raise HTTPException(status_code=409, detail="An active invitation already exists for this email address.")
     raw_token = secrets.token_urlsafe(48)
     invitation = UserInvitation(
         id=uuid4(),
