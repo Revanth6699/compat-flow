@@ -113,7 +113,14 @@ export async function requestPasswordReset(email: string) {
 }
 export async function updatePassword(password: string) {
   if (!accessToken) throw new Error("Your session has expired. Sign in again before changing your password.");
-  await authRequest("user", { password }, accessToken);
+  const { url, key } = config();
+  const response = await fetch(`${url}/auth/v1/user`, {
+    method: "PUT",
+    headers: { apikey: key, "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ password }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.msg || data.message || "Could not update your password.");
 }
 export async function updateProfile(fullName: string) {
   if (!accessToken) throw new Error("Your session has expired. Sign in again before updating your profile.");
