@@ -15,6 +15,7 @@ from app.core.auth import (
     get_current_user,
     get_supabase_identity,
     require_roles,
+    get_active_plan,
     require_verified_supabase_email,
 )
 from app.core.database import get_db
@@ -32,6 +33,8 @@ class CurrentUserResponse(BaseModel):
     role: str
     is_active: bool
     account_type: str = "demo"
+    plan_code: str | None = None
+    subscription_status: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -116,8 +119,9 @@ class InvitationResponse(BaseModel):
 
 
 @router.get("/me", response_model=CurrentUserResponse)
-def get_me(current: AuthenticatedUser = Depends(get_current_user)):
+def get_me(current: AuthenticatedUser = Depends(get_current_user), db: Session = Depends(get_db)):
     profile = current.profile
+    subscription, plan = get_active_plan(current, db)
     return CurrentUserResponse(
         id=profile.id,
         auth_user_id=current.identity.auth_user_id,
@@ -125,6 +129,9 @@ def get_me(current: AuthenticatedUser = Depends(get_current_user)):
         email=profile.email,
         role=profile.role,
         is_active=profile.is_active,
+        account_type=("enterprise" if plan and plan.code == "enterprise" else "subscriber" if plan else "demo"),
+        plan_code=plan.code if plan else None,
+        subscription_status=subscription.status if subscription else None,
     )
 
 

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import RolePermission, User
+from app.models import RolePermission, Subscription, SubscriptionPlan, User
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -150,4 +150,42 @@ def require_permission(permission: str):
             )
         return current
 
+    return dependency
+
+
+def get_active_plan(current: AuthenticatedUser, db: Session):
+    """Resolve the active subscription for the user's organization."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    subscription = db.scalar(
+        select(Subscription).where(
+            Subscription.organization_id == current.profile.organization_id,
+            Subscription.status.in_(("active", "trialing")),
+            (Subscription.current_period_end.is_(None)) | (Subscription.current_period_end > now),
+        ).order_by(Subscription.created_at.desc())
+    )
+    if subscription is None:
+        return None, None
+    plan = db.get(SubscriptionPlan, subscription.plan_code)
+    if plan is None or not plan.is_active:
+        return None, None
+    return subscription, plan
+
+
+def require_plan_feature(feature: str):
+    def dependency(
+        current: AuthenticatedUser = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> AuthenticatedUser:
+        subscription, plan = get_active_plan(current, db)
+        if subscription is None or plan is None:
+            raise HTTPException(status_code=402, detail="An active CompatFlow subscription is required to access this feature.")
+        if not bool((plan.entitlements or {}).get(feature, False)):
+            raise HTTPException(status_code=403, detail={
+                "message": "This feature is not included in your current subscription plan.",
+                "current_plan": plan.code,
+                "required_feature": feature,
+                "upgrade_url": "/pricing",
+            })
+        return current
     return dependency

@@ -259,6 +259,7 @@ class SubscriptionPlan(Base):
     storage_limit_bytes: Mapped[int | None] = mapped_column(BigInteger)
     monthly_validation_limit: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    entitlements: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

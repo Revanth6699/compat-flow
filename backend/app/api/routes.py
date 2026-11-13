@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from app.core.auth import AuthenticatedUser, require_permission
+from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.database import get_db
 from app.models import Product, Supplier
 from app.core.config import settings
@@ -145,6 +145,7 @@ def public_demo_import_disabled():
 @router.get("/suppliers", response_model=list[SupplierResponse])
 def list_suppliers(
     current: AuthenticatedUser = Depends(require_permission("supplier:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
     return list(
@@ -160,6 +161,7 @@ def list_suppliers(
 def create_supplier(
     payload: SupplierCreateRequest,
     current: AuthenticatedUser = Depends(require_permission("supplier:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
     supplier = Supplier(
@@ -176,6 +178,7 @@ def create_supplier(
 @router.get("/products", response_model=list[ProductResponse])
 def list_products(
     current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
     return list(
@@ -192,6 +195,7 @@ def list_products(
 def get_product(
     product_id: UUID,
     current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
     product = db.scalar(
@@ -210,6 +214,7 @@ def get_product(
 def create_product(
     payload: ProductCreateRequest,
     current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
     if payload.supplier_id is not None:

@@ -50,6 +50,13 @@ def upgrade() -> None:
         {"code": "enterprise", "name": "Enterprise", "monthly_price_minor": None, "currency": "USD", "is_active": True},
     ])
 
+    op.add_column("subscription_plans", sa.Column("entitlements", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default=sa.text("'{}'::jsonb")))
+    entitlements = sa.table("subscription_plans", sa.column("code", sa.String), sa.column("entitlements", postgresql.JSONB))
+    op.execute(entitlements.update().where(entitlements.c.code == "starter").values(entitlements={"csv_validation": True, "validation_metrics": True, "issue_reports": True}))
+    op.execute(entitlements.update().where(entitlements.c.code == "growth").values(entitlements={"csv_validation": True, "validation_metrics": True, "issue_reports": True, "supplier_catalogs": True, "version_comparison": True, "custom_rules": True, "recurring_validation": True}))
+    op.execute(entitlements.update().where(entitlements.c.code == "business").values(entitlements={"csv_validation": True, "validation_metrics": True, "issue_reports": True, "supplier_catalogs": True, "version_comparison": True, "custom_rules": True, "recurring_validation": True, "team_review": True, "issue_assignment": True, "approval_workflows": True, "audit_history": True, "exports": True, "integrations": True}))
+    op.execute(entitlements.update().where(entitlements.c.code == "enterprise").values(entitlements={"csv_validation": True, "validation_metrics": True, "issue_reports": True, "supplier_catalogs": True, "version_comparison": True, "custom_rules": True, "recurring_validation": True, "team_review": True, "issue_assignment": True, "approval_workflows": True, "audit_history": True, "exports": True, "integrations": True, "custom_limits": True, "governance": True, "custom_support_sla": True}))
+
     op.create_table(
         "subscriptions",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
