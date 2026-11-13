@@ -19,8 +19,15 @@ bearer_scheme = HTTPBearer(auto_error=False)
 
 
 @dataclass(frozen=True)
-class AuthenticatedUser:
+class SupabaseIdentity:
     auth_user_id: UUID
+    email: str
+    email_verified: bool
+
+
+@dataclass(frozen=True)
+class AuthenticatedUser:
+    identity: SupabaseIdentity
     profile: User
 
 
@@ -39,17 +46,16 @@ def _unauthorized() -> HTTPException:
     )
 
 
-def get_current_user(
+def get_supabase_identity(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    db: Session = Depends(get_db),
-) -> AuthenticatedUser:
+) -> SupabaseIdentity:
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise _unauthorized()
     if not settings.supabase_url:
         raise HTTPException(status_code=503, detail="Authentication is not configured.")
 
-    token = credentials.credentials
     try:
+        token = credentials.credentials
         header = jwt.get_unverified_header(token)
         algorithm = header.get("alg")
         if algorithm not in {"ES256", "RS256"}:
@@ -61,16 +67,27 @@ def get_current_user(
             algorithms=[algorithm],
             audience="authenticated",
             issuer=f"{settings.supabase_url.rstrip('/')}/auth/v1",
-            options={"require": ["exp", "sub", "iss", "aud"]},
+            options={"require": ["exp", "sub", "iss", "aud", "email"]},
         )
-        auth_user_id = UUID(claims["sub"])
+        return SupabaseIdentity(
+            auth_user_id=UUID(claims["sub"]),
+            email=str(claims["email"]).strip().lower(),
+            email_verified=claims.get("email_verified") is True,
+        )
     except (PyJWTError, ValueError, KeyError, RuntimeError):
         raise _unauthorized() from None
 
-    profile = db.scalar(select(User).where(User.auth_user_id == auth_user_id))
+
+def get_current_user(
+    identity: SupabaseIdentity = Depends(get_supabase_identity),
+    db: Session = Depends(get_db),
+) -> AuthenticatedUser:
+    profile = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
     if profile is None or not profile.is_active:
         raise HTTPException(status_code=403, detail="This account has no active CompatFlow access.")
-    return AuthenticatedUser(auth_user_id=auth_user_id, profile=profile)
+    if profile.email.lower() != identity.email:
+        raise HTTPException(status_code=403, detail="The authenticated email does not match the authorized account.")
+    return AuthenticatedUser(identity=identity, profile=profile)
 
 
 def require_roles(*roles: str):
