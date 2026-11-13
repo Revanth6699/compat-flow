@@ -27,7 +27,6 @@ type PreviewResponse = {
   preview: PreviewRow[];
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8001";
 
 export default function CatalogImportPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -65,7 +64,7 @@ export default function CatalogImportPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const response = await fetch(`${API_BASE}/api/v1/catalog/import/preview`, {
+      const response = await fetch("/api/catalog/import/preview", {
         method: "POST",
         body: formData,
       });
