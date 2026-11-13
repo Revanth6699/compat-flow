@@ -43,6 +43,9 @@ jobs:
             echo "::error::Repository secret STAGING_DATABASE_URL is not configured."
             exit 1
           fi
+          # Render's external URL may omit the SQLAlchemy driver. Force Psycopg 3,
+          # which is the PostgreSQL driver installed by backend/requirements.txt.
+          export DATABASE_URL="$(python -c 'import os; from sqlalchemy.engine import make_url; url = make_url(os.environ["DATABASE_URL"]); print(url.set(drivername="postgresql+psycopg").render_as_string(hide_password=False))')"
           echo "Configured Alembic heads:"
           python -m alembic heads
           echo "Current staging database revision:"
