@@ -18,7 +18,7 @@ from app.core.auth import (
     require_verified_supabase_email,
 )
 from app.core.database import get_db
-from app.models import User, UserInvitation
+from app.models import Organization, User, UserInvitation
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 invitation_router = APIRouter(prefix="/invitations", tags=["invitations"])
@@ -34,6 +34,48 @@ class CurrentUserResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+
+class OrganizationCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=160)
+
+
+@router.post("/organization", response_model=CurrentUserResponse, status_code=201)
+def create_organization_for_current_user(
+    payload: OrganizationCreateRequest,
+    identity: SupabaseIdentity = Depends(get_supabase_identity),
+    db: Session = Depends(get_db),
+):
+    """Create one organization for a verified Supabase identity during self-service onboarding."""
+    require_verified_supabase_email(identity)
+    existing = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="This account is already linked to a CompatFlow organization.")
+    organization = Organization(id=uuid4(), name=payload.name.strip())
+    profile = User(
+        id=uuid4(),
+        organization_id=organization.id,
+        auth_user_id=identity.auth_user_id,
+        email=identity.email,
+        role="owner",
+        is_active=True,
+    )
+    db.add(organization)
+    db.add(profile)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Organization setup could not be completed for this account.") from None
+    db.refresh(profile)
+    return CurrentUserResponse(
+        id=profile.id,
+        auth_user_id=identity.auth_user_id,
+        organization_id=profile.organization_id,
+        email=profile.email,
+        role=profile.role,
+        is_active=profile.is_active,
+    )
 
 class InvitationCreateRequest(BaseModel):
     email: EmailStr
