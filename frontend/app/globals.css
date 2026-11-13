@@ -449,3 +449,94 @@ button.button:disabled { opacity: .5; cursor: not-allowed; transform: none; box-
 .home-card-number { color: #0B8179; }
 .button-secondary { color: #24527D; }
 .button-secondary:hover { color: #173F66; }
+
+
+/* Balanced typography palette: charcoal text, blue as a restrained accent */
+:root {
+  --ink: #202833;
+  --muted: #56616F;
+  --subtle: #737E8B;
+  --navy: #24527D;
+  --navy-hover: #193F63;
+  --navy-soft: #F1F5F9;
+  --teal: #16877F;
+  --teal-hover: #106E68;
+}
+
+/* Keep text neutral across every page; reserve blue for actions and links */
+body { color: #202833; }
+h1, h2, h3, h4, .editorial-heading { color: #202833; }
+p, li, small, label { color: #56616F; }
+.eyebrow, .home-card-number { color: #24527D; }
+
+/* Homepage headings and card copy */
+.home-hero h1,
+.home-section-heading h2,
+.home-problem-card h3,
+.home-capability-card h3,
+.home-step h3,
+.home-demo-cta h2,
+.home-final-cta h2,
+.home-visual-metric,
+.home-visual-title,
+.home-visual-stat strong,
+.home-price,
+.results-heading h2,
+.import-heading h1,
+.import-panel h2,
+.result-section h3,
+.stat-card strong { color: #202833; }
+
+.home-hero-description,
+.home-section-heading p,
+.home-problem-card p,
+.home-capability-card p,
+.home-step p,
+.home-demo-cta p,
+.home-final-cta p,
+.home-visual-caption,
+.home-visual-stat span,
+.home-visual-table td,
+.home-visual-footer,
+.import-heading p,
+.import-description,
+.results-heading p,
+.stat-card span,
+.preview-table td,
+.column-hint { color: #56616F; }
+
+/* Neutral wordmark with one blue accent */
+.brand { color: #202833; }
+.brand-mark { color: #24527D; }
+.brand:hover { color: #24527D; }
+.brand:hover .brand-mark { color: #16877F; }
+
+/* Navigation stays neutral until interaction */
+.nav a { color: #46515E; }
+.nav a:hover, .nav a[aria-current="page"] { color: #24527D; }
+.nav a::after { background: #24527D; }
+
+/* Use restrained blue for primary actions, teal only for secondary feedback */
+.button { background: #24527D; border-color: #24527D; }
+.button:hover { background: #193F63; border-color: #193F63; }
+.button-secondary { color: #24527D; }
+.button-secondary:hover { color: #193F63; border-color: #24527D; }
+.home-cta-button { background: #24527D; border-color: #24527D; }
+.home-cta-button:hover { background: #193F63; border-color: #193F63; }
+
+/* White cards with neutral text and subtle blue interaction */
+.home-problem-card, .home-capability-card, .home-step, .home-pricing-card,
+.import-panel, .result-section, .stat-card { color: #202833; }
+.home-problem-card:hover, .home-capability-card:hover, .home-step:hover,
+.home-pricing-card:hover { border-color: #8CA8C2; background-color: #FFFFFF; }
+.home-step { border-top-color: #24527D; }
+.home-step:hover { border-top-color: #16877F; }
+
+/* Tables and form labels should read as charcoal, not blue */
+.home-visual-table th, .preview-table th { color: #344050; }
+.preview-table td { color: #56616F; }
+.home-visual-stat strong, .stat-card strong { color: #202833; }
+.import-panel h2, .result-section h3, .results-heading h2,
+.import-heading h1 { color: #202833; }
+.column-hint a { color: #24527D; }
+.column-hint a:hover { color: #16877F; }
