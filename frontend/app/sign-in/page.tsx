@@ -12,7 +12,7 @@ function SignInForm() {
   const [error,setError] = useState(""); const [busy,setBusy] = useState(false);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(""); setBusy(true);
-    try { await signIn(email,password); router.replace(search.get("next") || "/workspace"); }
+    try { await signIn(email,password); const next = search.get("next"); router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/workspace"); }
     catch (e) { setError(e instanceof Error ? e.message : "Unable to sign in."); }
     finally { setBusy(false); }
   }
