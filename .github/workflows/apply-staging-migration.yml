@@ -1,0 +1,60 @@
+name: Apply staging database migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_staging_migration:
+        description: "Type APPLY to authorize upgrading the staging database to Alembic head"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compat-flow-staging-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate-staging:
+    if: ${{ inputs.confirm_staging_migration == 'APPLY' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify current revision and apply migration
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Repository secret STAGING_DATABASE_URL is not configured."
+            exit 1
+          fi
+          export DATABASE_URL="$(python -c 'import os; from sqlalchemy.engine import make_url; url = make_url(os.environ["DATABASE_URL"]); print(url.set(drivername="postgresql+psycopg").render_as_string(hide_password=False))')"
+
+          echo "Expected Alembic head:"
+          python -m alembic heads
+
+          echo "Current staging revision before migration:"
+          python -m alembic current
+
+          echo "Applying staging migration..."
+          python -m alembic upgrade head
+
+          echo "Staging revision after migration:"
+          python -m alembic current -v
