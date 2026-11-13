@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { CookieConsent } from "@/components/cookie-consent";
+import { SiteHeader } from "@/components/site-header";
 
 const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
 
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body className={inter.variable}>
         <a className="skip-link" href="#main">Skip to content</a>
+        <SiteHeader />
         {children}
         <CookieConsent />
       </body>

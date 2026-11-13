@@ -48,20 +48,6 @@ const workflow = [
 export default function HomePage() {
   return (
     <>
-      <header className="site-header">
-        <div className="container header-inner">
-          <Link className="brand" href="/" aria-label="CompatFlow home">
-            compat<span className="brand-mark">flow</span>
-          </Link>
-          <nav className="nav" aria-label="Main navigation">
-            <Link href="/catalog/import">Catalog demo</Link>
-            <a href="#capabilities">Capabilities</a>
-            <a href="#workflow">How it works</a>
-            <Link href="/pricing">Pricing</Link>
-            <Link href="/catalog/import">Get started</Link>
-          </nav>
-        </div>
-      </header>
 
       <main id="main" className="home-page">
         <section className="home-hero">
