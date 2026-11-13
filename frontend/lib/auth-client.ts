@@ -11,6 +11,9 @@ let currentUser: AuthUser | null = null;
 let accessTokenExpiresAt = 0;
 const listeners = new Set<() => void>();
 const STORAGE_KEY = "compatflow_refresh_token";
+const ACCESS_TOKEN_KEY = "compatflow_access_token";
+const USER_KEY = "compatflow_user";
+const EXPIRY_KEY = "compatflow_access_expires_at";
 const PKCE_VERIFIER_KEY = "compatflow_pkce_verifier";
 
 function notify() { listeners.forEach((listener) => listener()); }
@@ -49,6 +52,11 @@ function applySession(session: AuthSession) {
   currentUser = session.user;
   accessTokenExpiresAt = session.expires_at ?? (Date.now() / 1000 + (session.expires_in ?? 3600));
   if (typeof window !== "undefined") {
+    // Write the access snapshot first and the refresh token last. Other tabs
+    // react to the refresh-token storage event and can hydrate without rotating it.
+    localStorage.setItem(ACCESS_TOKEN_KEY, session.access_token);
+    localStorage.setItem(USER_KEY, JSON.stringify(session.user));
+    localStorage.setItem(EXPIRY_KEY, String(accessTokenExpiresAt));
     localStorage.setItem(STORAGE_KEY, session.refresh_token);
     window.dispatchEvent(new Event("compatflow-auth-change"));
   }
@@ -141,6 +149,9 @@ export async function signOut() {
   accessToken = null; currentUser = null;
   if (typeof window !== "undefined") {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(EXPIRY_KEY);
     window.dispatchEvent(new Event("compatflow-auth-change"));
   }
   notify();
@@ -148,8 +159,29 @@ export async function signOut() {
     try { await authRequest("logout", {}, token); } catch { /* Local session is already cleared. */ }
   }
 }
+export function hydrateSessionFromStorage() {
+  if (typeof window === "undefined") return false;
+  const storedAccessToken = localStorage.getItem(ACCESS_TOKEN_KEY);
+  const storedUser = localStorage.getItem(USER_KEY);
+  const storedExpiry = Number(localStorage.getItem(EXPIRY_KEY) || 0);
+  if (!storedAccessToken || !storedUser || !Number.isFinite(storedExpiry) || storedExpiry <= Date.now() / 1000 + 60) {
+    return false;
+  }
+  try {
+    const parsedUser = JSON.parse(storedUser) as AuthUser;
+    if (!parsedUser?.id) return false;
+    accessToken = storedAccessToken;
+    currentUser = parsedUser;
+    accessTokenExpiresAt = storedExpiry;
+    notify();
+    return true;
+  } catch {
+    return false;
+  }
+}
 export async function restoreSession() {
   if (typeof window === "undefined") return;
+  if (hydrateSessionFromStorage()) return;
   const refreshToken = localStorage.getItem(STORAGE_KEY);
   if (!refreshToken) return;
   try {
@@ -157,7 +189,10 @@ export async function restoreSession() {
     applySession(session);
   } catch {
     localStorage.removeItem(STORAGE_KEY);
-    accessToken = null; currentUser = null; notify();
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(EXPIRY_KEY);
+    accessToken = null; currentUser = null; accessTokenExpiresAt = 0; notify();
   }
 }
 export function setSessionFromCallback(session: AuthSession) { applySession(session); }
@@ -165,6 +200,11 @@ export function clearSessionFromStorage() {
   accessToken = null;
   currentUser = null;
   accessTokenExpiresAt = 0;
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    localStorage.removeItem(EXPIRY_KEY);
+  }
   notify();
 }
 export class ApiRequestError extends Error {
