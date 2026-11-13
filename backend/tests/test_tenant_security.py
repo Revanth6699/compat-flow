@@ -119,3 +119,41 @@ def test_direct_product_lookup_cannot_cross_organization_boundary():
         assert "products.organization_id" in str(compiled)
     finally:
         clear_overrides()
+
+
+
+def test_supplier_read_query_is_scoped_to_authenticated_organization():
+    organization_id = uuid4()
+    db = FakeDB(permission_granted=True)
+    install_auth_overrides(organization_id, "member", db)
+    try:
+        response = TestClient(app).get("/api/v1/suppliers")
+        assert response.status_code == 200
+        statement = db.statements[-1]
+        compiled = statement.compile(dialect=postgresql.dialect())
+        assert organization_id in compiled.params.values()
+        assert "suppliers.organization_id" in str(compiled)
+    finally:
+        clear_overrides()
+
+
+def test_product_cannot_attach_supplier_from_another_organization():
+    organization_id = uuid4()
+    foreign_supplier_id = uuid4()
+    db = FakeDB(permission_granted=True)
+    install_auth_overrides(organization_id, "member", db)
+    try:
+        response = TestClient(app).post("/api/v1/products", json={
+            "sku": "SKU-FOREIGN",
+            "name": "Part",
+            "manufacturer": "Maker",
+            "part_number": "P-1",
+            "category": "Parts",
+            "supplier_id": str(foreign_supplier_id),
+        })
+        assert response.status_code == 404
+        supplier_query = db.statements[-1].compile(dialect=postgresql.dialect())
+        assert organization_id in supplier_query.params.values()
+        assert "suppliers.organization_id" in str(supplier_query)
+    finally:
+        clear_overrides()
