@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     app_secret_key: str = "local-development-only-change-me"
     frontend_origin: str = "http://localhost:3001"
     allowed_hosts: str = "*"
+    supabase_url: str = ""
 
     database_url: str = (
         "postgresql+psycopg://compatflow_local:"
