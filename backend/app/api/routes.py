@@ -136,7 +136,7 @@ def public_demo_import_disabled():
     raise HTTPException(
         status_code=403,
         detail=(
-            "Persistent catalog imports are disabled in this demo. "
+            "Persistent catalog imports are disabled in this public demo. "
             "You can validate and preview your CSV without saving it."
         ),
     )
