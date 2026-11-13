@@ -14,6 +14,7 @@ from app.schemas import (
     ImportPreviewResponse,
     ImportPreviewRowErrorResponse,
     ProductResponse,
+    ProductCreateRequest,
     SupplierCreateRequest,
     SupplierResponse,
 )
@@ -177,4 +178,43 @@ def get_product(
     )
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found.")
+    return product
+
+
+
+@router.post("/products", response_model=ProductResponse, status_code=201)
+def create_product(
+    payload: ProductCreateRequest,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    db: Session = Depends(get_db),
+):
+    if payload.supplier_id is not None:
+        supplier = db.scalar(
+            select(Supplier).where(
+                Supplier.id == payload.supplier_id,
+                Supplier.organization_id == current.profile.organization_id,
+            )
+        )
+        if supplier is None:
+            raise HTTPException(status_code=404, detail="Supplier not found.")
+
+    product = Product(
+        organization_id=current.profile.organization_id,
+        supplier_id=payload.supplier_id,
+        sku=payload.sku.strip(),
+        name=payload.name.strip(),
+        manufacturer=payload.manufacturer.strip(),
+        part_number=payload.part_number.strip(),
+        category=payload.category.strip(),
+        replacement_sku=payload.replacement_sku.strip() if payload.replacement_sku else None,
+    )
+    db.add(product)
+    try:
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        if "uq_products_org_sku" in str(exc):
+            raise HTTPException(status_code=409, detail="A product with this SKU already exists in the organization.") from None
+        raise
+    db.refresh(product)
     return product
