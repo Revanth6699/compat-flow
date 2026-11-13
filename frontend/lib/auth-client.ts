@@ -11,8 +11,21 @@ let currentUser: AuthUser | null = null;
 let accessTokenExpiresAt = 0;
 const listeners = new Set<() => void>();
 const STORAGE_KEY = "compatflow_refresh_token";
+const PKCE_VERIFIER_KEY = "compatflow_pkce_verifier";
 
 function notify() { listeners.forEach((listener) => listener()); }
+function base64Url(bytes: Uint8Array) {
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+async function createPkceChallenge() {
+  const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
+  const verifier = base64Url(verifierBytes);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  sessionStorage.setItem(PKCE_VERIFIER_KEY, verifier);
+  return base64Url(new Uint8Array(digest));
+}
 function config() {
   if (!supabaseUrl || !supabaseAnonKey) throw new Error("Authentication is not configured. Set the public Supabase URL and anon key.");
   return { url: supabaseUrl.replace(/\/$/, ""), key: supabaseAnonKey };
@@ -46,6 +59,14 @@ export function subscribeAuth(listener: () => void) {
   return () => listeners.delete(listener);
 }
 export function getAuthSnapshot() { return { user: currentUser, accessToken, loading: false }; }
+export async function exchangeCodeForSession(code: string) {
+  const verifier = sessionStorage.getItem(PKCE_VERIFIER_KEY);
+  if (!verifier) throw new Error("The sign-in verification session is missing or expired. Request a new email link.");
+  const session = await authRequest<AuthSession>("token?grant_type=pkce", { auth_code: code, code_verifier: verifier });
+  sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+  applySession(session);
+  return session.user;
+}
 export async function signIn(email: string, password: string) {
   const session = await authRequest<AuthSession>("token?grant_type=password", { email: email.trim().toLowerCase(), password });
   applySession(session);
@@ -55,25 +76,42 @@ export async function signUp(email: string, password: string, redirectPath = "/w
   const { url } = config();
   const safeNext = redirectPath.startsWith("/") && !redirectPath.startsWith("//") ? redirectPath : "/workspace";
   const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
-  const response = await fetch(`${url}/auth/v1/signup?redirect_to=${encodeURIComponent(redirectTo)}`, {
+  const codeChallenge = await createPkceChallenge();
+  const signupUrl = new URL(`${url}/auth/v1/signup`);
+  signupUrl.searchParams.set("redirect_to", redirectTo);
+  signupUrl.searchParams.set("code_challenge", codeChallenge);
+  signupUrl.searchParams.set("code_challenge_method", "s256");
+  const response = await fetch(signupUrl.toString(), {
     method: "POST",
     headers: { apikey: config().key, "Content-Type": "application/json" },
     body: JSON.stringify({ email: email.trim().toLowerCase(), password, data: {} }),
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.msg || data.message || data.error_description || "Could not create the account.");
-  if (data.access_token && data.refresh_token && data.user) applySession(data as AuthSession);
+  if (!response.ok) {
+    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+    throw new Error(data.msg || data.message || data.error_description || "Could not create the account.");
+  }
+  if (data.access_token && data.refresh_token && data.user) {
+    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
+    applySession(data as AuthSession);
+  }
   return data as { user?: AuthUser; access_token?: string };
 }
 export async function requestPasswordReset(email: string) {
   const { url, key } = config();
   const redirectTo = `${window.location.origin}/auth/reset-password`;
-  const response = await fetch(`${url}/auth/v1/recover?redirect_to=${encodeURIComponent(redirectTo)}`, {
+  const codeChallenge = await createPkceChallenge();
+  const recoveryUrl = new URL(`${url}/auth/v1/recover`);
+  recoveryUrl.searchParams.set("redirect_to", redirectTo);
+  recoveryUrl.searchParams.set("code_challenge", codeChallenge);
+  recoveryUrl.searchParams.set("code_challenge_method", "s256");
+  const response = await fetch(recoveryUrl.toString(), {
     method: "POST", headers: { apikey: key, "Content-Type": "application/json" },
     body: JSON.stringify({ email: email.trim().toLowerCase() }),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
+    sessionStorage.removeItem(PKCE_VERIFIER_KEY);
     throw new Error(data.msg || data.message || "Could not send the password reset email.");
   }
 }
