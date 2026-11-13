@@ -14,7 +14,8 @@ export default function AuthCallbackPage(){
    const userId=hash.get("user_id");
    fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`,{headers:{apikey:process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY||"",Authorization:`Bearer ${access_token}`}})
     .then(r=>{if(!r.ok)throw new Error("The confirmation link is invalid or expired.");return r.json();})
-    .then(user=>{setSessionFromCallback({access_token,refresh_token,expires_at:Date.now()/1000+expires_in,user:{id:user.id||userId||"",email:user.email}});router.replace("/workspace");})
+    .then(user=>{setSessionFromCallback({access_token,refresh_token,expires_at:Date.now()/1000+expires_in,user:{id:user.id||userId||"",email:user.email}});const next = new URLSearchParams(window.location.search).get("next");
+      router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/workspace");})
     .catch(e=>setError(e instanceof Error?e.message:"Could not verify your account."));
   }else{
    const params=new URLSearchParams(window.location.search);const code=params.get("code");
