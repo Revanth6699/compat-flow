@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { clearSessionFromStorage, getAuthSnapshot, restoreSession, signOut as endSession, subscribeAuth, type AuthUser } from "@/lib/auth-client";
+import { clearSessionFromStorage, getAuthSnapshot, hydrateSessionFromStorage, restoreSession, signOut as endSession, subscribeAuth, type AuthUser } from "@/lib/auth-client";
 
 type AuthContextValue = { user: AuthUser | null; accessToken: string | null; loading: boolean; signOut: () => Promise<void> };
 const AuthContext = createContext<AuthContextValue>({ user: null, accessToken: null, loading: true, signOut: async () => {} });
@@ -20,8 +20,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         update();
         return;
       }
-      // A sign-in or token refresh in another tab must update this tab's in-memory session too.
-      void restoreSession().finally(update);
+      // Reuse the access token snapshot written by the other tab. Refreshing
+      // the same rotating refresh token in every tab can invalidate sessions.
+      if (!hydrateSessionFromStorage()) void restoreSession().finally(update);
+      else update();
     };
     window.addEventListener("storage", handleStorage);
     restoreSession().finally(() => { if (active) { update(); setLoading(false); } });
