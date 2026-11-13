@@ -32,15 +32,15 @@ Invitation expiry defaults to 72 hours and can be set from 1 to 168 hours. Only 
 - `DELETE /api/v1/invitations/{invitation_id}`: revoke a pending invitation (owner/admin only).
 - `POST /api/v1/invitations/accept`: accept a token for the authenticated, verified matching email.
 
-## Initial owner bootstrap
+## Self-service organization onboarding
 
-There is intentionally no public endpoint that grants the first owner role. Before issuing invitations, an operator must:
+The first verified user creates the organization through `POST /api/v1/auth/organization`. This endpoint requires a valid Supabase access token and a confirmed email address. It creates the organization and the user's owner profile in one database transaction.
 
-1. Create the initial owner account in Supabase Auth and complete email verification.
-2. Create the organization's row in the backend PostgreSQL database.
-3. Insert the local `users` row with that Supabase Auth user UUID as `auth_user_id`, the same verified email, the organization UUID, role `owner`, and `is_active = true`.
+The endpoint rejects an identity already linked to a CompatFlow user and relies on the unique `users.auth_user_id` constraint to prevent concurrent duplicate provisioning. It does not accept a role or organization ID from the caller; the creator is always assigned the `owner` role for the newly created organization.
 
-Run this only through a trusted database administration session. Never expose a bootstrap endpoint or accept organization/role values from an unauthenticated request.
+Subsequent users must join through an invitation. Invitation recipients must verify the invited email and cannot create a second organization for the same Supabase identity. The current data model supports one organization per Supabase user.
+
+There is no public first-owner bootstrap endpoint that allows an unauthenticated visitor to claim an existing organization. The self-service endpoint creates a new organization only for a verified, not-yet-linked identity.
 
 ## Deployment order
 
