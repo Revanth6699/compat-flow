@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:3001"
     allowed_hosts: str = "*"
     supabase_url: str = ""
+    supabase_anon_key: str = ""
 
     database_url: str = (
         "postgresql+psycopg://compatflow_local:"
