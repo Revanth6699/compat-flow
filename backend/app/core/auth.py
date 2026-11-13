@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from uuid import UUID
 
+import httpx
+
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -22,7 +24,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 class SupabaseIdentity:
     auth_user_id: UUID
     email: str
-    email_verified: bool
+    access_token: str
 
 
 @dataclass(frozen=True)
@@ -72,7 +74,7 @@ def get_supabase_identity(
         return SupabaseIdentity(
             auth_user_id=UUID(claims["sub"]),
             email=str(claims["email"]).strip().lower(),
-            email_verified=claims.get("email_verified") is True,
+            access_token=token,
         )
     except (PyJWTError, ValueError, KeyError, RuntimeError):
         raise _unauthorized() from None
@@ -99,3 +101,26 @@ def require_roles(*roles: str):
         return current
 
     return dependency
+
+
+
+def require_verified_supabase_email(identity: SupabaseIdentity) -> None:
+    if not settings.supabase_anon_key:
+        raise HTTPException(status_code=503, detail="Email verification checks are not configured.")
+    try:
+        response = httpx.get(
+            f"{settings.supabase_url.rstrip('/')}/auth/v1/user",
+            headers={
+                "apikey": settings.supabase_anon_key,
+                "Authorization": f"Bearer {identity.access_token}",
+            },
+            timeout=5.0,
+        )
+        response.raise_for_status()
+        user_data = response.json()
+    except (httpx.HTTPError, ValueError):
+        raise HTTPException(status_code=503, detail="Could not verify the Supabase account status.") from None
+    confirmed_at = user_data.get("email_confirmed_at")
+    returned_email = str(user_data.get("email", "")).strip().lower()
+    if not confirmed_at or returned_email != identity.email:
+        raise HTTPException(status_code=403, detail="Verify your email address before accepting an invitation.")
