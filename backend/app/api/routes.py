@@ -1,11 +1,21 @@
 import csv
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+from uuid import UUID
+
+from app.core.auth import AuthenticatedUser, require_permission
+from app.core.database import get_db
+from app.models import Product, Supplier
 from app.core.config import settings
 from app.schemas import (
     HealthResponse,
     ImportPreviewResponse,
     ImportPreviewRowErrorResponse,
+    ProductResponse,
+    SupplierCreateRequest,
+    SupplierResponse,
 )
 from app.services.catalog_csv import (
     CatalogCSVValidationError,
@@ -104,3 +114,67 @@ def public_demo_import_disabled():
             "You can validate and preview your CSV without saving it."
         ),
     )
+
+
+
+@router.get("/suppliers", response_model=list[SupplierResponse])
+def list_suppliers(
+    current: AuthenticatedUser = Depends(require_permission("supplier:read")),
+    db: Session = Depends(get_db),
+):
+    return list(
+        db.scalars(
+            select(Supplier)
+            .where(Supplier.organization_id == current.profile.organization_id)
+            .order_by(Supplier.name.asc())
+        ).all()
+    )
+
+
+@router.post("/suppliers", response_model=SupplierResponse, status_code=201)
+def create_supplier(
+    payload: SupplierCreateRequest,
+    current: AuthenticatedUser = Depends(require_permission("supplier:write")),
+    db: Session = Depends(get_db),
+):
+    supplier = Supplier(
+        organization_id=current.profile.organization_id,
+        name=payload.name,
+        feed_format=payload.feed_format,
+    )
+    db.add(supplier)
+    db.commit()
+    db.refresh(supplier)
+    return supplier
+
+
+@router.get("/products", response_model=list[ProductResponse])
+def list_products(
+    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    db: Session = Depends(get_db),
+):
+    return list(
+        db.scalars(
+            select(Product)
+            .where(Product.organization_id == current.profile.organization_id)
+            .order_by(Product.sku.asc())
+            .limit(500)
+        ).all()
+    )
+
+
+@router.get("/products/{product_id}", response_model=ProductResponse)
+def get_product(
+    product_id: UUID,
+    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    db: Session = Depends(get_db),
+):
+    product = db.scalar(
+        select(Product).where(
+            Product.id == product_id,
+            Product.organization_id == current.profile.organization_id,
+        )
+    )
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    return product
