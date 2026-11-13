@@ -31,6 +31,7 @@ class CurrentUserResponse(BaseModel):
     email: str
     role: str
     is_active: bool
+    account_type: str = "demo"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -83,6 +84,7 @@ def create_organization_for_current_user(
         email=profile.email,
         role=profile.role,
         is_active=profile.is_active,
+        account_type=profile.account_type,
     )
 
 class InvitationCreateRequest(BaseModel):
