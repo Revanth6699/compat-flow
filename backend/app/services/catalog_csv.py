@@ -144,7 +144,7 @@ def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS) -> CatalogCSVResul
         if sku_key in seen_skus:
             add_issue(
                 line_number, "sku", "DUPLICATE_SKU_IN_FILE",
-                f"SKU '{parsed.sku}' duplicates row {seen_skus[sku_key]}.",
+                f"Duplicate SKU '{parsed.sku}' matches row {seen_skus[sku_key]}.",
                 "critical", "duplicate_identifier",
                 "Confirm which record is authoritative and provide a unique SKU.",
             )
