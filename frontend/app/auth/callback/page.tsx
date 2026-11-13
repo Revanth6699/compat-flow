@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiRequest, exchangeCodeForSession, setSessionFromCallback } from "@/lib/auth-client";
+import { ApiRequestError, apiRequest, exchangeCodeForSession, setSessionFromCallback } from "@/lib/auth-client";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -38,8 +38,19 @@ export default function AuthCallbackPage() {
       if (!active) return;
       const organizationName = confirmedUser?.user_metadata?.organization_name;
       if (organizationName) {
-        try { await apiRequest("/api/v1/auth/me"); }
-        catch { await apiRequest("/api/v1/auth/organization", { method: "POST", body: JSON.stringify({ name: organizationName }) }); }
+        try {
+          await apiRequest("/api/v1/auth/me");
+        } catch (cause) {
+          const isUnlinkedAccount =
+            cause instanceof ApiRequestError &&
+            cause.status === 404 &&
+            cause.message === "No CompatFlow organization is linked to this account yet.";
+          if (!isUnlinkedAccount) throw cause;
+          await apiRequest("/api/v1/auth/organization", {
+            method: "POST",
+            body: JSON.stringify({ name: organizationName }),
+          });
+        }
       }
       if (!active) return;
       const next = params.get("next");
