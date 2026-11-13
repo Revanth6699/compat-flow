@@ -148,3 +148,28 @@ def test_valid_invitation_is_consumed_once_and_creates_membership(monkeypatch):
         assert db.added[0].auth_user_id == identity.auth_user_id
     finally:
         clear_overrides()
+
+
+def test_admin_cannot_revoke_an_administrator_invitation():
+    profile = SimpleNamespace(
+        id=uuid4(),
+        organization_id=uuid4(),
+        email="admin@example.com",
+        role="admin",
+        is_active=True,
+    )
+    current = AuthenticatedUser(
+        identity=SupabaseIdentity(uuid4(), profile.email, "token"),
+        profile=profile,
+    )
+    invitation = make_invitation(role="admin")
+    db = InvitationDB(invitation)
+    app.dependency_overrides[get_current_user] = lambda: current
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        response = TestClient(app).delete(f"/api/v1/invitations/{invitation.id}")
+        assert response.status_code == 403
+        assert not db.committed
+        assert invitation.revoked_at is None
+    finally:
+        clear_overrides()
