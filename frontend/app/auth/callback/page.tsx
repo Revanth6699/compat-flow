@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { setSessionFromCallback } from "@/lib/auth-client";
+import { exchangeCodeForSession, setSessionFromCallback } from "@/lib/auth-client";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -12,25 +12,29 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     let active = true;
     void Promise.resolve().then(async () => {
-      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-      const access_token = hash.get("access_token");
-      const refresh_token = hash.get("refresh_token");
-      if (!access_token || !refresh_token) {
-        const params = new URLSearchParams(window.location.search);
-        if (params.has("code")) {
-          throw new Error("This confirmation link returned an authorization code, but this client currently expects Supabase's implicit token callback. Configure the Supabase confirmation template to use the token callback.");
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      if (code) {
+        await exchangeCodeForSession(code);
+      } else {
+        const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const access_token = hash.get("access_token");
+        const refresh_token = hash.get("refresh_token");
+        if (!access_token || !refresh_token) {
+          const providerError = hash.get("error_description") || params.get("error_description");
+          throw new Error(providerError || "The confirmation link is missing or expired. Request a new confirmation email.");
         }
-        throw new Error("The confirmation link is missing or expired. Request a new confirmation email.");
+        const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`, {
+          headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "", Authorization: `Bearer ${access_token}` },
+        });
+        if (!response.ok) throw new Error("The confirmation link is invalid or expired.");
+        const user = await response.json();
+        if (!active) return;
+        const expires_in = Number(hash.get("expires_in") || 3600);
+        setSessionFromCallback({ access_token, refresh_token, expires_at: Date.now() / 1000 + expires_in, user: { id: user.id, email: user.email } });
       }
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`, {
-        headers: { apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "", Authorization: `Bearer ${access_token}` },
-      });
-      if (!response.ok) throw new Error("The confirmation link is invalid or expired.");
-      const user = await response.json();
       if (!active) return;
-      const expires_in = Number(hash.get("expires_in") || 3600);
-      setSessionFromCallback({ access_token, refresh_token, expires_at: Date.now() / 1000 + expires_in, user: { id: user.id, email: user.email } });
-      const next = new URLSearchParams(window.location.search).get("next");
+      const next = params.get("next");
       router.replace(next && next.startsWith("/") && !next.startsWith("//") ? next : "/workspace");
     }).catch((cause: unknown) => {
       if (active) setError(cause instanceof Error ? cause.message : "Could not verify your account.");
