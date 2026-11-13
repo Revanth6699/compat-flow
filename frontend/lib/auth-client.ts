@@ -72,7 +72,7 @@ export async function signIn(email: string, password: string) {
   applySession(session);
   return session.user;
 }
-export async function signUp(email: string, password: string, redirectPath = "/workspace") {
+export async function signUp(email: string, password: string, fullName: string, organizationName: string, redirectPath = "/workspace") {
   const { url, key } = config();
   const safeNext = redirectPath.startsWith("/") && !redirectPath.startsWith("//") ? redirectPath : "/workspace";
   const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
@@ -82,7 +82,7 @@ export async function signUp(email: string, password: string, redirectPath = "/w
   const response = await fetch(signupUrl.toString(), {
     method: "POST",
     headers: { apikey: key, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: email.trim().toLowerCase(), password, data: {}, code_challenge: codeChallenge, code_challenge_method: "s256" }),
+    body: JSON.stringify({ email: email.trim().toLowerCase(), password, data: { full_name: fullName.trim(), organization_name: organizationName.trim() }, code_challenge: codeChallenge, code_challenge_method: "s256" }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
