@@ -5,9 +5,9 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 export type AuthUser = { id: string; email?: string };
-type AuthSession = { access_token: string; refresh_token: string; expires_at?: number; user: AuthUser };
+type AuthSession = { access_token: string; refresh_token: string; expires_at?: number; expires_in?: number; user: AuthUser };
 let accessToken: string | null = null;
-let currentUser: AuthUser | null = null;
+let currentUser: AuthUser | null = null;\nlet accessTokenExpiresAt = 0;
 const listeners = new Set<() => void>();
 const STORAGE_KEY = "compatflow_refresh_token";
 
