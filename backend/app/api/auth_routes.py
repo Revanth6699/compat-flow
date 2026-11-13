@@ -272,6 +272,11 @@ def revoke_invitation(
         raise HTTPException(status_code=404, detail="Invitation not found.")
     if invitation.accepted_at is not None:
         raise HTTPException(status_code=409, detail="An accepted invitation cannot be revoked.")
+    if current.profile.role != "owner" and invitation.role == "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Only an organization owner can revoke an administrator invitation.",
+        )
     if invitation.revoked_at is None:
         invitation.revoked_at = datetime.now(timezone.utc)
         db.commit()
