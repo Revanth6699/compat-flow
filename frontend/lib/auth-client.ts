@@ -33,7 +33,8 @@ async function authRequest<T>(path: string, body?: unknown, token?: string): Pro
 }
 function applySession(session: AuthSession) {
   accessToken = session.access_token;
-  currentUser = session.user;\n  accessTokenExpiresAt = session.expires_at ?? (Date.now() / 1000 + (session.expires_in ?? 3600));
+  currentUser = session.user;
+  accessTokenExpiresAt = session.expires_at ?? (Date.now() / 1000 + (session.expires_in ?? 3600));
   if (typeof window !== "undefined") {
     sessionStorage.setItem(STORAGE_KEY, session.refresh_token);
     window.dispatchEvent(new Event("compatflow-auth-change"));
@@ -106,7 +107,14 @@ export async function restoreSession() {
 }
 export function setSessionFromCallback(session: AuthSession) { applySession(session); }
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (accessToken && accessTokenExpiresAt < Date.now() / 1000 + 60) {\n    const refreshToken = sessionStorage.getItem(STORAGE_KEY);\n    if (refreshToken) {\n      const refreshed = await authRequest<AuthSession>("token?grant_type=refresh_token", { refresh_token: refreshToken });\n      applySession(refreshed);\n    }\n  }\n  if (!accessToken) throw new Error("Sign in is required to access this resource.");
+  if (accessToken && accessTokenExpiresAt < Date.now() / 1000 + 60) {
+    const refreshToken = sessionStorage.getItem(STORAGE_KEY);
+    if (refreshToken) {
+      const refreshed = await authRequest<AuthSession>("token?grant_type=refresh_token", { refresh_token: refreshToken });
+      applySession(refreshed);
+    }
+  }
+  if (!accessToken) throw new Error("Sign in is required to access this resource.");
   const response = await fetch(`${API_BASE.replace(/\/$/, "")}${path}`, {
     ...init,
     headers: { ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init.headers, Authorization: `Bearer ${accessToken}` },
