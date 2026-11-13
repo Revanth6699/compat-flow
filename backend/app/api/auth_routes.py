@@ -71,6 +71,7 @@ def create_organization_for_current_user(
         email=identity.email,
         role="owner",
         is_active=True,
+        account_type="demo",
     )
     db.add(organization)
     db.add(profile)
@@ -223,6 +224,7 @@ def accept_invitation(
         email=identity.email,
         role=invitation.role,
         is_active=True,
+        account_type="demo",
     )
     invitation.accepted_at = now
     db.add(profile)
