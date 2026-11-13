@@ -3,6 +3,8 @@ import uuid
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
+    ForeignKeyConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -60,6 +62,7 @@ class Supplier(Base):
     __tablename__ = "suppliers"
     __table_args__ = (
         Index("ix_suppliers_org", "organization_id"),
+        UniqueConstraint("organization_id", "id", name="uq_suppliers_org_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -80,9 +83,12 @@ class Product(Base):
     __tablename__ = "products"
     __table_args__ = (
         UniqueConstraint("organization_id", "sku", name="uq_products_org_sku"),
-    )
-    __table_args__ = (
-        UniqueConstraint("organization_id", "sku", name="uq_products_org_sku"),
+        UniqueConstraint("organization_id", "id", name="uq_products_org_id"),
+        ForeignKeyConstraint(
+            ["organization_id", "supplier_id"],
+            ["suppliers.organization_id", "suppliers.id"],
+            name="fk_products_org_supplier",
+        ),
         Index("ix_products_org_part_number", "organization_id", "part_number"),
     )
 
@@ -117,14 +123,10 @@ class CompatibilityRecord(Base):
             "target_identifier",
             name="uq_compatibility_target",
         ),
-    )
-
-    __table_args__ = (
-        UniqueConstraint(
-            "product_id",
-            "target_type",
-            "target_identifier",
-            name="uq_compatibility_target",
+        ForeignKeyConstraint(
+            ["organization_id", "product_id"],
+            ["products.organization_id", "products.id"],
+            name="fk_compatibility_org_product",
         ),
         Index("ix_compatibility_org", "organization_id"),
     )
@@ -150,6 +152,13 @@ class CompatibilityRecord(Base):
 
 class ImportJob(Base):
     __tablename__ = "import_jobs"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "supplier_id"],
+            ["suppliers.organization_id", "suppliers.id"],
+            name="fk_import_jobs_org_supplier",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -226,7 +235,10 @@ class UserInvitation(Base):
 
 class RolePermission(Base):
     __tablename__ = "role_permissions"
-    __table_args__ = (UniqueConstraint("role", "permission", name="uq_role_permission"),)
+    __table_args__ = (
+        UniqueConstraint("role", "permission", name="uq_role_permission"),
+        CheckConstraint("role IN ('owner', 'admin', 'member', 'viewer')", name="ck_role_permissions_role"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     role: Mapped[str] = mapped_column(String(32), nullable=False)
