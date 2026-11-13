@@ -4,7 +4,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-export type AuthUser = { id: string; email?: string; user_metadata?: { full_name?: string } };
+export type AuthUser = { id: string; email?: string; user_metadata?: { full_name?: string; organization_name?: string } };
 type AuthSession = { access_token: string; refresh_token: string; expires_at?: number; expires_in?: number; user: AuthUser };
 let accessToken: string | null = null;
 let currentUser: AuthUser | null = null;
