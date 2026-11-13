@@ -77,6 +77,7 @@ def upgrade() -> None:
         sa.CheckConstraint("status IN ('pending','trialing','active','past_due','canceled','expired','incomplete')", name="ck_subscriptions_status"),
         sa.CheckConstraint("billing_interval IN ('month','year')", name="ck_subscriptions_interval"),
     )
+    op.create_index("uq_subscriptions_one_current_per_org", "subscriptions", ["organization_id"], unique=True, postgresql_where=sa.text("status IN ('active', 'trialing')"))
     op.create_index("ix_subscriptions_org_status", "subscriptions", ["organization_id", "status"])
     op.create_index("ix_subscriptions_user_status", "subscriptions", ["user_id", "status"])
 
@@ -124,6 +125,7 @@ def downgrade() -> None:
     op.drop_index("ix_payments_org_created", table_name="payments")
     op.drop_table("payments")
     op.drop_index("ix_subscriptions_user_status", table_name="subscriptions")
+    op.drop_index("uq_subscriptions_one_current_per_org", table_name="subscriptions")
     op.drop_index("ix_subscriptions_org_status", table_name="subscriptions")
     op.drop_table("subscriptions")
     op.drop_table("subscription_plans")

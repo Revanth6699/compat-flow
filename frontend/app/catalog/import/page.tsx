@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "@/components/auth-provider";
+import { apiRequest } from "@/lib/auth-client";
 
 type PreviewRow = {
   sku: string; name: string; manufacturer: string; part_number: string;
@@ -20,6 +22,7 @@ type PreviewResponse = {
 };
 
 export default function CatalogImportPage() {
+  const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<PreviewResponse | null>(null);
   const [error, setError] = useState("");
@@ -41,10 +44,15 @@ export default function CatalogImportPage() {
     setLoading(true); setError(""); setResult(null);
     try {
       const formData = new FormData(); formData.append("file", file);
-      const response = await fetch("/api/catalog/import/preview", { method: "POST", body: formData });
-      const data = await response.json();
-      if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The backend could not validate this CSV.");
-      setResult(data as PreviewResponse);
+      if (user) {
+        const data = await apiRequest<PreviewResponse>("/api/v1/catalog/import/validate", { method: "POST", body: formData });
+        setResult(data);
+      } else {
+        const response = await fetch("/api/catalog/import/preview", { method: "POST", body: formData });
+        const data = await response.json();
+        if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The backend could not validate this CSV.");
+        setResult(data as PreviewResponse);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong while validating the file.");
     } finally { setLoading(false); }

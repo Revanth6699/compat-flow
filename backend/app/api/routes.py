@@ -33,6 +33,7 @@ def health():
     return HealthResponse(status="ok", service="compatflow-api")
 
 
+@router.post("/catalog/import/validate", response_model=ImportPreviewResponse, dependencies=[Depends(require_plan_feature("csv_validation"))])
 @router.post(
     "/catalog/import/preview",
     response_model=ImportPreviewResponse,
