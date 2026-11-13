@@ -19,7 +19,7 @@ import sys
 from uuid import UUID, uuid4
 
 import httpx
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -72,6 +72,9 @@ def provision_first_owner(
         raise ValueError("A verified email address is required.")
     if not 2 <= len(normalized_name) <= 160:
         raise ValueError("Organization name must contain between 2 and 160 characters.")
+
+    # Serialize bootstrap attempts so two operators cannot both observe an empty system.
+    db.execute(text("SELECT pg_advisory_xact_lock(731904221)"))
 
     existing_profile = db.scalar(
         select(User.id).where(User.auth_user_id == auth_user_id).limit(1)
