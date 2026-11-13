@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { signUp } from "@/lib/auth-client";
 
-export default function SignUpPage() {
+function SignUpForm() {
+  const search = useSearchParams();
   const [email,setEmail] = useState(""); const [password,setPassword] = useState(""); const [confirm,setConfirm] = useState("");
   const [message,setMessage] = useState(""); const [error,setError] = useState(""); const [busy,setBusy] = useState(false);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -13,7 +15,7 @@ export default function SignUpPage() {
     if(password!==confirm){setError("The passwords do not match.");return;}
     setBusy(true);
     try {
-      const result=await signUp(email,password);
+      const result=await signUp(email,password,search.get("next") || "/workspace");
       setMessage(result.access_token ? "Account created. Your organization access must be provisioned or linked through an invitation." : "Check your email and confirm your address. After confirmation, sign in with your new password. Organization access is granted separately.");
     } catch(e) { setError(e instanceof Error?e.message:"Could not create your account."); }
     finally { setBusy(false); }
@@ -30,3 +32,5 @@ export default function SignUpPage() {
     <p className="auth-switch">Already registered? <Link href="/sign-in">Sign in</Link></p>
   </section></main>;
 }
+
+export default function SignUpPage() { return <Suspense fallback={<main id="main" className="auth-shell">Loading…</main>}><SignUpForm /></Suspense>; }
