@@ -128,20 +128,7 @@ export default function PricingPage() {
         </div>
       </main>
 
-      <footer className="site-footer">
-        <div className="container footer">
-          <div className="footer-brand">
-            <Link className="footer-brand-name" href="/">compatflow</Link>
-            <span>Supplier catalog operations</span>
-          </div>
-          <div className="footer-links">
-            <Link href="/catalog/import">CSV demo</Link>
-            <Link href="/privacy">Privacy Policy</Link>
-            <Link href="/terms">Terms &amp; Conditions</Link>
-          </div>
-          <span className="footer-copyright">© {new Date().getFullYear()} CompatFlow</span>
-        </div>
-      </footer>
+
     </>
   );
 }

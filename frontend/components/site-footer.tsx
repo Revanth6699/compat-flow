@@ -1,0 +1,9 @@
+import Link from "next/link";
+export function SiteFooter() {
+ return <footer className="site-footer"><div className="container footer">
+  <div className="footer-brand"><Link className="footer-brand-name" href="/">compatflow</Link><span>Supplier catalog operations</span><p className="footer-summary">A product in development focused on helping commerce teams work with more consistent supplier catalog data.</p></div>
+  <div className="footer-column"><strong>Explore</strong><div className="footer-links"><Link href="/catalog/import">CSV demo</Link><Link href="/pricing">Pricing</Link><Link href="/about">About Us</Link></div></div>
+  <div className="footer-column"><strong>Information</strong><div className="footer-links"><Link href="/privacy">Privacy Policy</Link><Link href="/terms">Terms &amp; Conditions</Link></div></div>
+  <span className="footer-copyright">© {new Date().getFullYear()} CompatFlow</span>
+ </div></footer>;
+}
