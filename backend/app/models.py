@@ -9,13 +9,14 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    BigInteger,
     String,
     Text,
     UniqueConstraint,
     func,
 )
 
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -255,7 +256,7 @@ class SubscriptionPlan(Base):
     name: Mapped[str] = mapped_column(String(80), nullable=False, unique=True)
     monthly_price_minor: Mapped[int | None] = mapped_column(Integer)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD", server_default="USD")
-    storage_limit_bytes: Mapped[int | None] = mapped_column(Integer)
+    storage_limit_bytes: Mapped[int | None] = mapped_column(BigInteger)
     monthly_validation_limit: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -318,6 +319,6 @@ class PaymentWebhookEvent(Base):
     provider_event_id: Mapped[str] = mapped_column(String(180), nullable=False, unique=True)
     event_type: Mapped[str] = mapped_column(String(120), nullable=False)
     processing_status: Mapped[str] = mapped_column(String(24), nullable=False, default="received", server_default="received")
-    payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
     processed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
