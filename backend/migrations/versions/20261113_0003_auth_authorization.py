@@ -16,6 +16,54 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    invalid_links = {
+        "products -> suppliers": """
+            SELECT COUNT(*) FROM products p
+            JOIN suppliers s ON s.id = p.supplier_id
+            WHERE p.supplier_id IS NOT NULL
+              AND p.organization_id <> s.organization_id
+        """,
+        "compatibility_records -> products": """
+            SELECT COUNT(*) FROM compatibility_records c
+            JOIN products p ON p.id = c.product_id
+            WHERE c.organization_id <> p.organization_id
+        """,
+        "import_jobs -> suppliers": """
+            SELECT COUNT(*) FROM import_jobs j
+            JOIN suppliers s ON s.id = j.supplier_id
+            WHERE j.supplier_id IS NOT NULL
+              AND j.organization_id <> s.organization_id
+        """,
+    }
+    for relation, query in invalid_links.items():
+        if bind.execute(sa.text(query)).scalar_one():
+            raise RuntimeError(
+                f"Cannot enable tenant constraints: existing cross-organization links in {relation}."
+            )
+    op.create_unique_constraint("uq_suppliers_org_id", "suppliers", ["organization_id", "id"])
+    op.create_unique_constraint("uq_products_org_id", "products", ["organization_id", "id"])
+    op.create_foreign_key(
+        "fk_products_org_supplier",
+        "products",
+        "suppliers",
+        ["organization_id", "supplier_id"],
+        ["organization_id", "id"],
+    )
+    op.create_foreign_key(
+        "fk_compatibility_org_product",
+        "compatibility_records",
+        "products",
+        ["organization_id", "product_id"],
+        ["organization_id", "id"],
+    )
+    op.create_foreign_key(
+        "fk_import_jobs_org_supplier",
+        "import_jobs",
+        "suppliers",
+        ["organization_id", "supplier_id"],
+        ["organization_id", "id"],
+    )
     op.add_column("users", sa.Column("auth_user_id", postgresql.UUID(as_uuid=True), nullable=True))
     op.create_index("uq_users_auth_user_id", "users", ["auth_user_id"], unique=True)
     op.create_check_constraint(
@@ -60,6 +108,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    op.drop_constraint("fk_import_jobs_org_supplier", "import_jobs", type_="foreignkey")
+    op.drop_constraint("fk_compatibility_org_product", "compatibility_records", type_="foreignkey")
+    op.drop_constraint("fk_products_org_supplier", "products", type_="foreignkey")
+    op.drop_constraint("uq_products_org_id", "products", type_="unique")
+    op.drop_constraint("uq_suppliers_org_id", "suppliers", type_="unique")
     op.drop_table("role_permissions")
     op.drop_index("ix_user_invitations_org_email", table_name="user_invitations")
     op.drop_table("user_invitations")
