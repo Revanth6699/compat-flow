@@ -83,11 +83,12 @@ def create_invitation(
     db: Session = Depends(get_db),
 ):
     email = str(payload.email).strip().lower()
+    if current.profile.role != "owner" and payload.role == "admin":
+        raise HTTPException(status_code=403, detail="Only an organization owner can invite administrators.")
     existing = db.scalar(
         select(User).where(
             User.organization_id == current.profile.organization_id,
             User.email == email,
-            User.is_active.is_(True),
         )
     )
     if existing:
