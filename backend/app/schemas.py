@@ -22,6 +22,9 @@ class ImportPreviewRowErrorResponse(BaseModel):
     field: str | None
     error_code: str
     message: str
+    severity: str = "critical"
+    category: str = "data_integrity"
+    recommendation: str = "Review the value and correct it at the source."
 
 class ImportIssueCategoryResponse(BaseModel):
     category: str
