@@ -1,98 +1,51 @@
-"use client";
-
 import Link from "next/link";
-import { useState } from "react";
 
-type PreviewRow = {
-  sku: string;
-  name: string;
-  manufacturer: string;
-  part_number: string;
-  category: string;
-  compatibility?: string | null;
-  replacement_sku?: string | null;
-};
+const capabilities = [
+  {
+    number: "01",
+    title: "Catalog validation",
+    description:
+      "Check supplier files for required fields, malformed values and duplicate SKUs before data moves further into your workflow.",
+    status: "Available in demo",
+    available: true,
+  },
+  {
+    number: "02",
+    title: "Product data normalization",
+    description:
+      "Create a more consistent product data foundation across supplier formats, naming conventions and catalog structures.",
+    status: "Planned",
+    available: false,
+  },
+  {
+    number: "03",
+    title: "Catalog change review",
+    description:
+      "Build a controlled way to understand supplier-driven product changes before they affect downstream commerce systems.",
+    status: "Planned",
+    available: false,
+  },
+];
 
-type PreviewResponse = {
-  filename: string;
-  total_rows: number;
-  valid_rows: number;
-  invalid_rows: number;
-  errors: string[];
-  row_errors?: {
-    row_number: number;
-    field: string | null;
-    error_code: string;
-    message: string;
-  }[];
-  preview: PreviewRow[];
-};
+const workflow = [
+  {
+    number: "01",
+    title: "Receive supplier data",
+    description: "Start with a supplier catalog file and its product information.",
+  },
+  {
+    number: "02",
+    title: "Check data quality",
+    description: "Identify missing fields, inconsistent values and duplicate product identifiers.",
+  },
+  {
+    number: "03",
+    title: "Review what needs attention",
+    description: "Understand which records are ready and which need correction.",
+  },
+];
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8001";
-
-export default function CatalogImportPage() {
-  const [file, setFile] = useState<File | null>(null);
-  const [result, setResult] = useState<PreviewResponse | null>(null);
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  function handleFileChange(selectedFile: File | null) {
-    setFile(selectedFile);
-    setResult(null);
-    setError("");
-
-    if (!selectedFile) return;
-
-    if (!selectedFile.name.toLowerCase().endsWith(".csv")) {
-      setFile(null);
-      setError("Only CSV files are supported.");
-      return;
-    }
-
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      setFile(null);
-      setError("The file exceeds the 5 MB limit.");
-    }
-  }
-
-  async function handleValidate() {
-    if (!file || loading) return;
-
-    setLoading(true);
-    setError("");
-    setResult(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const response = await fetch(`${API_BASE}/api/v1/catalog/import/preview`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          typeof data.detail === "string"
-            ? data.detail
-            : "The backend could not validate this CSV."
-        );
-      }
-
-      setResult(data as PreviewResponse);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong while validating the file."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
+export default function HomePage() {
   return (
     <>
       <header className="site-header">
@@ -101,211 +54,204 @@ export default function CatalogImportPage() {
             compat<span className="brand-mark">flow</span>
           </Link>
           <nav className="nav" aria-label="Main navigation">
-            <Link href="/">Home</Link>
-            <Link href="/catalog/import">Catalog Import</Link>
-            <Link href="/privacy">Privacy</Link>
-            <Link href="/terms">Terms</Link>
+            <Link href="/catalog/import">Catalog demo</Link>
+            <a href="#capabilities">Capabilities</a>
+            <a href="#workflow">How it works</a>
+            <Link href="/catalog/import">Get started</Link>
           </nav>
         </div>
       </header>
 
-      <main id="main" className="page">
-        <div className="container">
-          <div className="import-heading">
-            <div className="eyebrow">Public product demo</div>
-            <h1>Validate a supplier catalog CSV</h1>
-            <p>
-              Check required columns, row values and duplicate SKUs within
-              your uploaded file before considering a catalog import workflow.
-            </p>
-          </div>
-
-          <section className="panel import-panel">
-            <h2>Try the CSV validator</h2>
-            <p className="import-description">
-              CSV only · Maximum 5 MB · Maximum 10,000 data rows.
-            </p>
-            <p className="import-description">
-              Your file is validated in memory. This public demo does not save
-              uploaded files, change a catalog or run persistent imports.
-            </p>
-
-            <p className="column-hint">
-              Required columns: sku, name, manufacturer, part_number, category
-            </p>
-
-            <p className="column-hint">
-              <a href="/sample_supplier_catalog.csv" download>
-                Download the sample supplier catalog
-              </a>
-            </p>
-
-            <label className="file-picker" htmlFor="catalog-file">
-              <span className="file-picker-icon" aria-hidden="true">↥</span>
-              <strong>{file ? file.name : "Choose a CSV file"}</strong>
-              <span>
-                {file
-                  ? `${(file.size / 1024).toFixed(1)} KB`
-                  : "Select a file from your computer"}
-              </span>
-            </label>
-
-            <input
-              id="catalog-file"
-              className="visually-hidden"
-              type="file"
-              accept=".csv,text/csv"
-              onChange={(event) =>
-                handleFileChange(event.target.files?.[0] ?? null)
-              }
-            />
-
-            <div className="import-actions">
-              <button
-                className="button"
-                type="button"
-                onClick={handleValidate}
-                disabled={!file || loading}
-              >
-                {loading ? "Validating..." : "Validate CSV"}
-              </button>
-              <button
-                className="button button-secondary"
-                type="button"
-                onClick={() => {
-                  setFile(null);
-                  setResult(null);
-                  setError("");
-                  const input = document.getElementById(
-                    "catalog-file"
-                  ) as HTMLInputElement | null;
-                  if (input) input.value = "";
-                }}
-                disabled={loading}
-              >
-                Clear
-              </button>
+      <main id="main" className="home-page">
+        <section className="home-hero">
+          <div className="container home-hero-grid">
+            <div className="home-hero-copy">
+              <div className="eyebrow">Supplier catalog operations</div>
+              <h1>Product data deserves a more consistent workflow.</h1>
+              <p className="home-hero-description">
+                CompatFlow is being built to help commerce teams validate,
+                organize and review supplier catalog data before product
+                changes move into downstream workflows.
+              </p>
+              <div className="home-hero-actions">
+                <Link className="button" href="/catalog/import">
+                  Try the CSV demo
+                </Link>
+                <a className="button button-secondary" href="#capabilities">
+                  Explore the platform
+                </a>
+              </div>
+              <p className="home-hero-note">
+                Early-stage product · Public demo currently supports CSV validation
+              </p>
             </div>
 
-            {error && (
-              <div className="import-error" role="alert">{error}</div>
-            )}
-          </section>
-
-          {result && (
-            <section className="import-results" aria-live="polite">
-              <div className="results-heading">
-                <div>
-                  <div className="eyebrow">Validation complete</div>
-                  <h2>Validation results</h2>
-                  <p>{result.filename}</p>
-                </div>
-                <span
-                  className={
-                    result.invalid_rows === 0
-                      ? "result-status success"
-                      : "result-status warning"
-                  }
-                >
-                  {result.invalid_rows === 0 ? "All rows valid" : "Review required"}
+            <div className="home-visual" aria-label="Illustrative CompatFlow catalog interface preview">
+              <div className="home-visual-top">
+                <span className="home-visual-title">CATALOG WORKSPACE / PREVIEW</span>
+                <span className="home-visual-live">
+                  <span className="home-visual-dot" />
+                  Interface concept
                 </span>
               </div>
-
-              <div className="result-stats">
-                <div className="panel stat-card">
-                  <span>Total rows</span>
-                  <strong>{result.total_rows}</strong>
+              <div className="home-visual-body">
+                <div className="eyebrow">Supplier file overview</div>
+                <div className="home-visual-metric">Catalog review</div>
+                <div className="home-visual-caption">
+                  An example of how product records could be organized for review.
                 </div>
-                <div className="panel stat-card">
-                  <span>Valid rows</span>
-                  <strong>{result.valid_rows}</strong>
-                </div>
-                <div className="panel stat-card">
-                  <span>Invalid rows</span>
-                  <strong>{result.invalid_rows}</strong>
-                </div>
-              </div>
-
-              {((result.row_errors?.length ?? 0) > 0 || result.errors.length > 0) && (
-                <div className="panel result-section">
-                  <h3>Validation errors</h3>
-                  <p className="import-description">Showing up to 50 reported errors.</p>
-                  <ul className="error-list">
-                    {result.row_errors && result.row_errors.length > 0
-                      ? result.row_errors.map((item, index) => (
-                          <li key={`${item.row_number}-${item.field}-${item.error_code}-${index}`}>
-                            <strong>Row {item.row_number}</strong>
-                            {" · "}
-                            <code>{item.field || "General"}</code>
-                            {": "}
-                            {item.message}
-                          </li>
-                        ))
-                      : result.errors.map((item, index) => (
-                          <li key={`${index}-${item}`}>{item}</li>
-                        ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="panel result-section">
-                <h3>Valid row preview</h3>
-                <p className="import-description">
-                  Showing up to the first 10 valid records. Duplicate SKU
-                  checks apply only within this uploaded file.
-                </p>
-
-                {result.preview.length === 0 ? (
-                  <p>No valid records to preview.</p>
-                ) : (
-                  <div className="table-scroll">
-                    <table className="preview-table">
-                      <thead>
-                        <tr>
-                          <th>SKU</th>
-                          <th>Product</th>
-                          <th>Manufacturer</th>
-                          <th>Part number</th>
-                          <th>Category</th>
-                          <th>Compatibility</th>
-                          <th>Replacement SKU</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {result.preview.map((row, index) => (
-                          <tr key={`${row.sku}-${index}`}>
-                            <td>{row.sku}</td>
-                            <td>{row.name}</td>
-                            <td>{row.manufacturer}</td>
-                            <td>{row.part_number}</td>
-                            <td>{row.category}</td>
-                            <td>{row.compatibility || "—"}</td>
-                            <td>{row.replacement_sku || "—"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <div className="home-visual-stats">
+                  <div className="home-visual-stat">
+                    <strong>SKU</strong>
+                    <span>Product identifier</span>
                   </div>
-                )}
+                  <div className="home-visual-stat valid">
+                    <strong>Data</strong>
+                    <span>Field completeness</span>
+                  </div>
+                  <div className="home-visual-stat invalid">
+                    <strong>Review</strong>
+                    <span>Needs attention</span>
+                  </div>
+                </div>
+                <table className="home-visual-table">
+                  <thead>
+                    <tr>
+                      <th>Product record</th>
+                      <th>Supplier data</th>
+                      <th>Review</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>BRK-100 · Brake pad</td>
+                      <td>Sample record</td>
+                      <td><span className="home-visual-tag">Example</span></td>
+                    </tr>
+                    <tr>
+                      <td>FLT-210 · Oil filter</td>
+                      <td>Sample record</td>
+                      <td><span className="home-visual-tag">Example</span></td>
+                    </tr>
+                    <tr>
+                      <td>BRK-099 · Brake pad</td>
+                      <td>Sample record</td>
+                      <td><span className="home-visual-tag">Example</span></td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-            </section>
-          )}
+              <div className="home-visual-footer">
+                <span>Illustrative interface preview</span>
+                <span>Not live catalog data</span>
+              </div>
+            </div>
+          </div>
+        </section>
 
-          <p className="import-disclaimer">
-            Demonstration only. Do not upload confidential supplier files,
-            personal information or production catalog data.
-          </p>
+        <div className="home-proof-strip" aria-label="Product focus">
+          <span>Supplier data</span>
+          <span>Product catalogs</span>
+          <span>Data quality</span>
+          <span>Commerce operations</span>
         </div>
+
+        <section className="home-section" id="capabilities">
+          <div className="container">
+            <div className="home-section-heading">
+              <div className="eyebrow">The platform</div>
+              <h2>A clearer way to work with supplier product data.</h2>
+              <p>
+                Supplier files often arrive in different structures and levels
+                of quality. CompatFlow is focused on making those catalog
+                workflows easier to inspect and manage.
+              </p>
+            </div>
+            <div className="home-capability-grid">
+              {capabilities.map((item) => (
+                <article className="home-capability-card" key={item.number}>
+                  <div className="home-card-number">{item.number}</div>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <span className={item.available ? "home-capability-status" : "home-capability-status planned"}>
+                    {item.status}
+                  </span>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="home-section" id="workflow">
+          <div className="container">
+            <div className="home-section-heading">
+              <div className="eyebrow">A practical workflow</div>
+              <h2>From supplier file to informed review.</h2>
+              <p>
+                The intended workflow is simple: bring in supplier data,
+                identify quality issues and make the next action clearer.
+              </p>
+            </div>
+            <div className="home-steps-grid">
+              {workflow.map((item) => (
+                <article className="home-step" key={item.number}>
+                  <div className="home-card-number">STEP {item.number}</div>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="home-section">
+          <div className="container">
+            <div className="home-demo-cta">
+              <div>
+                <div className="eyebrow">Explore the current demo</div>
+                <h2>Start with a supplier CSV.</h2>
+                <p>
+                  Upload a non-confidential sample file to check required
+                  columns, row values and duplicate SKUs. The current public
+                  demo validates files in memory and does not save catalog data.
+                </p>
+              </div>
+              <Link className="button home-cta-button" href="/catalog/import">
+                Open CSV validator
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="home-final-cta">
+          <div className="container">
+            <div className="eyebrow">CompatFlow</div>
+            <h2>Make supplier catalog changes easier to understand.</h2>
+            <p>
+              Explore the current validation demo and see the first part of
+              the CompatFlow workflow.
+            </p>
+            <div className="home-hero-actions">
+              <Link className="button" href="/catalog/import">
+                Try the CSV demo
+              </Link>
+            </div>
+          </div>
+        </section>
       </main>
 
       <footer className="site-footer">
         <div className="container footer">
-          <span>CompatFlow · Early-stage product demo</span>
+          <div className="footer-brand">
+            <Link className="footer-brand-name" href="/">compatflow</Link>
+            <span>Supplier catalog operations</span>
+          </div>
           <div className="footer-links">
+            <Link href="/catalog/import">CSV demo</Link>
             <Link href="/privacy">Privacy Policy</Link>
             <Link href="/terms">Terms &amp; Conditions</Link>
-            <Link href="/">Home</Link>
           </div>
+          <span className="footer-copyright">© {new Date().getFullYear()} CompatFlow</span>
         </div>
       </footer>
     </>
