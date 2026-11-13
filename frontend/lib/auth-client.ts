@@ -161,6 +161,12 @@ export async function restoreSession() {
   }
 }
 export function setSessionFromCallback(session: AuthSession) { applySession(session); }
+export function clearSessionFromStorage() {
+  accessToken = null;
+  currentUser = null;
+  accessTokenExpiresAt = 0;
+  notify();
+}
 export class ApiRequestError extends Error {
   status: number;
   constructor(status: number, message: string) {
