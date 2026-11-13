@@ -675,3 +675,19 @@ small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs)
   .import-heading h1 { font-size: 2rem; }
   .results-heading h2 { font-size: 1.5rem; }
 }
+
+
+/* Fix secondary hero action: white surface and readable label */
+.home-hero-actions .button-secondary {
+  background-color: #FFFFFF !important;
+  background-image: none !important;
+  color: #24527D !important;
+  border: 1px solid #CBD5E1 !important;
+  box-shadow: none;
+}
+.home-hero-actions .button-secondary:hover {
+  background-color: #F1F5F9 !important;
+  color: #193F63 !important;
+  border-color: #24527D !important;
+  transform: translateY(-2px);
+}
