@@ -15,6 +15,7 @@ from app.core.auth import (
     get_current_user,
     get_supabase_identity,
     require_roles,
+    require_verified_supabase_email,
 )
 from app.core.database import get_db
 from app.models import User, UserInvitation
@@ -121,8 +122,7 @@ def accept_invitation(
     identity: SupabaseIdentity = Depends(get_supabase_identity),
     db: Session = Depends(get_db),
 ):
-    if not identity.email_verified:
-        raise HTTPException(status_code=403, detail="Verify your email address with Supabase before accepting an invitation.")
+    require_verified_supabase_email(identity)
 
     token_hash = sha256(payload.token.encode("utf-8")).hexdigest()
     invitation = db.scalar(
