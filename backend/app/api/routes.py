@@ -2,6 +2,7 @@ import csv
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -211,7 +212,7 @@ def create_product(
     db.add(product)
     try:
         db.commit()
-    except Exception as exc:
+    except IntegrityError as exc:
         db.rollback()
         if "uq_products_org_sku" in str(exc):
             raise HTTPException(status_code=409, detail="A product with this SKU already exists in the organization.") from None
