@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { exchangeCodeForSession, setSessionFromCallback } from "@/lib/auth-client";
+import { apiRequest, exchangeCodeForSession, setSessionFromCallback } from "@/lib/auth-client";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
@@ -14,8 +14,9 @@ export default function AuthCallbackPage() {
     void Promise.resolve().then(async () => {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
+      let confirmedUser;
       if (code) {
-        await exchangeCodeForSession(code);
+        confirmedUser = await exchangeCodeForSession(code);
       } else {
         const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
         const access_token = hash.get("access_token");
@@ -31,7 +32,14 @@ export default function AuthCallbackPage() {
         const user = await response.json();
         if (!active) return;
         const expires_in = Number(hash.get("expires_in") || 3600);
-        setSessionFromCallback({ access_token, refresh_token, expires_at: Date.now() / 1000 + expires_in, user: { id: user.id, email: user.email } });
+        setSessionFromCallback({ access_token, refresh_token, expires_at: Date.now() / 1000 + expires_in, user: { id: user.id, email: user.email, user_metadata: user.user_metadata } });
+        confirmedUser = user;
+      }
+      if (!active) return;
+      const organizationName = confirmedUser?.user_metadata?.organization_name;
+      if (organizationName) {
+        try { await apiRequest("/api/v1/auth/me"); }
+        catch { await apiRequest("/api/v1/auth/organization", { method: "POST", body: JSON.stringify({ name: organizationName }) }); }
       }
       if (!active) return;
       const next = params.get("next");
