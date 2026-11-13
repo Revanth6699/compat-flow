@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 
 type PreviewRow = {
@@ -95,19 +94,7 @@ export default function CatalogImportPage() {
 
   return (
     <>
-      <header className="site-header">
-        <div className="container header-inner">
-          <Link className="brand" href="/" aria-label="CompatFlow home">
-            compat<span className="brand-mark">flow</span>
-          </Link>
-          <nav className="nav" aria-label="Main navigation">
-            <Link href="/">Home</Link>
-            <Link href="/catalog/import">Catalog Import</Link>
-            <Link href="/privacy">Privacy</Link>
-            <Link href="/terms">Terms</Link>
-          </nav>
-        </div>
-      </header>
+
 
       <main id="main" className="page">
         <div className="container">
@@ -298,16 +285,7 @@ export default function CatalogImportPage() {
         </div>
       </main>
 
-      <footer className="site-footer">
-        <div className="container footer">
-          <span>CompatFlow · Early-stage product demo</span>
-          <div className="footer-links">
-            <Link href="/privacy">Privacy Policy</Link>
-            <Link href="/terms">Terms &amp; Conditions</Link>
-            <Link href="/">Home</Link>
-          </div>
-        </div>
-      </footer>
+
     </>
   );
 }

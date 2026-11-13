@@ -1,32 +1,37 @@
-
 "use client";
 
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 
 type Consent = "accepted" | "rejected";
-
 const STORAGE_KEY = "compatflow-cookie-consent";
 
+function subscribe(callback: () => void) {
+  window.addEventListener("storage", callback);
+  return () => window.removeEventListener("storage", callback);
+}
+
+function getSnapshot() {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) === null;
+  } catch {
+    return false;
+  }
+}
+
+function getServerSnapshot() {
+  return false;
+}
+
 export function CookieConsent() {
-  const [visible, setVisible] = useState(() => {
-    try {
-      return (
-        typeof window !== "undefined" &&
-        window.localStorage.getItem(STORAGE_KEY) === null
-      );
-    } catch {
-      return false;
-    }
-  });
+  const visible = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   function choose(value: Consent) {
     try {
       window.localStorage.setItem(STORAGE_KEY, value);
     } catch {
-      // Keep the current page usable if browser storage is unavailable.
+      // Keep the page usable when browser storage is unavailable.
     }
-
-    setVisible(false);
+    window.dispatchEvent(new Event("storage"));
   }
 
   if (!visible) return null;
@@ -39,21 +44,14 @@ export function CookieConsent() {
       aria-live="polite"
     >
       <strong>Privacy preferences</strong>
-
-      <p style={{ margin: "8px 0 0", color: "#374151", fontSize: 14 }}>
-        This demo uses essential browser storage to remember your
-        preference. It does not currently load advertising or analytics
-        cookies.
+      <p style={{ margin: "8px 0 0", color: "#686B70", fontSize: 14 }}>
+        This demo uses essential browser storage to remember your preference.
+        It does not currently load advertising or analytics cookies.
       </p>
-
       <div className="cookie-actions">
-        <button
-          className="accept"
-          onClick={() => choose("accepted")}
-        >
+        <button className="accept" onClick={() => choose("accepted")}>
           Accept
         </button>
-
         <button onClick={() => choose("rejected")}>
           Reject optional cookies
         </button>
