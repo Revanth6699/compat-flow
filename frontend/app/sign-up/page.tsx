@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { signUp } from "@/lib/auth-client";
+import { apiRequest, signUp } from "@/lib/auth-client";
 
 function SignUpForm() {
   const search = useSearchParams();
@@ -16,7 +16,8 @@ function SignUpForm() {
     setBusy(true);
     try {
       const result=await signUp(email,password,fullName,organizationName,search.get("next") || "/workspace");
-      setMessage(result.access_token ? "Account created. Your organization workspace is being prepared. You can continue to your workspace." : "Account created. Check your email and confirm your address to finish setting up your organization workspace.");
+      if (result.access_token) { await apiRequest("/api/v1/auth/organization", { method: "POST", body: JSON.stringify({ name: organizationName.trim() }) }); setMessage("Account and organization workspace created. You can now open your workspace."); }
+      else setMessage("Account created. Check your email and confirm your address to finish setting up your organization workspace.");
     } catch(e) { setError(e instanceof Error?e.message:"Could not create your account."); }
     finally { setBusy(false); }
   }
