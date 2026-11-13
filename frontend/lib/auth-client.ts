@@ -161,6 +161,15 @@ export async function restoreSession() {
   }
 }
 export function setSessionFromCallback(session: AuthSession) { applySession(session); }
+export class ApiRequestError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+  }
+}
+
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (accessToken && accessTokenExpiresAt < Date.now() / 1000 + 60) {
     const refreshToken = localStorage.getItem(STORAGE_KEY);
@@ -176,6 +185,6 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   });
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.detail || data.message || "The request could not be completed.");
+  if (!response.ok) throw new ApiRequestError(response.status, data.detail || data.message || "The request could not be completed.");
   return data as T;
 }
