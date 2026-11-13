@@ -7,7 +7,9 @@ export function SiteHeader() {
    <Link href="/#capabilities">Capabilities</Link>
    <Link href="/#workflow">How it works</Link>
    <Link href="/pricing">Pricing</Link>
-   <Link className="nav-get-started" href="/contact?intent=demo">Request demo</Link>
+   <Link href="/contact?intent=demo">Request demo</Link>
+   <Link href="/sign-in">Sign in</Link>
+   <Link className="nav-get-started" href="/sign-up">Create account</Link>
   </nav>
  </div></header>;
 }
