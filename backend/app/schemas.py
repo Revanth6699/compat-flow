@@ -88,3 +88,13 @@ class ProductResponse(BaseModel):
     replacement_sku: str | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProductCreateRequest(BaseModel):
+    sku: str = Field(min_length=1, max_length=100)
+    name: str = Field(min_length=1, max_length=255)
+    manufacturer: str = Field(min_length=1, max_length=160)
+    part_number: str = Field(min_length=1, max_length=120)
+    category: str = Field(min_length=1, max_length=120)
+    supplier_id: uuid.UUID | None = None
+    replacement_sku: str | None = Field(default=None, max_length=100)
