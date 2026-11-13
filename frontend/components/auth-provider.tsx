@@ -14,10 +14,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = subscribeAuth(update);
     window.addEventListener("compatflow-auth-change", update);
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === "compatflow_refresh_token" && event.newValue === null) {
+      if (event.key !== "compatflow_refresh_token") return;
+      if (event.newValue === null) {
         clearSessionFromStorage();
         update();
+        return;
       }
+      // A sign-in or token refresh in another tab must update this tab's in-memory session too.
+      void restoreSession().finally(update);
     };
     window.addEventListener("storage", handleStorage);
     restoreSession().finally(() => { if (active) { update(); setLoading(false); } });
