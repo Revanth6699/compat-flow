@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from app.models import Organization, User
+from app.models import Organization
 from scripts.provision_owner import provision_first_owner
 
 
