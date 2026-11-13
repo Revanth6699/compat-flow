@@ -86,9 +86,18 @@ app.add_middleware(
     max_bytes=settings.import_max_upload_bytes + 64 * 1024,
 )
 
+# Vercel preview URLs are deployment-specific. Permit only this project's
+# team-owned preview hostname pattern in staging; production remains exact-origin.
+staging_preview_origin_regex = (
+    r"https://compat-flow-web(?:-[a-z0-9-]+)?-revanth-fbe6\\.vercel\\.app"
+    if settings.app_env.lower() == "staging"
+    else None
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=staging_preview_origin_regex,
     allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
