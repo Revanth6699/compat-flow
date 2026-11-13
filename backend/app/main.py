@@ -9,17 +9,21 @@ from app.core.config import settings
 
 
 class UploadBodyLimitMiddleware:
-    """Cap the full multipart request body before Starlette parses the upload."""
+    """Cap CSV request bodies before Starlette parses multipart uploads."""
 
     def __init__(self, app, max_bytes: int):
         self.app = app
         self.max_bytes = max_bytes
 
     async def __call__(self, scope, receive, send):
+        protected_paths = {
+            "/api/v1/catalog/import/preview",
+            "/api/v1/catalog/import/validate",
+        }
         if (
             scope["type"] != "http"
             or scope.get("method") != "POST"
-            or scope.get("path") != "/api/v1/catalog/import/preview"
+            or scope.get("path") not in protected_paths
         ):
             await self.app(scope, receive, send)
             return
@@ -29,7 +33,7 @@ class UploadBodyLimitMiddleware:
             try:
                 if int(content_length) > self.max_bytes:
                     response = JSONResponse(
-                        {"detail": "Request body exceeds the 5 MB upload limit."},
+                        {"detail": "Request body exceeds the configured CSV upload limit."},
                         status_code=413,
                     )
                     await response(scope, receive, send)
@@ -46,7 +50,7 @@ class UploadBodyLimitMiddleware:
             total_bytes += len(message.get("body", b""))
             if total_bytes > self.max_bytes:
                 response = JSONResponse(
-                    {"detail": "Request body exceeds the 5 MB upload limit."},
+                    {"detail": "Request body exceeds the configured CSV upload limit."},
                     status_code=413,
                 )
                 await response(scope, receive, send)
@@ -86,8 +90,6 @@ app.add_middleware(
     max_bytes=settings.import_max_upload_bytes + 64 * 1024,
 )
 
-# Vercel preview URLs are deployment-specific. Permit only this project's
-# team-owned preview hostname pattern in staging; production remains exact-origin.
 staging_preview_origin_regex = (
     r"https://compat-flow-web(?:-[a-z0-9-]+)?-revanth-fbe6\.vercel\.app"
     if settings.app_env.lower() == "staging"

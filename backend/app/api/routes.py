@@ -16,6 +16,7 @@ from app.schemas import (
     ImportPreviewRowErrorResponse,
     ImportIssueCategoryResponse,
     ImportFieldMetricResponse,
+    ImportColumnMappingResponse,
     ProductResponse,
     ProductCreateRequest,
     SupplierCreateRequest,
@@ -28,55 +29,34 @@ from app.services.catalog_csv import (
 
 router = APIRouter()
 
+
 @router.get("/health", response_model=HealthResponse)
 def health():
     return HealthResponse(status="ok", service="compatflow-api")
 
 
-@router.post("/catalog/import/validate", response_model=ImportPreviewResponse, dependencies=[Depends(require_plan_feature("csv_validation"))])
-@router.post(
-    "/catalog/import/preview",
-    response_model=ImportPreviewResponse,
-)
-async def preview_catalog_import(file: UploadFile = File(...)):
-    """Validate an uploaded CSV in memory; never persist or import visitor data."""
+async def _validate_catalog_csv(file: UploadFile) -> ImportPreviewResponse:
     filename = (file.filename or "").strip()
-
     if not filename.lower().endswith(".csv"):
         await file.close()
-        raise HTTPException(
-            status_code=415,
-            detail="Only CSV files are supported in this preview.",
-        )
-
+        raise HTTPException(status_code=415, detail="Only CSV files are supported.")
     if len(filename) > 255:
         await file.close()
-        raise HTTPException(
-            status_code=400,
-            detail="Filename must not exceed 255 characters.",
-        )
+        raise HTTPException(status_code=400, detail="Filename must not exceed 255 characters.")
 
     try:
-       raw = await file.read(settings.import_max_upload_bytes + 1)
+        raw = await file.read(settings.import_max_upload_bytes + 1)
     finally:
         await file.close()
 
     if len(raw) > settings.import_max_upload_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail="File exceeds the 5 MB limit.",
-        )
-
+        raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded CSV is empty.")
-
     try:
         content = raw.decode("utf-8-sig")
     except UnicodeDecodeError:
-        raise HTTPException(
-            status_code=400,
-            detail="CSV must be UTF-8 encoded.",
-        ) from None
+        raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded.") from None
 
     try:
         result = parse_catalog_csv(content)
@@ -85,10 +65,7 @@ async def preview_catalog_import(file: UploadFile = File(...)):
         status_code = 413 if "row limit" in message else 422
         raise HTTPException(status_code=status_code, detail=message) from None
     except csv.Error:
-        raise HTTPException(
-            status_code=400,
-            detail="CSV could not be parsed.",
-        ) from None
+        raise HTTPException(status_code=400, detail="CSV could not be parsed. Check quoting and delimiters.") from None
 
     return ImportPreviewResponse(
         filename=filename,
@@ -114,6 +91,15 @@ async def preview_catalog_import(file: UploadFile = File(...)):
             )
             for metric in result.field_metrics
         ],
+        column_mappings=[
+            ImportColumnMappingResponse(
+                field=mapping.field,
+                source_header=mapping.source_header,
+                confidence=mapping.confidence,
+            )
+            for mapping in result.column_mappings
+        ],
+        unmapped_headers=result.unmapped_headers,
         preview=result.preview,
         row_errors=[
             ImportPreviewRowErrorResponse(
@@ -130,17 +116,30 @@ async def preview_catalog_import(file: UploadFile = File(...)):
     )
 
 
+@router.post("/catalog/import/validate", response_model=ImportPreviewResponse)
+async def validate_paid_catalog_import(
+    file: UploadFile = File(...),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("csv_validation")),
+):
+    """Authenticated, subscription-gated validation. Files are not persisted."""
+    return await _validate_catalog_csv(file)
+
+
+@router.post("/catalog/import/preview", response_model=ImportPreviewResponse)
+async def preview_catalog_import(file: UploadFile = File(...)):
+    """Public stateless demo validation. Files are not persisted."""
+    return await _validate_catalog_csv(file)
+
+
 @router.post("/catalog/import")
 def public_demo_import_disabled():
-    """Persistent imports remain unavailable until authentication and tenant isolation exist."""
     raise HTTPException(
         status_code=403,
         detail=(
-            "Persistent catalog imports are disabled in this public demo. "
+            "Persistent catalog imports are disabled in this demo. "
             "You can validate and preview your CSV without saving it."
         ),
     )
-
 
 
 @router.get("/suppliers", response_model=list[SupplierResponse])
@@ -208,7 +207,6 @@ def get_product(
     if product is None:
         raise HTTPException(status_code=404, detail="Product not found.")
     return product
-
 
 
 @router.post("/products", response_model=ProductResponse, status_code=201)

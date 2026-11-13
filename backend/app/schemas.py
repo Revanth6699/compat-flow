@@ -2,9 +2,11 @@ from pydantic import BaseModel, ConfigDict, Field
 import uuid
 from datetime import datetime
 
+
 class HealthResponse(BaseModel):
     status: str
     service: str
+
 
 class ImportPreviewRow(BaseModel):
     sku: str = Field(min_length=1, max_length=100)
@@ -17,6 +19,7 @@ class ImportPreviewRow(BaseModel):
 
     model_config = ConfigDict(str_strip_whitespace=True)
 
+
 class ImportPreviewRowErrorResponse(BaseModel):
     row_number: int
     field: str | None
@@ -25,6 +28,7 @@ class ImportPreviewRowErrorResponse(BaseModel):
     severity: str = "critical"
     category: str = "data_integrity"
     recommendation: str = "Review the value and correct it at the source."
+
 
 class ImportIssueCategoryResponse(BaseModel):
     category: str
@@ -36,6 +40,12 @@ class ImportFieldMetricResponse(BaseModel):
     populated: int
     missing: int
     completeness_pct: float
+
+
+class ImportColumnMappingResponse(BaseModel):
+    field: str
+    source_header: str
+    confidence: float
 
 
 class ImportPreviewResponse(BaseModel):
@@ -51,8 +61,11 @@ class ImportPreviewResponse(BaseModel):
     errors: list[str]
     issue_categories: list[ImportIssueCategoryResponse]
     field_metrics: list[ImportFieldMetricResponse]
+    column_mappings: list[ImportColumnMappingResponse]
+    unmapped_headers: list[str]
     preview: list[ImportPreviewRow]
     row_errors: list[ImportPreviewRowErrorResponse]
+
 
 class ImportJobCreatedResponse(BaseModel):
     id: uuid.UUID
@@ -60,12 +73,14 @@ class ImportJobCreatedResponse(BaseModel):
     status: str
     created_at: datetime
 
+
 class ImportRowErrorResponse(BaseModel):
     row_number: int
     field: str | None
     error_code: str
     message: str
     created_at: datetime
+
 
 class ImportJobStatusResponse(BaseModel):
     id: uuid.UUID
@@ -80,7 +95,6 @@ class ImportJobStatusResponse(BaseModel):
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None
-
     error_total: int
     error_limit: int
     error_offset: int
