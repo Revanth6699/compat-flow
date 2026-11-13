@@ -7,7 +7,7 @@ import { signUp } from "@/lib/auth-client";
 
 function SignUpForm() {
   const search = useSearchParams();
-  const [email,setEmail] = useState(""); const [password,setPassword] = useState(""); const [confirm,setConfirm] = useState("");
+  const [fullName,setFullName] = useState(""); const [organizationName,setOrganizationName] = useState(""); const [email,setEmail] = useState(""); const [password,setPassword] = useState(""); const [confirm,setConfirm] = useState("");
   const [message,setMessage] = useState(""); const [error,setError] = useState(""); const [busy,setBusy] = useState(false);
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(""); setMessage("");
@@ -15,14 +15,16 @@ function SignUpForm() {
     if(password!==confirm){setError("The passwords do not match.");return;}
     setBusy(true);
     try {
-      const result=await signUp(email,password,search.get("next") || "/workspace");
-      setMessage(result.access_token ? "Account created. Your organization access must be provisioned or linked through an invitation." : "Check your email and confirm your address. After confirmation, sign in with your new password. Organization access is granted separately.");
+      const result=await signUp(email,password,fullName,organizationName,search.get("next") || "/workspace");
+      setMessage(result.access_token ? "Account created. Your organization workspace is being prepared. You can continue to your workspace." : "Account created. Check your email and confirm your address to finish setting up your organization workspace.");
     } catch(e) { setError(e instanceof Error?e.message:"Could not create your account."); }
     finally { setBusy(false); }
   }
   return <main id="main" className="auth-shell"><section className="auth-card">
-    <span className="eyebrow">GET STARTED</span><h1>Create your account</h1><p className="auth-intro">Create a verified CompatFlow identity. An account alone does not create an organization or grant workspace access.</p>
+    <span className="eyebrow">GET STARTED</span><h1>Create your account</h1><p className="auth-intro">Create your account and organization workspace. Your email must be verified before workspace access is activated.</p>
     <form className="auth-form" onSubmit={submit}>
+      <label htmlFor="signup-name">Full name</label><input id="signup-name" type="text" autoComplete="name" minLength={2} maxLength={100} required value={fullName} onChange={e=>setFullName(e.target.value)} />
+      <label htmlFor="signup-organization">Organization name</label><input id="signup-organization" type="text" minLength={2} maxLength={160} required value={organizationName} onChange={e=>setOrganizationName(e.target.value)} />
       <label htmlFor="signup-email">Work email</label><input id="signup-email" type="email" autoComplete="email" required value={email} onChange={e=>setEmail(e.target.value)} />
       <label htmlFor="signup-password">Password</label><input id="signup-password" type="password" autoComplete="new-password" minLength={10} required value={password} onChange={e=>setPassword(e.target.value)} />
       <label htmlFor="signup-confirm">Confirm password</label><input id="signup-confirm" type="password" autoComplete="new-password" minLength={10} required value={confirm} onChange={e=>setConfirm(e.target.value)} />
