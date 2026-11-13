@@ -4,7 +4,7 @@ import secrets
 from uuid import uuid4, UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -38,6 +38,14 @@ class CurrentUserResponse(BaseModel):
 
 class OrganizationCreateRequest(BaseModel):
     name: str = Field(min_length=2, max_length=160)
+
+    @field_validator("name")
+    @classmethod
+    def normalize_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 2:
+            raise ValueError("Organization name must contain at least 2 non-whitespace characters.")
+        return normalized
 
 
 @router.post("/organization", response_model=CurrentUserResponse, status_code=201)
