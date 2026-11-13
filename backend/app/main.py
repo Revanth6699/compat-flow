@@ -4,6 +4,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import JSONResponse
 
 from app.api.routes import router
+from app.api.auth_routes import router as auth_router
 from app.core.config import settings
 
 
@@ -116,6 +117,7 @@ async def security_headers(request, call_next):
 
 
 app.include_router(router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
 
 
 @app.get("/", include_in_schema=False)
