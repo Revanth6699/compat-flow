@@ -13,6 +13,9 @@ class FakeSession:
         self.committed = False
         self.rolled_back = False
 
+    def execute(self, statement):
+        return None
+
     def scalar(self, statement):
         return next(self.scalar_results)
 
