@@ -19,13 +19,26 @@ class FakeDB:
         self.permission_granted = permission_granted
         self.scalar_calls = 0
         self.statements = []
+        self.subscription = SimpleNamespace(
+            id=uuid4(), plan_code="growth", status="active",
+            current_period_end=None, created_at=None,
+        )
+        self.plan = SimpleNamespace(
+            code="growth", is_active=True,
+            entitlements={"supplier_catalogs": True},
+        )
 
     def scalar(self, statement):
         self.statements.append(statement)
         self.scalar_calls += 1
         if self.scalar_calls == 1:
             return "permission-row" if self.permission_granted else None
+        if self.scalar_calls == 2:
+            return self.subscription
         return None
+
+    def get(self, model, key):
+        return self.plan
 
     def scalars(self, statement):
         self.statements.append(statement)
@@ -60,15 +73,11 @@ def test_catalog_and_supplier_endpoints_reject_anonymous_requests():
     assert client.get("/api/v1/products").status_code == 401
     assert client.get("/api/v1/suppliers").status_code == 401
     assert client.post("/api/v1/products", json={
-        "sku": "SKU-1",
-        "name": "Part",
-        "manufacturer": "Maker",
-        "part_number": "P-1",
-        "category": "Parts",
+        "sku": "SKU-1", "name": "Part", "manufacturer": "Maker",
+        "part_number": "P-1", "category": "Parts",
     }).status_code == 401
     assert client.post("/api/v1/suppliers", json={
-        "name": "Supplier",
-        "feed_format": "csv",
+        "name": "Supplier", "feed_format": "csv",
     }).status_code == 401
 
 
@@ -78,11 +87,8 @@ def test_viewer_without_write_grant_cannot_create_products():
     install_auth_overrides(organization_id, "viewer", db)
     try:
         response = TestClient(app).post("/api/v1/products", json={
-            "sku": "SKU-1",
-            "name": "Part",
-            "manufacturer": "Maker",
-            "part_number": "P-1",
-            "category": "Parts",
+            "sku": "SKU-1", "name": "Part", "manufacturer": "Maker",
+            "part_number": "P-1", "category": "Parts",
         })
         assert response.status_code == 403
     finally:
@@ -109,9 +115,7 @@ def test_direct_product_lookup_cannot_cross_organization_boundary():
     db = FakeDB(permission_granted=True)
     install_auth_overrides(organization_id, "member", db)
     try:
-        response = TestClient(app).get(
-            "/api/v1/products/00000000-0000-0000-0000-000000000099"
-        )
+        response = TestClient(app).get("/api/v1/products/00000000-0000-0000-0000-000000000099")
         assert response.status_code == 404
         statement = db.statements[-1]
         compiled = statement.compile(dialect=postgresql.dialect())
@@ -119,7 +123,6 @@ def test_direct_product_lookup_cannot_cross_organization_boundary():
         assert "products.organization_id" in str(compiled)
     finally:
         clear_overrides()
-
 
 
 def test_supplier_read_query_is_scoped_to_authenticated_organization():
@@ -144,11 +147,8 @@ def test_product_cannot_attach_supplier_from_another_organization():
     install_auth_overrides(organization_id, "member", db)
     try:
         response = TestClient(app).post("/api/v1/products", json={
-            "sku": "SKU-FOREIGN",
-            "name": "Part",
-            "manufacturer": "Maker",
-            "part_number": "P-1",
-            "category": "Parts",
+            "sku": "SKU-FOREIGN", "name": "Part", "manufacturer": "Maker",
+            "part_number": "P-1", "category": "Parts",
             "supplier_id": str(foreign_supplier_id),
         })
         assert response.status_code == 404
