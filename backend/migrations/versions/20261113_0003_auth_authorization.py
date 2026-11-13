@@ -3,6 +3,8 @@
 Revision ID: 20261113_0003
 Revises: b58c792979c7
 """
+from uuid import uuid4
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
@@ -36,13 +38,25 @@ def upgrade() -> None:
         sa.CheckConstraint("role IN ('admin', 'member', 'viewer')", name="ck_invitation_role"),
     )
     op.create_index("ix_user_invitations_org_email", "user_invitations", ["organization_id", "email"])
-    op.create_table(
+    role_permissions = op.create_table(
         "role_permissions",
         sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
         sa.Column("role", sa.String(32), nullable=False),
         sa.Column("permission", sa.String(100), nullable=False),
         sa.UniqueConstraint("role", "permission", name="uq_role_permission"),
+        sa.CheckConstraint("role IN ('owner', 'admin', 'member', 'viewer')", name="ck_role_permissions_role"),
     )
+    permission_rows = []
+    grants = {
+        "owner": ["catalog:read", "catalog:write", "supplier:read", "supplier:write"],
+        "admin": ["catalog:read", "catalog:write", "supplier:read", "supplier:write"],
+        "member": ["catalog:read", "catalog:write", "supplier:read", "supplier:write"],
+        "viewer": ["catalog:read", "supplier:read"],
+    }
+    for role, permissions in grants.items():
+        for permission in permissions:
+            permission_rows.append({"id": uuid4(), "role": role, "permission": permission})
+    op.bulk_insert(role_permissions, permission_rows)
 
 
 def downgrade() -> None:
