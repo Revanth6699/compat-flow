@@ -1,34 +1,46 @@
 # Backend operations
 
-## Initial organization owner provisioning
+## Self-service organization onboarding
 
-Supabase Auth owns password registration and login. The FastAPI service validates Supabase access tokens and maps authenticated Supabase users to CompatFlow organization profiles.
+Supabase Auth owns password registration, login, email confirmation, and password recovery. The FastAPI service validates Supabase access tokens and maps authenticated Supabase users to CompatFlow organization profiles.
 
-The first verified user must be provisioned as the owner of the initial organization. This is deliberately an operator-run command, not a public API endpoint: an unauthenticated public bootstrap endpoint would let an arbitrary visitor claim the first-owner role.
+The first user creates an organization through the authenticated `POST /api/v1/auth/organization` endpoint after confirming their email. The backend creates the organization and owner profile in one transaction. The caller cannot choose a role or attach themselves to an existing organization through this endpoint.
 
-### Prerequisites
+The frontend signup form collects full name, organization name, work email, and password. If Supabase requires email confirmation, the callback exchanges the PKCE code for a session and then provisions the organization. If Supabase returns a session immediately, the signup page provisions it directly.
 
-1. Apply all Alembic migrations from the current backend branch to the intended database.
-2. Register the initial user through Supabase Auth and confirm the user's email.
-3. Obtain a fresh Supabase access token for that user.
-4. Run the command from the `backend/` directory with these environment variables set:
-   - `DATABASE_URL`: the intended database URL, using `postgresql+psycopg://`.
-   - `SUPABASE_URL`: the Supabase project URL.
-   - `SUPABASE_ANON_KEY`: the Supabase publishable/anon key.
-   - `SUPABASE_ACCESS_TOKEN`: the initial user's access token. Keep it private; do not commit it or paste it into logs or chat.
+### Required backend environment
 
-### Run
+- `DATABASE_URL`: PostgreSQL URL using the Psycopg 3 driver.
+- `SUPABASE_URL`: Supabase project URL.
+- `SUPABASE_ANON_KEY`: Supabase public anon/publishable key used to verify confirmed email status.
 
-```powershell
-$env:SUPABASE_ACCESS_TOKEN = "YOUR_FRESH_SUPABASE_ACCESS_TOKEN"
-python -m scripts.provision_owner --organization-name "Your Organization"
-Remove-Item Env:SUPABASE_ACCESS_TOKEN
-```
+Do not configure or expose a Supabase service-role key for this flow. Never commit credentials.
 
-The command asks Supabase to validate the token and requires a confirmed email. It then creates the initial organization and owner profile in one database transaction. It refuses to run if the Supabase identity is already linked or an active owner already exists. It never prints the access token.
+## Subsequent users and invitations
 
-Run this only against the intended staging database during staging validation. Do not point it at production until the rollout has been separately approved.
+Additional employees join an existing organization through invitations:
 
-### Subsequent users
+1. An owner or admin creates an invitation through `POST /api/v1/invitations`.
+2. The API returns the raw invitation token once. Only its SHA-256 hash is stored in PostgreSQL.
+3. The administrator must deliver the invitation link through an approved channel. Automated invitation email delivery is not implemented.
+4. The recipient creates or signs into a Supabase account using the invited email and confirms that email.
+5. The recipient accepts the invitation through `POST /api/v1/invitations/accept`.
+6. The backend checks the token, expiry, revocation, single-use state, verified email, and email match before creating the organization membership.
 
-Additional users should register or sign in through Supabase Auth and join an existing organization through the invitation workflow. Do not create additional owners with this bootstrap command. Organization self-service signup and multi-organization membership are not implemented by this initial-owner operation.
+Invitation roles are limited to `admin`, `member`, and `viewer`. Only an owner can invite another administrator. A Supabase identity already linked to an organization cannot join a second organization in this version.
+
+## Staging migration procedure
+
+Before applying migrations to staging:
+
+1. Create and verify a recoverable backup of the Render staging PostgreSQL database.
+2. Confirm the target database URL is the staging database, not production.
+3. Review the migration status and expected Alembic head.
+4. Run the manually triggered **Apply staging database migration** GitHub Actions workflow only after the backup is confirmed. The workflow requires the exact input `APPLY` and the repository secret `STAGING_DATABASE_URL`.
+5. Verify the resulting Alembic revision and run the staging smoke tests.
+
+The workflow does not create a database backup. The operator must create and verify the backup separately before authorizing it. Do not run the workflow against production.
+
+## Public demo boundary
+
+The public CSV preview remains available without authentication. It validates uploads in memory and does not persist files or catalog records. Persistent imports remain disabled. Protected supplier and catalog endpoints derive organization scope from the authenticated backend profile and enforce database-backed role permissions.
