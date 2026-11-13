@@ -57,6 +57,7 @@ export default function HomePage() {
             <Link href="/catalog/import">Catalog demo</Link>
             <a href="#capabilities">Capabilities</a>
             <a href="#workflow">How it works</a>
+            <Link href="/pricing">Pricing</Link>
             <Link href="/catalog/import">Get started</Link>
           </nav>
         </div>
