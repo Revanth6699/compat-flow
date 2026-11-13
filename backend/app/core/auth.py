@@ -85,8 +85,13 @@ def get_current_user(
     db: Session = Depends(get_db),
 ) -> AuthenticatedUser:
     profile = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
-    if profile is None or not profile.is_active:
-        raise HTTPException(status_code=403, detail="This account has no active CompatFlow access.")
+    if profile is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No CompatFlow organization is linked to this account yet.",
+        )
+    if not profile.is_active:
+        raise HTTPException(status_code=403, detail="This CompatFlow account is inactive.")
     if profile.email.lower() != identity.email:
         raise HTTPException(status_code=403, detail="The authenticated email does not match the authorized account.")
     return AuthenticatedUser(identity=identity, profile=profile)
