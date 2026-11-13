@@ -18,6 +18,8 @@ type PreviewResponse = {
   critical_issues: number; warning_issues: number; errors: string[];
   issue_categories: { category: string; count: number }[];
   field_metrics: { field: string; populated: number; missing: number; completeness_pct: number }[];
+  column_mappings: { field: string; source_header: string; confidence: number }[];
+  unmapped_headers: string[];
   preview: PreviewRow[]; row_errors: RowIssue[];
 };
 
@@ -71,6 +73,9 @@ export default function CatalogImportPage() {
       ["Critical issues", result.critical_issues],
       ["Warnings", result.warning_issues],
       [],
+      ["Canonical field", "Detected source header", "Mapping confidence"],
+      ...result.column_mappings.map((m) => [m.field, m.source_header, m.confidence]),
+      [],
       ["Field", "Populated", "Missing", "Completeness (%)"],
       ...result.field_metrics.map((m) => [m.field, m.populated, m.missing, m.completeness_pct]),
       [],
@@ -100,7 +105,7 @@ export default function CatalogImportPage() {
           <h2>Try the CSV validator</h2>
           <p className="import-description">CSV only · Maximum 5 MB · Maximum 10,000 data rows.</p>
           <p className="import-description">Files are validated in memory. This public demo does not save files or modify a catalog.</p>
-          <p className="column-hint">Required columns: sku, name, manufacturer, part_number, category</p>
+          <p className="column-hint">CompatFlow detects common supplier header variants and maps them to the product catalog fields.</p>
           <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>
           <label className="file-picker" htmlFor="catalog-file">
             <span className="file-picker-icon" aria-hidden="true">↥</span>
@@ -138,6 +143,16 @@ export default function CatalogImportPage() {
               <div className="panel stat-card"><span>Quality score</span><strong>{result.data_quality_score.toFixed(2)}%</strong></div>
               <div className="panel stat-card"><span>Pass rate</span><strong>{result.validation_pass_rate.toFixed(2)}%</strong></div>
               <div className="panel stat-card"><span>Total issues</span><strong>{result.total_issues.toLocaleString()}</strong></div>
+            </div>
+
+            <div className="panel result-section">
+              <h3>Detected column mapping</h3>
+              <p className="import-description">Confidence indicates how closely a source header matches a known alias. It is not a measure of data accuracy. Unrecognized columns are preserved in the source file but are not used by this product-catalog profile.</p>
+              <div className="table-scroll"><table className="preview-table"><thead><tr><th>Product field</th><th>Source column</th><th>Mapping confidence</th></tr></thead>
+                <tbody>{result.column_mappings.map((mapping) => <tr key={mapping.field}>
+                  <td>{mapping.field.replaceAll("_", " ")}</td><td>{mapping.source_header}</td><td>{(mapping.confidence * 100).toFixed(0)}%</td>
+                </tr>)}</tbody></table></div>
+              {result.unmapped_headers.length > 0 && <p className="import-description">Unmapped columns: {result.unmapped_headers.join(", ")}</p>}
             </div>
 
             <div className="panel result-section">
@@ -185,7 +200,7 @@ export default function CatalogImportPage() {
                   </tr>)}</tbody></table></div>
               )}
             </div>
-            <p className="import-disclaimer">The score is a rule-based heuristic, not a statistical accuracy measurement. It reflects only the current validation rules.</p>
+            <p className="import-disclaimer">The score is a transparent rule-based heuristic, not a statistical accuracy measurement. It reflects only the current product-catalog validation rules.</p>
           </section>
         )}
         <p className="import-disclaimer">Demonstration only. Do not upload confidential supplier files, personal information or production catalog data.</p>
