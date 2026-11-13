@@ -4,6 +4,7 @@ import "./globals.css";
 import { CookieConsent } from "@/components/cookie-consent";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { AuthProvider } from "@/components/auth-provider";
 
 const inter = Inter({ subsets: ["latin"], display: "swap", variable: "--font-inter" });
 
@@ -44,11 +45,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body className={inter.variable}>
+        <AuthProvider>
         <a className="skip-link" href="#main">Skip to content</a>
         <SiteHeader />
         {children}
         <SiteFooter />
         <CookieConsent />
+        </AuthProvider>
       </body>
     </html>
   );
