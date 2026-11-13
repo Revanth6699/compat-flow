@@ -63,3 +63,28 @@ class ImportJobStatusResponse(BaseModel):
     error_limit: int
     error_offset: int
     row_errors: list[ImportRowErrorResponse]
+
+
+class SupplierCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=160)
+    feed_format: str = Field(default="csv", pattern="^(csv|xml|json)$")
+
+
+class SupplierResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    feed_format: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProductResponse(BaseModel):
+    id: uuid.UUID
+    sku: str
+    name: str
+    manufacturer: str
+    part_number: str
+    category: str
+    replacement_sku: str | None
+
+    model_config = ConfigDict(from_attributes=True)
