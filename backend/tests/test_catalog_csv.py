@@ -88,7 +88,7 @@ def test_duplicate_sku_rejected_from_valid_records():
     assert result.total_rows == 2
     assert result.valid_count == 1
     assert result.invalid_count == 1
-    assert "duplicate SKU" in result.errors[0]
+    assert "Duplicate SKU" in result.errors[0]
 
 
 def test_missing_required_value_rejected():
