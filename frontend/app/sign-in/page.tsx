@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "@/lib/auth-client";
 
-export default function SignInPage() {
+function SignInForm() {
   const router = useRouter();
   const search = useSearchParams();
   const [email,setEmail] = useState(""); const [password,setPassword] = useState("");
@@ -28,3 +28,5 @@ export default function SignInPage() {
     <p className="auth-switch">New to CompatFlow? <Link href="/sign-up">Create an account</Link></p>
   </section></main>;
 }
+
+export default function SignInPage() { return <Suspense fallback={<main id="main" className="auth-shell">Loading…</main>}><SignInForm /></Suspense>; }
