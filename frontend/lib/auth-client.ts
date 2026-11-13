@@ -4,7 +4,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-export type AuthUser = { id: string; email?: string };
+export type AuthUser = { id: string; email?: string; user_metadata?: { full_name?: string } };
 type AuthSession = { access_token: string; refresh_token: string; expires_at?: number; expires_in?: number; user: AuthUser };
 let accessToken: string | null = null;
 let currentUser: AuthUser | null = null;
@@ -73,7 +73,7 @@ export async function signIn(email: string, password: string) {
   return session.user;
 }
 export async function signUp(email: string, password: string, redirectPath = "/workspace") {
-  const { url } = config();
+  const { url, key } = config();
   const safeNext = redirectPath.startsWith("/") && !redirectPath.startsWith("//") ? redirectPath : "/workspace";
   const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
   const codeChallenge = await createPkceChallenge();
@@ -81,7 +81,7 @@ export async function signUp(email: string, password: string, redirectPath = "/w
   signupUrl.searchParams.set("redirect_to", redirectTo);
   const response = await fetch(signupUrl.toString(), {
     method: "POST",
-    headers: { apikey: config().key, "Content-Type": "application/json" },
+    headers: { apikey: key, "Content-Type": "application/json" },
     body: JSON.stringify({ email: email.trim().toLowerCase(), password, data: {}, code_challenge: codeChallenge, code_challenge_method: "s256" }),
   });
   const data = await response.json().catch(() => ({}));
@@ -112,8 +112,22 @@ export async function requestPasswordReset(email: string) {
   }
 }
 export async function updatePassword(password: string) {
-  if (!accessToken) throw new Error("Your recovery session has expired. Request a new password reset email.");
+  if (!accessToken) throw new Error("Your session has expired. Sign in again before changing your password.");
   await authRequest("user", { password }, accessToken);
+}
+export async function updateProfile(fullName: string) {
+  if (!accessToken) throw new Error("Your session has expired. Sign in again before updating your profile.");
+  const { url, key } = config();
+  const response = await fetch(`${url}/auth/v1/user`, {
+    method: "PUT",
+    headers: { apikey: key, "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ data: { full_name: fullName.trim() } }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.msg || data.message || "Could not update your profile.");
+  currentUser = data as AuthUser;
+  notify();
+  return currentUser;
 }
 export async function signOut() {
   const token = accessToken;
