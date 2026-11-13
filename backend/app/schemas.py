@@ -23,12 +23,31 @@ class ImportPreviewRowErrorResponse(BaseModel):
     error_code: str
     message: str
 
+class ImportIssueCategoryResponse(BaseModel):
+    category: str
+    count: int
+
+
+class ImportFieldMetricResponse(BaseModel):
+    field: str
+    populated: int
+    missing: int
+    completeness_pct: float
+
+
 class ImportPreviewResponse(BaseModel):
     filename: str
     total_rows: int
     valid_rows: int
     invalid_rows: int
+    validation_pass_rate: float
+    data_quality_score: float
+    total_issues: int
+    critical_issues: int
+    warning_issues: int
     errors: list[str]
+    issue_categories: list[ImportIssueCategoryResponse]
+    field_metrics: list[ImportFieldMetricResponse]
     preview: list[ImportPreviewRow]
     row_errors: list[ImportPreviewRowErrorResponse]
 
