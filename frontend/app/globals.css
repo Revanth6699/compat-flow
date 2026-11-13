@@ -923,3 +923,20 @@ small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs)
 .workspace-profile dt { color: var(--muted); font-weight: 700; }
 .workspace-profile dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
 @media (max-width: 640px) { .auth-card { padding: 26px 20px; } .workspace-heading { align-items: flex-start; flex-direction: column; } .workspace-profile dl div { flex-direction: column; gap: 4px; } .workspace-profile dd { text-align: left; } }
+
+
+/* Profile settings */
+.account-settings { max-width: 900px; padding-top: 52px; padding-bottom: 76px; }
+.settings-panel { max-width: 720px; margin: 0 0 18px; padding: 26px; }
+.settings-panel h2 { margin: 0 0 14px; color: var(--navy); font-size: 1.2rem; }
+.settings-panel .auth-form { max-width: 520px; }
+.settings-panel .auth-form small { color: var(--muted); font-size: .75rem; line-height: 1.6; }
+.settings-description { max-width: 620px; margin: 0 0 16px; color: var(--muted); font-size: .86rem; line-height: 1.7; }
+.settings-description a, .account-help-content a { color: var(--teal); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.workspace-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.account-help-content { padding-top: 38px; }
+@media (max-width: 640px) {
+ .account-settings { padding-top: 34px; }
+ .settings-panel { padding: 20px; }
+ .workspace-actions { width: 100%; }
+}
