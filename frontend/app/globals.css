@@ -540,3 +540,138 @@ p, li, small, label { color: #56616F; }
 .import-heading h1 { color: #202833; }
 .column-hint a { color: #24527D; }
 .column-hint a:hover { color: #16877F; }
+
+
+/* Typography refinement — consistent, compact SaaS type scale */
+:root {
+  --type-xs: 0.75rem;
+  --type-sm: 0.875rem;
+  --type-base: 0.9375rem;
+  --type-lg: 1.0625rem;
+  --type-xl: 1.25rem;
+  --type-2xl: 1.625rem;
+  --type-3xl: clamp(2rem, 3.2vw, 2.5rem);
+  --type-display: clamp(2.5rem, 5vw, 3.5rem);
+}
+
+html { font-size: 16px; }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--type-base);
+  font-weight: 400;
+  line-height: 1.65;
+  letter-spacing: 0;
+  color: #202833;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, .editorial-heading {
+  font-family: var(--font-sans);
+  color: #202833;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+h1 { font-size: var(--type-display); font-weight: 700; line-height: 1.12; }
+h2 { font-size: var(--type-3xl); font-weight: 700; line-height: 1.2; }
+h3 { font-size: var(--type-xl); font-weight: 650; line-height: 1.3; }
+h4 { font-size: var(--type-lg); font-weight: 650; line-height: 1.4; }
+
+p, li { font-size: var(--type-base); line-height: 1.7; }
+small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs); line-height: 1.5; }
+.eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+}
+
+/* Header and brand */
+.brand {
+  font-size: 1.375rem;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -0.055em;
+}
+.nav a { font-size: 0.8125rem; font-weight: 600; }
+
+/* Homepage hierarchy */
+.home-hero h1 {
+  max-width: 680px;
+  font-size: var(--type-display);
+  line-height: 1.1;
+  font-weight: 750;
+  letter-spacing: -0.04em;
+}
+.home-hero-description {
+  font-size: 1rem;
+  line-height: 1.75;
+}
+.home-section-heading h2,
+.home-final-cta h2 {
+  font-size: var(--type-3xl);
+  line-height: 1.18;
+  font-weight: 700;
+}
+.home-section-heading p,
+.home-final-cta p { font-size: 0.9375rem; line-height: 1.75; }
+
+.home-problem-card h3,
+.home-capability-card h3,
+.home-step h3 {
+  margin: 0.75rem 0 0.5rem;
+  font-size: 1.125rem;
+  line-height: 1.35;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.home-problem-card p,
+.home-capability-card p,
+.home-step p { font-size: 0.875rem; line-height: 1.7; }
+
+.home-demo-cta h2 { font-size: 1.75rem; line-height: 1.2; font-weight: 700; }
+.home-demo-cta p { font-size: 0.875rem; line-height: 1.7; }
+
+/* Product preview and data */
+.home-visual-title { font-size: 0.8125rem; font-weight: 700; }
+.home-visual-metric { font-size: 2.25rem; font-weight: 750; letter-spacing: -0.04em; }
+.home-visual-stat strong { font-size: 1.25rem; font-weight: 700; }
+.home-visual-stat span,
+.home-visual-caption,
+.home-visual-table { font-size: 0.75rem; }
+.home-visual-table th { font-size: 0.6875rem; font-weight: 700; }
+.home-visual-table td { font-size: 0.75rem; }
+
+/* CSV import and validation results */
+.import-heading h1 { font-size: clamp(2rem, 4vw, 2.75rem); line-height: 1.15; }
+.import-heading p, .import-description { font-size: 0.875rem; line-height: 1.7; }
+.import-panel h2, .result-section h3 { font-size: 1.25rem; line-height: 1.3; font-weight: 700; }
+.column-hint { font-size: 0.8125rem; line-height: 1.6; }
+.file-picker strong { font-size: 0.9375rem; font-weight: 650; }
+.file-picker span:last-child { font-size: 0.8125rem; }
+.results-heading h2 { font-size: 1.75rem; line-height: 1.2; font-weight: 700; }
+.results-heading p { font-size: 0.8125rem; }
+.result-status { font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.04em; }
+.stat-card span { font-size: 0.8125rem; }
+.stat-card strong { font-size: 1.75rem; line-height: 1.15; font-weight: 750; }
+.preview-table { font-size: 0.8125rem; }
+.preview-table th { font-size: 0.6875rem; font-weight: 700; }
+.preview-table td { font-size: 0.8125rem; }
+.error-list li { font-size: 0.875rem; line-height: 1.6; }
+
+/* Controls and footer */
+.button { font-size: 0.8125rem; font-weight: 650; letter-spacing: 0.005em; }
+.cookie-actions button { font-size: 0.8125rem; font-weight: 600; }
+.footer a { font-size: 0.8125rem; }
+.footer-brand-name { font-size: 1.25rem !important; }
+.footer-brand > span, .footer-copyright { font-size: 0.75rem; }
+
+@media (max-width: 560px) {
+  body { font-size: 0.9375rem; }
+  .brand { font-size: 1.25rem; }
+  .home-hero h1 { font-size: clamp(2.25rem, 10vw, 2.75rem); }
+  .home-section-heading h2, .home-final-cta h2 { font-size: 1.875rem; }
+  .home-demo-cta h2 { font-size: 1.5rem; }
+  .import-heading h1 { font-size: 2rem; }
+  .results-heading h2 { font-size: 1.5rem; }
+}
