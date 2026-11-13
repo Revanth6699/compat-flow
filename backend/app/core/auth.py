@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import User
+from app.models import RolePermission, User
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -124,3 +124,25 @@ def require_verified_supabase_email(identity: SupabaseIdentity) -> None:
     returned_email = str(user_data.get("email", "")).strip().lower()
     if not confirmed_at or returned_email != identity.email:
         raise HTTPException(status_code=403, detail="Verify your email address before accepting an invitation.")
+
+
+
+def require_permission(permission: str):
+    def dependency(
+        current: AuthenticatedUser = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> AuthenticatedUser:
+        granted = db.scalar(
+            select(RolePermission.id).where(
+                RolePermission.role == current.profile.role,
+                RolePermission.permission == permission,
+            )
+        )
+        if granted is None:
+            raise HTTPException(
+                status_code=403,
+                detail="You do not have permission to perform this action.",
+            )
+        return current
+
+    return dependency
