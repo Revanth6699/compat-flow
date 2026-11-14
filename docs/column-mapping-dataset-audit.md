@@ -682,3 +682,104 @@ Continue inspecting datasets individually and append each verified file here. Af
 6. Inventory fields such as available/current/expected stock, daily demand, safety stock, lead time, and MOQ require inventory-specific validation and metrics.
 7. Data quality test fixtures sometimes contain prewritten issue labels. Treat those labels as test metadata, not as ground truth for model training or measured validation outcomes.
 8. A product master with top_category and sub_category provides evidence for a top_category alias, but the hierarchy must be preserved separately when both fields exist.
+
+
+### 61. Swaadhi hospital inventory product master
+
+- Source: https://github.com/Swaadhi/hospital-inventory-intelligence/blob/eac8d86df2599ea36a1d72565b596d6a3bfd8c59/data/Product_master.csv
+- Type: hospital procurement/inventory product master
+- Delimiter: comma
+- Header: `SKU,Product_Name,Category,Unit,Unit_Price_USD,Reorder_Point,Max_Stock,Lead_Time_Days,Safety_Stock,WHO_Essential`
+- Mapping observations: SKU, product name, and category are explicit. Unit, price, reorder point, max stock, lead time, safety stock, and WHO essential flag are separate. There is no manufacturer or MPN field, so this file cannot satisfy the current general product profile.
+- Current mapper gap: unit, USD price, stock bounds, replenishment, and essential-list classification require an inventory/procurement profile.
+
+### 62. ZURU toy channel product master
+
+- Source: https://github.com/Saurav-Kanegaonkar/ZURU-Toy-Channel-Data-Quality-Analysis-Pack/blob/05e16acb3cc905b7b33f1ed21a79b65e11243bd8/data/product_master.csv
+- Type: compact toy product master fixture
+- Delimiter: comma
+- Header: `sku_id,product_name,category,unit_price`
+- Mapping observations: `sku_id` contains SKU-shaped values and is explicitly named as an SKU identifier. Product name and category are explicit. No manufacturer, MPN, or separate product ID is supplied. This supports a sku_id alias but not a generic product_id alias.
+- Current mapper gap: unit price and source ID are outside the canonical schema; manufacturer and MPN are absent.
+
+### 63. Cinderhaven CPG item-setup master
+
+- Source: https://github.com/lailarallc/item-setup-form-preflight/blob/9763a6389214fc0f8ab2026e61928aaa3c078b7e/public/sample/product_master.csv
+- Type: consumer packaged goods retailer item-setup and GS1 data export
+- Delimiter: comma
+- Header: 40+ fields including `sku,product_name,product_line,subcategory,gtin14,upc,case_pack_qty,unit_weight_lbs,case_weight_lbs,msrp,serving_size,calories_per_serving,total_fat_g,sodium_mg,total_carb_g,protein_g,brand_owner,country_of_origin,product_description,category,wholesale_price,list_price,map_price,shelf_life_days,inner_pack_count,ti,hi,cases_per_layer,layers_per_pallet,pallet_weight_lb,active_retailers,oneworldsync_status,last_updated,updated_by`
+- Mapping observations: SKU, GTIN-14, UPC, brand owner, and category are distinct. GTIN/UPC values have leading zeros and must remain strings. Brand owner is not automatically a legal manufacturer. MSRP, wholesale, list, and MAP prices are separate. Nutrition, case/pallet logistics, retailer distribution, and GS1 registration state are specialized attributes. Some dimension and case-weight fields are blank.
+- Current mapper gap: GS1 identifiers, nutrition, price types, packaging, palletization, retailer distribution, ownership, and item-setup status need a CPG profile.
+
+### 64. SwiftOps India procurement product master
+
+- Source: https://github.com/Naseem-Naaz/SwiftOps/blob/a1517872cf9805da0c8d6b076260b15806233d9c/Product_Master.csv
+- Type: Indian multi-category procurement and inventory product master
+- Delimiter: comma
+- Header: `Product_ID,SKU_Code,Product_Category,Sub_Category,Product_Name,Brand,Procurement_Cost_INR,Selling_Price_INR,Target_Profit_Margin_%,Unit_Weight_Kg,Packaging_Type,ABC_Class,XYZ_Class,Reorder_Level,EOQ,Average_Monthly_Demand,Lead_Time_Days,Storage_Zone,Temperature_Controlled,Hazardous_Material,Damage_Risk,Demand_Seasonality,GST_%`
+- Mapping observations: Product ID and SKU_Code are distinct. Product category, subcategory, name, and brand are separate. Procurement cost and selling price are INR-denominated measures; target margin, EOQ, demand, lead time, storage, hazard, and GST fields have separate semantics. No manufacturer or MPN is present.
+- Current mapper gap: add the explicit SKU_Code alias; INR cost/price, margin, GST, ABC/XYZ, packaging, storage, and replenishment require separate fields.
+
+### 65. Faraz Supply Chain Inventory Intelligence product master
+
+- Source: https://github.com/Faraz-05/Supply-Chain-Inventory-Intelligence/blob/0061240a80967b5c144789d4fa9e65c6918bb3eb/data/processed/product_master.csv
+- Type: compact multi-category product dimension
+- Delimiter: comma
+- Header: `SKU_ID,Product_Name,Brand,Category`
+- Mapping observations: SKU_ID, product name, brand, and category are explicit. Some product names redundantly append the SKU value, while others do not. Brand is not manufacturer. No manufacturer or MPN is present. This independently supports treating an explicitly named SKU_ID as an SKU, while not promoting generic product_id to SKU.
+- Current mapper gap: add SKU_ID alias; no manufacturer or MPN means this sample cannot satisfy the general profile.
+
+### 66. Nobu dbt marketplace product master
+
+- Source: https://github.com/NobuYoshi928/dbt_training/blob/402a76d5f80832be7414f6a45aa73720c68b6574/setup/sample_data/product_master.csv
+- Type: multi-marketplace product identifier mapping
+- Delimiter: comma
+- Header: `product_id,product_name,category,amazon_sku,rakuten_item_code`
+- Mapping observations: product_id, Amazon SKU, and Rakuten item code are three distinct identifier namespaces. The source does not provide a universal supplier SKU. Product name and category are explicit. Channel-specific identifiers should not be collapsed into the canonical SKU without a source contract.
+- Current mapper gap: marketplace-specific identifiers and cross-channel product mappings are not represented.
+
+### 67. Indigo manufacturing cost-analysis product master
+
+- Source: https://github.com/Indigo-data/Manufacturing_Cost_Analysis/blob/f15282dbe25b95058e1e105819e23593767feb61/data/bronze/product_master.csv
+- Type: manufacturing procurement and production-planning catalog
+- Delimiter: comma
+- Header: `sku,manufacturer,product_name,vendor,category,unit_of_measure,product_spec,case_pack,standard_unit_cost,pricing_basis,minimum_order_units,standard_lead_time_days,reorder_point_units,machine_line_count,operating_shifts_per_day,units_issued_per_line_shift,eligible_lines`
+- Mapping observations: SKU, manufacturer, product name, vendor, and category are explicit. Manufacturer and vendor are distinct; the sample includes a manufacturer and a separate wholesale account. Product spec is a technical description, not MPN. Standard unit cost depends on pricing_basis, and production capacity fields are operational constraints.
+- Current mapper gap: vendor, UOM, technical specification, case pack, cost basis, MOQ, lead time, reorder point, and production constraints need a manufacturing/procurement profile.
+
+### 68. Nyayomat marketplace product import template
+
+- Source: https://github.com/nyayomat/Nyayomat-Web_Production-Environment/blob/57cca58143c85bd634cca98e64451973602dfded/public/csv_templates/products.csv
+- Type: marketplace product import template
+- Delimiter: comma
+- Header: `NAME,SLUG,ACTIVE,CATEGORIES,GTIN,GTIN_TYPE,MODEL_NUMBER,BRAND,MPN,DESCRIPTION,MANUFACTURER,ORIGIN_COUNTRY,HAS_VARIANT,REQUIRES_SHIPPING,MINIMUM_PRICE,MAXIMUM_PRICE,IMAGE_LINK,TAGS`
+- Mapping observations: NAME, MANUFACTURER, MPN, GTIN, and BRAND are separate. GTIN_TYPE distinguishes UPC and EAN. MODEL_NUMBER is not MPN. CATEGORIES is plural and can contain multiple category values; it should not silently map to a single scalar category. The sample contains a misspelled boolean literal `FASLE`, missing MPN/manufacturer values, and price bounds.
+- Current mapper gap: slug, GTIN/type, model number, origin, variant/shipping flags, min/max prices, images, and multi-valued categories/tags need marketplace support.
+
+### 69. PriceMatch identifier comparison test products
+
+- Source: https://github.com/muchecomanoj/pricemtch/blob/66e99d4641e1b6c34dc9fe20c83935276226a1ad/frontend/test-products.csv
+- Type: product matching test fixture with marketplace identifiers
+- Delimiter: comma
+- Header: `sku,title,brand,category,condition,packQuantity,asin,upc,ean,gtin,mpn`
+- Mapping observations: SKU, ASIN, UPC, EAN, GTIN, and MPN are separate identifiers. UPC/EAN/GTIN values include leading zeros; they must be preserved as strings. Title is a product-name candidate. Brand is distinct from manufacturer. Pack quantity and condition are attributes. The sample is intentionally compact and should be tagged as test data.
+- Current mapper gap: ASIN, barcode/GTIN, condition, pack quantity, and product matching across identifier types are unsupported.
+
+### 70. Perishable Stock Recovery product master
+
+- Source: https://github.com/lamjahnavy/perishable--Stock-Recovery-Desk/blob/4d6154e26a06b23d238f417578d50f2b77062c62/data/C30_Dataset_CSVs/Product_Master.csv
+- Type: cafe/grocery perishable product and demand-assumption master
+- Delimiter: comma
+- Header: `Product_ID,Business_Type,Product_Name,Category,Sell_Unit,Selling_Price_INR,Unit_Cost_INR,Unit_Contribution_Before_Overheads_INR,Shelf_Life_Days,Lead_Time_Days,Order_Pack_Size_Units,Demand_Penetration_Assumption,Weekend_Demand_Factor,Promotion_Uplift_Assumption,Stock_Input_Definition`
+- Mapping observations: Product_ID is not explicitly SKU. Business_Type differentiates cafe-prepared products from grocery supplier-receipt products. Unit contribution is a derived measure and should be recomputed from selling price and unit cost. Shelf life, lead time, order pack, demand penetration, weekend factor, promotion uplift, and stock-input definition are separate business semantics.
+- Current mapper gap: business type, sell unit, perishability, demand assumptions, promotion factors, and unit contribution require a perishable inventory/planning profile.
+
+## Findings after 70 individually inspected files
+
+1. Explicit SKU_ID and SKU_Code headers can be safely recognized as SKU candidates; generic product_id, record_id, marketplace IDs, and warehouse keys remain separate.
+2. Marketplace-specific identifiers (Amazon SKU, Rakuten item code, ASIN) must remain in separate namespaces. A canonical SKU should not be fabricated by choosing one marketplace identifier.
+3. GTIN-14, UPC, EAN, and MPN are independent identifiers. Leading zeros are meaningful; values must remain strings throughout ingestion and validation.
+4. CPG/retail item setup includes brand ownership, GS1 registration, nutrition, pack hierarchies, pallet configuration, retailer distribution, and several price types. This cannot be compressed into the existing seven-field product schema.
+5. Manufacturing procurement feeds distinguish manufacturer from vendor, and unit cost may depend on an explicit pricing basis.
+6. Inventory and perishable planning feeds include derived contributions, demand assumptions, reorder rules, shelf life, and business-type-specific stock definitions. These are not product identity fields.
+7. Templates can contain malformed boolean values and blank required identifiers. Structural import should preserve the source value and deterministic validation should report the exact malformed cell.
