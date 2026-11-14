@@ -69,3 +69,14 @@ def test_excel_xlsx_adapter_reads_selected_sheet():
     parsed = parse_excel(output.getvalue(), ".xlsx", sheet_name="Products")
     assert parsed.records[0].values["SKU"] == "001"
     assert parsed.records[0].source_location == "sheet:Products!row:2"
+
+
+def test_xml_single_record_root_is_not_split_into_field_records():
+    parsed = parse_xml(b'<Product><SKU>001</SKU><Name>Widget</Name></Product>')
+    assert len(parsed.records) == 1
+    assert parsed.records[0].values == {"SKU": "001", "Name": "Widget"}
+
+
+def test_xml_multiple_repeated_groups_require_explicit_record_tag():
+    with pytest.raises(IngestionParseError, match="multiple repeated record groups"):
+        parse_xml(b'<feed><products><product/><product/></products><variants><variant/><variant/></variants></feed>')
