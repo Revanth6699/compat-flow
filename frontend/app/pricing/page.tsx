@@ -2,73 +2,72 @@
 
 import Link from "next/link";
 
-const plans = [
+type FeatureStatus = "Included" | "Planned" | "Not included";
+type Plan = {
+  name: string; price: string; description: string; featured?: boolean;
+  features: [string, FeatureStatus][]; action: string; href: string;
+};
+
+const plans: Plan[] = [
   {
-    name: "Demo",
-    price: "Free",
-    description: "Evaluate the core validation workflow before creating an account.",
-    featured: false,
+    name: "Demo", price: "Free", description: "Evaluate the core validation workflow without creating an account.",
     features: [
-      ["CSV upload and validation", true],
-      ["Required-field and duplicate checks", true],
-      ["On-screen quality metrics", true],
-      ["Issue details and recommendations", true],
-      ["Downloadable validation report", false],
-      ["Excel, JSON and XML inputs", false],
-      ["Supplier API, SFTP and database connections", false],
-      ["Organization workspace and team access", false],
+      ["CSV, XLS and XLSX uploads", "Included"],
+      ["Required-field and duplicate checks", "Included"],
+      ["On-screen quality metrics", "Included"],
+      ["Issue details and recommendations", "Included"],
+      ["Downloadable validation report", "Not included"],
+      ["JSON and XML inputs", "Not included"],
+      ["API, SFTP and database connections", "Not included"],
+      ["Organization workspace", "Not included"],
     ],
-    action: "Try the demo",
-    href: "/catalog/import",
+    action: "Try the demo", href: "/catalog/import",
   },
   {
-    name: "Starter",
-    price: "$27",
-    description: "For individuals and small teams that need repeatable validation and shareable results.",
-    featured: true,
+    name: "Starter", price: "$27", description: "For small teams that need repeatable validation and shareable results.", featured: true,
     features: [
-      ["CSV upload and validation", true],
-      ["Required-field and duplicate checks", true],
-      ["On-screen quality metrics", true],
-      ["Issue details and recommendations", true],
-      ["Downloadable validation report", true],
-      ["Excel, JSON and XML inputs", false],
-      ["Supplier API, SFTP and database connections", false],
-      ["Organization workspace and team access", true],
+      ["CSV validation", "Included"],
+      ["Required-field and duplicate checks", "Included"],
+      ["Validation metrics and issue details", "Included"],
+      ["Downloadable validation report", "Included"],
+      ["Signed-in organization workspace", "Included"],
+      ["XLS, XLSX, JSON and XML inputs", "Not included"],
+      ["API, SFTP and database connections", "Not included"],
     ],
-    action: "Create an account",
-    href: "/sign-up",
+    action: "Create an account", href: "/sign-up",
   },
   {
-    name: "Growth",
-    price: "$64",
-    description: "For teams handling multiple supplier feeds and structured catalog inputs.",
-    featured: false,
+    name: "Growth", price: "$64", description: "For teams working with multiple supplier feeds and connected data sources.",
     features: [
-      ["Everything in Starter", true],
-      ["Excel, JSON and XML inputs", true],
-      ["Supplier API, SFTP and database connections", true],
-      ["Multiple supplier catalogs", true],
-      ["Recurring validation and change comparison", true],
-      ["Team review and issue assignment", false],
+      ["Everything in Starter", "Included"],
+      ["XLS, XLSX, JSON and XML inputs", "Included"],
+      ["REST API, SFTP and SQL Server connections", "Included"],
+      ["Multiple supplier catalog imports", "Included"],
+      ["Recurring validation and version comparison", "Planned"],
+      ["Team review and issue assignment", "Planned"],
     ],
-    action: "Discuss Growth",
-    href: "/contact?intent=pricing&plan=growth",
+    action: "Discuss Growth", href: "/contact?intent=pricing&plan=growth",
   },
   {
-    name: "Business",
-    price: "$153",
-    description: "For operations teams coordinating catalog quality across people and systems.",
-    featured: false,
+    name: "Business", price: "$153", description: "For operations teams coordinating catalog quality across departments.",
     features: [
-      ["Everything in Growth", true],
-      ["Team review and issue assignment", true],
-      ["Approval workflows and audit history", true],
-      ["Advanced integrations", true],
-      ["Custom governance and support", false],
+      ["Everything in Growth", "Included"],
+      ["Team review and issue assignment", "Planned"],
+      ["Approval workflows", "Planned"],
+      ["Audit history and governance", "Planned"],
+      ["Advanced integrations", "Planned"],
     ],
-    action: "Discuss Business",
-    href: "/contact?intent=pricing&plan=business",
+    action: "Discuss Business", href: "/contact?intent=pricing&plan=business",
+  },
+  {
+    name: "Enterprise", price: "Custom", description: "For organizations with custom scale, integration and governance requirements.",
+    features: [
+      ["Everything in Business", "Included"],
+      ["Custom import and usage limits", "Planned"],
+      ["Custom governance and security controls", "Planned"],
+      ["Dedicated onboarding and support terms", "Planned"],
+    ],
+    action: "Discuss Enterprise", href: "/contact?intent=pricing&plan=enterprise",
   },
 ];
 
@@ -77,58 +76,37 @@ export default function PricingPage() {
     <main id="main" className="page pricing-page">
       <div className="container">
         <section className="pricing-intro">
-          <div className="eyebrow">Simple plan boundaries</div>
-          <h1>Start with a demo. Upgrade when the workflow earns its place.</h1>
-          <p>
-            Reference prices are in USD per month. These are proposed early-access
-            prices; paid checkout is not enabled yet. Feature access is enforced
-            by the subscription on the backend when billing is activated.
-          </p>
+          <div className="eyebrow">Plans built around your workflow</div>
+          <h1>Start with a demo. Upgrade when your catalog operations need more.</h1>
+          <p>Reference prices are in USD per month. These are proposed early-access prices; paid checkout is not enabled yet. Features marked Planned are not currently available for purchase.</p>
         </section>
-
         <section className="pricing-grid" aria-label="CompatFlow plans">
-          {plans.map((plan) => (
+          {plans.map(plan => (
             <article className={`pricing-card${plan.featured ? " pricing-card-featured" : ""}`} key={plan.name}>
               <div className="pricing-card-top">
                 <div className="eyebrow">{plan.name === "Demo" ? "No account required" : plan.featured ? "For small teams" : "For growing operations"}</div>
-                <h2>{plan.name}</h2>
-                <p>{plan.description}</p>
-                <div className="pricing-amount">
-                  <strong>{plan.price}</strong>
-                  {plan.price !== "Free" && <span>/ month</span>}
-                </div>
+                <h2>{plan.name}</h2><p>{plan.description}</p>
+                <div className="pricing-amount"><strong>{plan.price}</strong>{plan.price !== "Free" && plan.price !== "Custom" && <span>/ month</span>}</div>
               </div>
-              <div className="pricing-includes">Included capabilities</div>
+              <div className="pricing-includes">Capabilities</div>
               <ul className="pricing-feature-list">
-                {plan.features.map(([feature, included]) => (
-                  <li key={`${plan.name}-${String(feature)}`}>
+                {plan.features.map(([feature, status]) => (
+                  <li key={`${plan.name}-${feature}`}>
                     <span>{feature}</span>
-                    <span className={included ? "pricing-status available" : "pricing-status planned"}>{included ? "Included" : "Not included"}</span>
+                    <span className={status === "Included" ? "pricing-status available" : "pricing-status planned"}>{status}</span>
                   </li>
                 ))}
               </ul>
-              <div className="pricing-card-action">
-                <Link className={plan.featured ? "button" : "button button-secondary"} href={plan.href}>{plan.action}</Link>
-              </div>
+              <div className="pricing-card-action"><Link className={plan.featured ? "button" : "button button-secondary"} href={plan.href}>{plan.action}</Link></div>
             </article>
           ))}
         </section>
-
         <section className="pricing-footnote">
-          <h2>What is the difference between Demo and Starter?</h2>
-          <p>
-            The public demo is a limited, temporary evaluation: CSV only, no
-            account, no downloadable report and no organization workspace.
-            Starter adds a signed-in workspace and downloadable validation
-            reports. It does not unlock connector ingestion or the additional
-            structured file formats.
-          </p>
-          <p>
-            Growth and Business capabilities shown above are plan targets, not
-            claims that every workflow is currently live. Subscription checkout
-            and provider configuration are still being completed.
-          </p>
-          <Link className="pricing-text-link" href="/catalog/import">Try the public CSV demo</Link>
+          <h2>Demo vs Starter</h2>
+          <p>The public demo lets anyone test CSV and Excel validation without signing in. It is limited to 5 MB per file, shows results on screen and does not offer report downloads or a saved workspace.</p>
+          <p>Starter adds a signed-in organization workspace, a larger 25 MB upload ceiling and downloadable validation reports. It does not unlock JSON/XML ingestion or external source connectors.</p>
+          <p>Growth connector access is also subject to operator-side host allowlisting and source security configuration. Subscription checkout and provider credentials are still being completed.</p>
+          <Link className="pricing-text-link" href="/catalog/import">Try the public demo</Link>
         </section>
       </div>
     </main>
