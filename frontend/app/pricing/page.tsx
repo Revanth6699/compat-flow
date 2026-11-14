@@ -11,7 +11,7 @@ type Plan = {
 
 const plans: Plan[] = [
   {
-    name: "Demo", price: "Free", description: "Evaluate the core validation workflow without creating an account.",
+    name: "Demo", price: "Free", description: "Request access to evaluate the core validation workflow.",
     features: [
       ["CSV, XLS and XLSX uploads", "Included"],
       ["Required-field and duplicate checks", "Included"],
@@ -22,7 +22,7 @@ const plans: Plan[] = [
       ["API, SFTP and database connections", "Not included"],
       ["Organization workspace", "Not included"],
     ],
-    action: "Try the demo", href: "/catalog/import",
+    action: "Request demo access", href: "/contact?intent=demo",
   },
   {
     name: "Starter", code: "starter", price: "$27", description: "For small teams that need repeatable validation and shareable results.", featured: true,
@@ -95,7 +95,7 @@ export default function PricingPage() {
             return (
               <article className={`pricing-card${plan.featured ? " pricing-card-featured" : ""}`} key={plan.name}>
                 <div className="pricing-card-top">
-                  <div className="eyebrow">{plan.name === "Demo" ? "No account required" : plan.featured ? "For small teams" : plan.custom ? "Custom requirements" : "For growing operations"}</div>
+                  <div className="eyebrow">{plan.name === "Demo" ? "Approval required" : plan.featured ? "For small teams" : plan.custom ? "Custom requirements" : "For growing operations"}</div>
                   <h2>{plan.name}</h2><p>{plan.description}</p>
                   <div className="pricing-amount"><strong>{plan.price}</strong>{plan.price !== "Free" && plan.price !== "Custom" && <span>/ month</span>}</div>
                 </div>
@@ -119,7 +119,7 @@ export default function PricingPage() {
         </section>
         {!user && <section className="pricing-footnote">
           <h2>Demo vs Starter</h2>
-          <p>The public demo lets anyone test CSV and Excel validation without signing in. It is limited to 5 MB per file, shows results on screen and does not offer report downloads or an organization workspace.</p>
+          <p>Demo access is not automatic. Submit a request and wait for approval before uploading a CSV or Excel file. Approved demo access is limited to 5 MB per file, on-screen results and no report downloads or organization workspace.</p>
           <p>Starter adds an organization workspace, a 25 MB subscribed-import ceiling and downloadable validation reports. It does not unlock JSON/XML ingestion or external source connectors.</p>
           <p>Growth connector access is subject to operator-side host allowlisting and source security configuration. A plan becomes active only after a verified payment-provider webhook.</p>
           <Link className="pricing-text-link" href="/catalog/import">Try the public demo</Link>
