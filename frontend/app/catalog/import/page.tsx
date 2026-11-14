@@ -268,6 +268,11 @@ export default function CatalogImportPage() {
               <div className="panel stat-card"><span>Invalid records</span><strong className="metric-invalid">{multiResult.invalid_records.toLocaleString()}</strong></div>
             </div>
             <div className="panel result-section">
+              <h3>Validation outcome</h3>
+              <div className="validation-chart"><span className="chart-valid" style={{ width: `${multiResult.total_records ? multiResult.valid_records / multiResult.total_records * 100 : 0}%` }} /><span className="chart-invalid" style={{ width: `${multiResult.total_records ? multiResult.invalid_records / multiResult.total_records * 100 : 0}%` }} /></div>
+              <p><span className="metric-valid">Valid: {multiResult.valid_records.toLocaleString()}</span> · <span className="metric-invalid">Invalid: {multiResult.invalid_records.toLocaleString()}</span></p>
+            </div>
+            <div className="panel result-section">
               <h3>Field mapping</h3>
               <p className="import-description">Automatic matches are conservative. Review and confirm every mapping before revalidating.</p>
               <div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical field</th><th>Source column</th><th>Confidence</th></tr></thead><tbody>
@@ -314,6 +319,13 @@ export default function CatalogImportPage() {
               <div className="panel stat-card"><span>Total issues</span><strong>{result.total_issues.toLocaleString()}</strong></div>
             </div>
 
+            <div className="panel result-section">
+              <h3>Validation outcome</h3>
+              <div className="validation-chart"><span className="chart-valid" style={{ width: `${result.total_rows ? result.valid_rows / result.total_rows * 100 : 0}%` }} /><span className="chart-invalid" style={{ width: `${result.total_rows ? result.invalid_rows / result.total_rows * 100 : 0}%` }} /></div>
+              <p><span className="metric-valid">Valid: {result.valid_rows.toLocaleString()}</span> · <span className="metric-invalid">Invalid: {result.invalid_rows.toLocaleString()}</span> · <span className="metric-warning">Warnings: {result.warning_issues.toLocaleString()}</span></p>
+              <h3>Required-field completeness by column</h3>
+              <div className="field-chart-list">{result.field_metrics.map(metric => <div key={metric.field}><span>{metric.field.replaceAll("_", " ")}</span><div className="metric-bar"><span style={{ width: `${metric.completeness_pct}%` }} /></div><strong>{metric.completeness_pct.toFixed(1)}%</strong></div>)}</div>
+            </div>
             <div className="panel result-section">
               <h3>Column mapping</h3>
               <p className="import-description">Confidence indicates how closely a source header matches a known alias. It is not a measure of data accuracy. Unrecognized columns are preserved in the source file but are not part of this product validation check.</p>
