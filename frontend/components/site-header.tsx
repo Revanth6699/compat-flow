@@ -15,6 +15,7 @@ export function SiteHeader() {
         <nav className="nav header-main-nav" aria-label="Main navigation">
           {user ? (
             <>
+              <Link href="/">Home</Link>
               <Link href="/workspace">Workspace</Link>
               <Link href="/catalog/import">Catalog</Link>
               <Link href="/catalog/sources">Data sources</Link>
