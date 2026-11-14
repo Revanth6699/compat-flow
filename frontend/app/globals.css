@@ -736,7 +736,7 @@ small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs)
 }
 .pricing-note strong { color: #202833; font-size: .84rem; }
 .pricing-grid {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: stretch; gap: 14px; padding: 8px 0 40px;
 }
 .pricing-card {
