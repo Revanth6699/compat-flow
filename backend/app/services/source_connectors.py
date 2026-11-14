@@ -7,12 +7,12 @@ from __future__ import annotations
 
 import ipaddress
 import re
+import socket
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import URL
 
 
 class SourceConnectorError(RuntimeError):
@@ -28,11 +28,14 @@ def _validate_https_url(url: str, allowed_hosts: set[str]) -> None:
     if host not in {item.casefold().rstrip(".") for item in allowed_hosts}:
         raise SourceConnectorError("Connector host is not in the configured allowlist.")
     try:
-        address = ipaddress.ip_address(host)
-    except ValueError:
-        address = None
-    if address and (address.is_private or address.is_loopback or address.is_link_local or address.is_reserved):
-        raise SourceConnectorError("Private and local network targets are not allowed.")
+        resolved = {item[4][0] for item in socket.getaddrinfo(host, parsed.port or 443, type=socket.SOCK_STREAM)}
+    except OSError:
+        raise SourceConnectorError("Connector host could not be resolved.") from None
+    for value in resolved:
+        address = ipaddress.ip_address(value)
+        if (address.is_private or address.is_loopback or address.is_link_local
+                or address.is_reserved or address.is_unspecified):
+            raise SourceConnectorError("Private and local network targets are not allowed.")
 
 
 async def fetch_api_records(url: str, *, allowed_hosts: set[str],
