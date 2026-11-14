@@ -1125,3 +1125,13 @@ Continue inspecting datasets individually and append each verified file here. Af
 - The latest manufacturer_part alias/test changes are in the newest CI run; final status is pending.
 - The parser already rejects ragged rows with COLUMN_COUNT_MISMATCH, so the malformed comma examples from datasets 99 and 100 are useful regression fixtures rather than a reason to loosen parsing.
 - Headerless input currently cannot satisfy the required mapped profile; it must not silently treat the first data record as a header. Explicit headerless-schema support would need a separate user-selected template.
+
+
+## Final mapping safety updates after the 100-file review
+
+- Added `manufacturer_part` as a part-number alias for the explicit `Manufacturer Part #` header. `Ferguson Part #` remains a distinct distributor identifier.
+- Removed `product_type` and `item_type` from automatic category mapping because product type and category often coexist as separate columns.
+- Removed `item_code`, `item_number`, `part_id`, and `stock_code` from automatic SKU mapping because those identifiers are not guaranteed to be SKUs.
+- Removed generic `part_no` from automatic MPN mapping because it can represent an internal/maintenance part identifier rather than a manufacturer's part number.
+- Added regression tests for these conservative decisions. CI run 43560733690 passed the manufacturer_part alias and all previous changes; the newest conservative-alias tests are in a later run and remain pending.
+- This is intentionally conservative: an unmapped field can be manually mapped or later suggested by AI. A wrong automatic identifier mapping can corrupt catalog identity and is more costly than asking for confirmation.
