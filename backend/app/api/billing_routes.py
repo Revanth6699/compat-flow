@@ -67,6 +67,8 @@ def create_subscription(
 ):
     if not settings.razorpay_key_id or not settings.razorpay_key_secret:
         raise HTTPException(status_code=503, detail="Razorpay API credentials are not configured.")
+    if payload.billing_interval == "year" and payload.total_count > 10:
+        raise HTTPException(status_code=422, detail="Yearly Razorpay subscriptions cannot exceed 10 billing cycles.")
     provider_plan_id = configured_plan_id(payload.plan_code, payload.billing_interval)
     if not provider_plan_id:
         raise HTTPException(
@@ -298,7 +300,11 @@ async def razorpay_webhook(
     db.add(webhook_event)
 
     payload = event_payload.get("payload") or {}
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Razorpay webhook payload structure is invalid.")
     subscription_entity = ((payload.get("subscription") or {}).get("entity") or {})
+    if not isinstance(subscription_entity, dict):
+        raise HTTPException(status_code=400, detail="Razorpay subscription entity is invalid.")
     provider_subscription_id = subscription_entity.get("id")
     subscription = None
     if isinstance(provider_subscription_id, str):
@@ -324,6 +330,8 @@ async def razorpay_webhook(
                 subscription.canceled_at = datetime.now(timezone.utc)
 
     payment_entity = ((payload.get("payment") or {}).get("entity") or {})
+    if not isinstance(payment_entity, dict):
+        raise HTTPException(status_code=400, detail="Razorpay payment entity is invalid.")
     provider_payment_id = payment_entity.get("id")
     if subscription is not None and isinstance(provider_payment_id, str):
         payment = db.scalar(
