@@ -6,6 +6,7 @@ import { apiRequest } from "@/lib/auth-client";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
+type DatasetProfile = { filename: string; format: string; total_records: number; total_columns: number; total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number; duplicate_rows: number; is_product_catalog: boolean; persisted: false; columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string; minimum: number | null; maximum: number | null; average: number | null }[]; preview: Record<string, unknown>[] };
 type PreviewRow = {
   sku: string; name: string; manufacturer: string; part_number: string;
   category: string; compatibility?: string | null; replacement_sku?: string | null;
@@ -51,6 +52,7 @@ export default function CatalogImportPage() {
   const { user } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<PreviewResponse | null>(null);
+  const [datasetResult, setDatasetResult] = useState<DatasetProfile | null>(null);
   const [multiResult, setMultiResult] = useState<MultiResult | null>(null);
   const [recordType, setRecordType] = useState("products");
   const [aiConsent, setAiConsent] = useState(false);
@@ -62,7 +64,7 @@ export default function CatalogImportPage() {
   const canonicalFields = ["sku", "name", "manufacturer", "part_number", "category", "compatibility", "replacement_sku"];
 
   function handleFileChange(selectedFile: File | null) {
-    setFile(selectedFile); setResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setError("");
+    setFile(selectedFile); setResult(null); setDatasetResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setError("");
     if (!selectedFile) return;
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
     if (!(user ? ["csv", "xlsx", "xls", "json", "xml"] : ["csv", "xlsx", "xls"]).includes(extension ?? "")) {
@@ -75,10 +77,20 @@ export default function CatalogImportPage() {
 
   async function handleValidate() {
     if (!file || loading) return;
-    setLoading(true); setError(""); setResult(null); setMultiResult(null);
+    setLoading(true); setError(""); setResult(null); setDatasetResult(null); setMultiResult(null);
     try {
       const formData = new FormData(); formData.append("file", file);
       const extension = file.name.split(".").pop()?.toLowerCase();
+      if (!user) {
+        const profileResponse = await fetch(`${API_BASE.replace(/\\/$/, "")}/api/v1/catalog/import/profile`, { method: "POST", body: formData });
+        const profileData = await profileResponse.json();
+        if (!profileResponse.ok) throw new Error(typeof profileData.detail === "string" ? profileData.detail : "The dataset could not be profiled.");
+        const profile = profileData as DatasetProfile;
+        if (!profile.is_product_catalog) {
+          setDatasetResult(profile);
+          return;
+        }
+      }
       if (extension !== "csv" || recordType !== "products" || Object.keys(manualMapping).some((field) => !canonicalFields.includes(field))) {
         if (!user && ["xlsx", "xls"].includes(extension ?? "") && recordType === "products") {
           const response = await fetch(`${API_BASE.replace(/\/$/, "")}/api/v1/catalog/import/preview-records`, { method: "POST", body: formData });
@@ -191,7 +203,7 @@ export default function CatalogImportPage() {
             The public demo accepts CSV, XLS and XLSX product files. JSON, XML and connected data sources require an eligible subscription.
           </div>
           <p className="import-description">Files are validated in memory. This public demo does not save files or modify a catalog.</p>
-          <p className="column-hint">This demo validates product catalogs, not seller or customer master-data files. Download the sample product catalog to see the expected columns. Unrecognized datasets are rejected before a misleading quality score is generated.</p>
+          <p className="column-hint">Non-product datasets are profiled using their actual columns; CompatFlow will not label them as invalid product catalogs or invent a product quality score.</p>
           <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>
           <label className="file-picker" htmlFor="catalog-file">
             <span className="file-picker-icon" aria-hidden="true">↥</span>
@@ -225,6 +237,25 @@ export default function CatalogImportPage() {
             </>}
           </section>
         )}
+        {datasetResult && (
+          <section className="import-results" aria-live="polite">
+            <div className="results-heading"><div><div className="eyebrow">Dataset profile complete</div><h2>Dataset statistics</h2><p>{datasetResult.filename} · {datasetResult.format.toUpperCase()} · Analysis only, not saved</p></div><span className="result-status success">Profile generated</span></div>
+            <div className="result-stats">
+              <div className="panel stat-card"><span>Total records</span><strong>{datasetResult.total_records.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Columns</span><strong>{datasetResult.total_columns.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Data completeness</span><strong>{datasetResult.completeness_pct.toFixed(2)}%</strong></div>
+              <div className="panel stat-card"><span>Missing cells</span><strong className={datasetResult.missing_cells ? "metric-invalid" : "metric-valid"}>{datasetResult.missing_cells.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Duplicate rows</span><strong className={datasetResult.duplicate_rows ? "metric-warning" : "metric-valid"}>{datasetResult.duplicate_rows.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Populated cells</span><strong>{datasetResult.populated_cells.toLocaleString()}</strong></div>
+            </div>
+            <div className="panel result-section"><h3>Dataset completeness</h3><div className="metric-bar"><span style={{ width: `${datasetResult.completeness_pct}%` }} /></div><p className="import-description">{datasetResult.populated_cells.toLocaleString()} populated of {datasetResult.total_cells.toLocaleString()} total cells.</p></div>
+            <div className="panel result-section"><h3>Column statistics</h3><div className="table-scroll"><table className="preview-table"><thead><tr><th>Column</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th><th>Distinct</th><th>Min</th><th>Max</th><th>Average</th></tr></thead><tbody>
+              {datasetResult.columns.map(column => <tr key={column.name}><td>{column.name}</td><td>{column.inferred_type}</td><td className="metric-valid">{column.populated.toLocaleString()}</td><td className={column.missing ? "metric-invalid" : "metric-valid"}>{column.missing.toLocaleString()}</td><td><div className="metric-bar metric-bar-small"><span style={{ width: `${column.completeness_pct}%` }} /></div>{column.completeness_pct.toFixed(1)}%</td><td>{column.distinct_values.toLocaleString()}</td><td>{column.minimum ?? "—"}</td><td>{column.maximum ?? "—"}</td><td>{column.average ?? "—"}</td></tr>)}
+            </tbody></table></div></div>
+            <div className="panel result-section"><h3>Record preview</h3><div className="table-scroll"><table className="preview-table"><thead><tr>{datasetResult.columns.map(column => <th key={column.name}>{column.name}</th>)}</tr></thead><tbody>{datasetResult.preview.map((row,index)=><tr key={index}>{datasetResult.columns.map(column=><td key={column.name}>{String(row[column.name] ?? "—")}</td>)}</tr>)}</tbody></table></div></div>
+            <p className="import-disclaimer">This is a structural data profile, not a product validation score. No file or record was saved.</p>
+          </section>
+        )}
         {multiResult && (
           <section className="import-results" aria-live="polite">
             <div className="results-heading">
@@ -233,8 +264,8 @@ export default function CatalogImportPage() {
             </div>
             <div className="result-stats">
               <div className="panel stat-card"><span>Total records</span><strong>{multiResult.total_records.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Valid records</span><strong>{multiResult.valid_records.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Invalid records</span><strong>{multiResult.invalid_records.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Valid records</span><strong className="metric-valid">{multiResult.valid_records.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Invalid records</span><strong className="metric-invalid">{multiResult.invalid_records.toLocaleString()}</strong></div>
             </div>
             <div className="panel result-section">
               <h3>Field mapping</h3>
@@ -276,8 +307,8 @@ export default function CatalogImportPage() {
 
             <div className="result-stats">
               <div className="panel stat-card"><span>Total records</span><strong>{result.total_rows.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Valid records</span><strong>{result.valid_rows.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Invalid records</span><strong>{result.invalid_rows.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Valid records</span><strong className="metric-valid">{result.valid_rows.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Invalid records</span><strong className="metric-invalid">{result.invalid_rows.toLocaleString()}</strong></div>
               <div className="panel stat-card"><span>Quality score</span><strong>{result.data_quality_score.toFixed(2)}%</strong></div>
               <div className="panel stat-card"><span>Pass rate</span><strong>{result.validation_pass_rate.toFixed(2)}%</strong></div>
               <div className="panel stat-card"><span>Total issues</span><strong>{result.total_issues.toLocaleString()}</strong></div>
@@ -330,7 +361,7 @@ export default function CatalogImportPage() {
               {result.row_errors.length === 0 ? <p>No row-level issues were found.</p> : (
                 <div className="table-scroll"><table className="preview-table"><thead><tr><th>Row</th><th>Field</th><th>Severity</th><th>Category</th><th>Reason</th><th>Recommended action</th></tr></thead>
                   <tbody>{result.row_errors.slice(0, 50).map((item, index) => <tr key={`${item.row_number}-${item.error_code}-${index}`}>
-                    <td>{item.row_number}</td><td>{item.field ?? "General"}</td><td>{item.severity}</td><td>{item.category.replaceAll("_", " ")}</td><td>{item.message}</td><td>{item.recommendation}</td>
+                    <td>{item.row_number}</td><td>{item.field ?? "General"}</td><td className={item.severity === "critical" ? "metric-invalid" : "metric-warning"}>{item.severity}</td><td>{item.category.replaceAll("_", " ")}</td><td>{item.message}</td><td>{item.recommendation}</td>
                   </tr>)}</tbody></table></div>
               )}
             </div>
