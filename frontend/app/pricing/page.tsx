@@ -101,7 +101,7 @@ export default function PricingPage() {
               <div className="pricing-includes">Included capabilities</div>
               <ul className="pricing-feature-list">
                 {plan.features.map(([feature, included]) => (
-                  <li key={feature}>
+                  <li key={`${plan.name}-${String(feature)}`}>
                     <span>{feature}</span>
                     <span className={included ? "pricing-status available" : "pricing-status planned"}>{included ? "Included" : "Not included"}</span>
                   </li>
