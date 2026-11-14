@@ -31,4 +31,18 @@ Each parser returns a `ParsedSource` containing a format, headers, metadata, and
 
 ## Current implementation boundary
 
-These modules provide parser and connector primitives. They do not yet constitute a complete end-user import workflow: record-type selection, mapping confirmation, deterministic validation across all five catalog record types, durable import jobs/lineage, scheduled API/SFTP/SQL Server polling, connector management UI, and transactional persistence still need to be wired and tested end to end. Do not label those capabilities generally available until that integration is complete.
+Implemented on the feature branch:
+- Format-neutral parsers for CSV, XLSX, XLS, JSON, and XML with source-location metadata.
+- An authenticated, subscription-gated `POST /api/v1/catalog/import/parse-preview` endpoint for structural preview only.
+- Secure connector primitives for HTTPS API fetch, host-key-verified SFTP download, and bounded SQL Server read projections.
+- An opt-in AI mapping provider interface with bounded evidence, HTTPS provider endpoint requirement, candidate-field allowlisting, source-evidence checks, and no-provider fallback.
+
+Not yet an end-to-end production import workflow:
+- The existing CSV business validator is not yet generalized to all five record types and every input adapter.
+- The preview endpoint does not persist data.
+- No connector configuration UI, encrypted credential vault, API pagination scheduler, SFTP polling/deduplication scheduler, or SQL Server incremental watermark scheduler exists.
+- Durable job orchestration, retry/recovery, full row/item lineage storage, and transactional batch persistence remain to be implemented.
+- The frontend does not yet expose format selectors, mapping review, or connector setup.
+- AI suggestions are not yet exposed in the product UI; no AI provider credentials are configured and no model has been trained.
+
+Do not label these incomplete capabilities generally available. SQL Server requires the Microsoft ODBC Driver and a least-privilege read-only login in the runtime environment.
