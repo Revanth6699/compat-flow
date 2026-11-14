@@ -77,7 +77,7 @@ def test_supabase_token_rejects_hmac_algorithm(signing_keys):
             "iss": "https://project.supabase.co/auth/v1",
             "exp": int((datetime.now(timezone.utc) + timedelta(minutes=15)).timestamp()),
         },
-        "attacker-controlled-secret",
+        "attacker-controlled-secret-value-with-32-plus-bytes",
         algorithm="HS256",
     )
     with pytest.raises(HTTPException) as error:
