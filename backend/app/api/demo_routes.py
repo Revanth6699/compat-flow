@@ -170,13 +170,17 @@ def platform_admin_overview(
         return int(db.scalar(select(func.count()).select_from(model)) or 0)
     return {
         "users": count(User),
+        "active_users": int(db.scalar(select(func.count()).select_from(User).where(User.is_active.is_(True))) or 0),
         "organizations": count(Organization),
         "subscriptions": count(Subscription),
+        "active_subscriptions": int(db.scalar(select(func.count()).select_from(Subscription).where(Subscription.status.in_(("active", "trialing")))) or 0),
         "reviews": count(Review),
         "demo_requests": count(DemoAccessRequest),
         "pending_demo_requests": int(db.scalar(select(func.count()).select_from(DemoAccessRequest).where(DemoAccessRequest.status == "pending")) or 0),
         "approved_demo_requests": int(db.scalar(select(func.count()).select_from(DemoAccessRequest).where(DemoAccessRequest.status == "approved")) or 0),
         "complaints": None,
         "complaints_note": "Complaint tracking is not implemented yet.",
+        "subscription_usage": None,
+        "subscription_usage_note": "Monthly validation/storage usage is not yet persisted as a usage ledger, so usage totals are unavailable.",
     }
 
