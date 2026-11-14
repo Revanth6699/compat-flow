@@ -23,7 +23,7 @@ def test_valid_csv():
 
 def test_alias_headers_are_mapped_to_canonical_fields():
     content = (
-        "product_sku,product_name,brand,mpn,product_category,warehouse_code\n"
+        "product_sku,product_name,manufacturer,mpn,product_category,warehouse_code\n"
         "SKU-1,Brake Pad,Maker A,BP-100,Brakes,W-01\n"
     )
     result = parse_catalog_csv(content)
@@ -31,13 +31,11 @@ def test_alias_headers_are_mapped_to_canonical_fields():
     assert {mapping.field: mapping.source_header for mapping in result.column_mappings} == {
         "sku": "product_sku",
         "name": "product_name",
-        "manufacturer": "brand",
+        "manufacturer": "manufacturer",
         "part_number": "mpn",
         "category": "product_category",
     }
     assert result.unmapped_headers == ["warehouse_code"]
-    assert next(m.confidence for m in result.column_mappings if m.field == "manufacturer") == 0.88
-
 
 
 def test_product_mpn_header_maps_to_part_number():
@@ -93,6 +91,36 @@ def test_shopify_google_shopping_mpn_header_maps_to_part_number():
     assert result.valid_count == 1
     mapped = {item.field: item.source_header for item in result.column_mappings}
     assert mapped["part_number"] == "Google Shopping / Manufacturer part number (MPN)"
+
+
+def test_brand_is_not_automatically_mapped_to_manufacturer():
+    content = (
+        "sku,name,brand,category\n"
+        "SKU-1,Phone,Acme,Electronics\n"
+    )
+    result = parse_catalog_csv(content, allow_incomplete_mapping=True)
+    assert "manufacturer" not in {item.field for item in result.column_mappings}
+    assert "brand" in result.unmapped_headers
+
+
+def test_description_is_not_automatically_used_as_product_name():
+    content = (
+        "sku,description,manufacturer,category\n"
+        "SKU-1,A long product description,Maker A,Electronics\n"
+    )
+    result = parse_catalog_csv(content, allow_incomplete_mapping=True)
+    assert "name" not in {item.field for item in result.column_mappings}
+    assert "description" in result.unmapped_headers
+
+
+def test_sku_number_header_maps_to_sku():
+    content = (
+        "sku_number,product_name,manufacturer,category\n"
+        "SKU-1,Phone,Maker A,Electronics\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.valid_count == 1
+    assert {item.field: item.source_header for item in result.column_mappings}["sku"] == "sku_number"
 
 
 def test_header_normalization_accepts_spaces_and_punctuation():
