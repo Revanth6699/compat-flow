@@ -45,4 +45,4 @@ Not yet an end-to-end production import workflow:
 - The frontend does not yet expose format selectors, mapping review, or connector setup.
 - AI suggestions are not yet exposed in the product UI; no AI provider credentials are configured and no model has been trained.
 
-Do not label these incomplete capabilities generally available. SQL Server requires the Microsoft ODBC Driver and a least-privilege read-only login in the runtime environment.
+Do not label these incomplete capabilities generally available. SQL Server requires the Python pyodbc package, Microsoft ODBC Driver 18, and a least-privilege read-only login in the runtime environment. Configure encryption and certificate verification; never disable TLS verification for a production source.
