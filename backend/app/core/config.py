@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
+    platform_admin_email: str = ""
 
     database_url: str = (
         "postgresql+psycopg://compatflow_local:"
