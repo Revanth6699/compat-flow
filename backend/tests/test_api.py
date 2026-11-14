@@ -52,7 +52,7 @@ def test_preview_rejects_invalid_utf8():
     assert response.status_code == 400
 
 
-def test_preview_rejects_missing_required_columns():
+def test_preview_returns_row_errors_for_missing_required_mappings():
     response = client.post(
         "/api/v1/catalog/import/preview",
         files={
@@ -63,7 +63,10 @@ def test_preview_rejects_missing_required_columns():
             )
         },
     )
-    assert response.status_code == 422
+    assert response.status_code == 200
+    data = response.json()
+    assert data["invalid_rows"] == 1
+    assert any("manufacturer" in issue["message"] for issue in data["row_errors"])
 
 
 def test_preview_detects_duplicate_skus_within_uploaded_file():
