@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";\nimport { useRouter } from "next/navigation";
 import { AuthRequired } from "@/components/auth-required";
 import { useAuth } from "@/components/auth-provider";
-import { updatePassword, updateProfile } from "@/lib/auth-client";
+import { apiRequest, updatePassword, updateProfile } from "@/lib/auth-client";
 
 function SettingsContent() {
-  const { user, signOut } = useAuth();
+  const { user, signOut } = useAuth();\n  const router = useRouter();\n  const [accountRole, setAccountRole] = useState<string | null>(null);\n  const [deleteConfirmation, setDeleteConfirmation] = useState("");\n  const [deleteError, setDeleteError] = useState("");\n  const [deleting, setDeleting] = useState(false);\n  const requiredDeleteText = accountRole === "owner" ? "DELETE ORGANIZATION" : "DELETE MY ACCOUNT";
   const metadata = user?.user_metadata || {};
   const [fullName, setFullName] = useState(metadata.full_name || "");
   const [jobTitle, setJobTitle] = useState(metadata.job_title || "");
@@ -22,7 +22,27 @@ function SettingsContent() {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [busyProfile, setBusyProfile] = useState(false);
-  const [busyPassword, setBusyPassword] = useState(false);
+  const [busyPassword, setBusyPassword] = useState(false);\n\n  useEffect(() => {\n    void apiRequest<{ role: string }>("/api/v1/auth/me").then(profile => setAccountRole(profile.role)).catch(() => setAccountRole(null));\n  }, []);
+
+  async function deleteAccount() {
+    setDeleteError("");
+    if (deleteConfirmation !== requiredDeleteText) {
+      setDeleteError(`Type ${requiredDeleteText} exactly to continue.`);
+      return;
+    }
+    setDeleting(true);
+    try {
+      await apiRequest<{ deleted: boolean }>("/api/v1/auth/account", {
+        method: "DELETE",
+        body: JSON.stringify({ confirmation: requiredDeleteText }),
+      });
+      await signOut();
+      router.replace("/");
+    } catch (cause) {
+      setDeleteError(cause instanceof Error ? cause.message : "Account deletion could not be completed.");
+      setDeleting(false);
+    }
+  }
 
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setProfileMessage(""); setProfileError("");
@@ -68,6 +88,14 @@ function SettingsContent() {
       <button className="button auth-submit" disabled={busyPassword}>{busyPassword ? "Updating…" : "Update password"}</button>
     </form></section>
     <section className="panel settings-panel"><h2>Account and privacy</h2><p className="settings-description">CompatFlow uses your account details to authenticate you and associate your access with an organization. You can review how information is processed in the <Link href="/privacy">Privacy Policy</Link>.</p><button className="button button-secondary" onClick={() => void signOut()}>Sign out</button></section>
+    <section className="panel settings-panel danger-zone">
+      <h2>Delete account</h2>
+      {accountRole === "owner" ? <p className="settings-description">Deleting the owner account permanently removes the entire company workspace: all employee accounts, organization data, import history, reviews, subscription records and payment history. Any active Razorpay subscription is sent an immediate cancellation request first. This cannot be undone.</p> : <p className="settings-description">Deleting your account permanently removes your sign-in identity and organization membership. Shared company data and the organization subscription remain with the company owner.</p>}
+      <label htmlFor="delete-account-confirmation">Type <strong>{requiredDeleteText}</strong> to confirm</label>
+      <input id="delete-account-confirmation" value={deleteConfirmation} onChange={event => setDeleteConfirmation(event.target.value)} autoComplete="off" spellCheck={false} placeholder={requiredDeleteText} />
+      {deleteError && <p className="auth-error" role="alert">{deleteError}</p>}
+      <button className="button button-danger" type="button" disabled={deleting || deleteConfirmation !== requiredDeleteText} onClick={() => void deleteAccount()}>{deleting ? "Deleting account…" : "Permanently delete account"}</button>
+    </section>
   </div></main>;
 }
 export default function SettingsPage() { return <AuthRequired><SettingsContent /></AuthRequired>; }
