@@ -5,7 +5,6 @@ import { useAuth } from "@/components/auth-provider";
 
 export function SiteHeader() {
   const { user, loading, signOut } = useAuth();
-  const role = user?.user_metadata?.role;
 
   return (
     <header className="site-header">
@@ -19,8 +18,9 @@ export function SiteHeader() {
               <Link href="/workspace">Workspace</Link>
               <Link href="/catalog/import">Catalog</Link>
               <Link href="/catalog/sources">Data sources</Link>
-              <Link href="/team">Team</Link>
-              <Link href="/reviews">Reviews</Link>\n              <Link href="/reviews/write">Write a review</Link>
+
+              <Link href="/reviews">Reviews</Link>
+              <Link href="/reviews/write">Write a review</Link>
               <Link href="/pricing">Plans</Link>
             </>
           ) : (
