@@ -21,16 +21,15 @@ HEADER_ALIASES = {
     "sku": {
         "sku": 1.0, "product_sku": 0.98, "item_sku": 0.98,
         "product_code": 0.96, "item_code": 0.96, "item_number": 0.92,
-        "part_id": 0.90, "stock_code": 0.90,
+        "part_id": 0.90, "stock_code": 0.90, "sku_number": 0.98,
     },
     "name": {
         "name": 1.0, "product_name": 0.99, "item_name": 0.98,
-        "title": 0.94, "product_title": 0.98, "device_name": 0.98, "description": 0.82,
-        "short_description": 0.80,
+        "title": 0.94, "product_title": 0.98, "device_name": 0.98,
     },
     "manufacturer": {
         "manufacturer": 1.0, "manufacturer_name": 0.99, "mfr": 0.97,
-        "maker": 0.94, "brand": 0.88, "brand_name": 0.88,
+        "maker": 0.94,
     },
     "part_number": {
         "part_number": 1.0, "manufacturer_part_number": 0.99,
