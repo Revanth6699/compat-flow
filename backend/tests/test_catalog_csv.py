@@ -210,8 +210,8 @@ def test_first_pass_preview_surfaces_ambiguous_aliases_for_manual_mapping():
 
 def test_semicolon_delimited_supplier_feed_is_detected():
     content = (
-        "product_code;name;price_gross;vat;currency;stock\\n"
-        "SKU-1;Electric guitar;129.99;21;EUR;4\\n"
+        "product_code;name;price_gross;vat;currency;stock\n"
+        "SKU-1;Electric guitar;129.99;21;EUR;4\n"
     )
     result = parse_catalog_csv(
         content,
@@ -229,8 +229,8 @@ def test_semicolon_delimited_supplier_feed_is_detected():
 
 def test_tab_delimited_feed_is_detected():
     content = (
-        "sku\\tname\\tmanufacturer\\tpart_number\\tcategory\\n"
-        "SKU-1\\tBrake Pad\\tMaker A\\tBP-100\\tBrakes\\n"
+        "sku\tname\tmanufacturer\tpart_number\tcategory\n"
+        "SKU-1\tBrake Pad\tMaker A\tBP-100\tBrakes\n"
     )
     result = parse_catalog_csv(content)
     assert result.total_rows == 1
@@ -239,8 +239,8 @@ def test_tab_delimited_feed_is_detected():
 
 def test_pipe_delimited_feed_is_detected():
     content = (
-        "sku|name|manufacturer|part_number|category\\n"
-        "SKU-1|Brake Pad|Maker A|BP-100|Brakes\\n"
+        "sku|name|manufacturer|part_number|category\n"
+        "SKU-1|Brake Pad|Maker A|BP-100|Brakes\n"
     )
     result = parse_catalog_csv(content)
     assert result.total_rows == 1
