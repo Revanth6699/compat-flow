@@ -86,7 +86,7 @@ export default function PlatformAdminPage() {
   }
 
   if (loading) return <main className="page"><div className="container">Checking account...</div></main>;
-  if (!user) return <main className="page"><div className="container panel"><h1>Platform administration</h1><p>Sign in with the configured platform-owner account.</p><Link className="button" href="/sign-in">Sign in</Link></div></main>;
+  if (!user) return <main className="page"><div className="container panel"><h1>Platform administration</h1><p>Sign in with the configured platform-owner account.</p><Link className="button" href="/sign-in?next=%2Fplatform-admin">Sign in</Link></div></main>;
   if ((user.email || "").trim().toLowerCase() !== "sarvasettyrevanth.66@gmail.com") {
     return <main className="page"><div className="container panel"><h1>Access denied</h1><p>This account is not authorized to access platform administration.</p><Link className="button button-secondary" href="/">Return to website</Link></div></main>;
   }
