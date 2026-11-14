@@ -525,7 +525,7 @@ class PaymentWebhookEvent(Base):
 class Review(Base):
     __tablename__ = "reviews"
     __table_args__ = (
-        UniqueConstraint("user_id", name="uq_reviews_user"),
+        UniqueConstraint("user_id", name="uq_reviews_user"),\n        CheckConstraint("rating >= 1 AND rating <= 5", name="ck_reviews_rating_range"),
         Index("ix_reviews_published_created", "is_published", "created_at"),
     )
 
