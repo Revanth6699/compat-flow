@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import ImportJob, ImportRowError
+from app.models import ImportJob, ImportRowError, ImportRecordLineage
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
@@ -223,6 +223,16 @@ def get_import_history_item(
     )) or 0
     errors = db.scalars(errors_query.order_by(ImportRowError.row_number.asc())
                         .offset(error_offset).limit(error_limit)).all()
+    lineage_total = db.scalar(select(func.count()).select_from(ImportRecordLineage).where(
+        ImportRecordLineage.job_id == job.id,
+        ImportRecordLineage.organization_id == current.profile.organization_id,
+    )) or 0
+    lineage = db.scalars(
+        select(ImportRecordLineage).where(
+            ImportRecordLineage.job_id == job.id,
+            ImportRecordLineage.organization_id == current.profile.organization_id,
+        ).order_by(ImportRecordLineage.created_at.asc()).limit(500)
+    ).all()
     return {
         "id": str(job.id), "filename": job.filename, "record_type": job.import_type,
         "status": job.status, "total_records": job.row_count,
@@ -230,6 +240,12 @@ def get_import_history_item(
         "processed_records": job.processed_rows, "created_at": job.created_at,
         "completed_at": job.completed_at, "error_message": job.error_message,
         "error_total": error_total, "error_limit": error_limit, "error_offset": error_offset,
+        "lineage_total": lineage_total,
+        "lineage": [{
+            "record_type": item.record_type, "source_location": item.source_location,
+            "source_key": item.source_key, "target_record_id": str(item.target_record_id),
+        } for item in lineage],
+        "lineage_truncated": lineage_total > len(lineage),
         "errors": [{
             "row_number": error.row_number, "source_location": error.source_location,
             "field": error.field, "error_code": error.error_code, "message": error.message,
