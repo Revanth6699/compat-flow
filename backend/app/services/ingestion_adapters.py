@@ -121,6 +121,8 @@ def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
             headers = _clean_headers(list(raw_headers))
             for row_number, row in enumerate(iterator, start=header_row + 1):
                 values = list(row[:len(headers)])
+                if any(value is not None and str(value).strip() for value in row[len(headers):]):
+                    raise IngestionParseError(f"Worksheet row {row_number} contains values beyond the header columns.")
                 if len(values) < len(headers):
                     values.extend([None] * (len(headers) - len(values)))
                 if all(value is None or str(value).strip() == "" for value in values):
@@ -150,7 +152,10 @@ def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
                 raise IngestionParseError("Worksheet header row is missing.")
             headers = _clean_headers(sheet.row_values(header_row - 1))
             for index in range(header_row, sheet.nrows):
-                values = sheet.row_values(index)[:len(headers)]
+                raw_values = sheet.row_values(index)
+                if any(value is not None and str(value).strip() for value in raw_values[len(headers):]):
+                    raise IngestionParseError(f"Worksheet row {index + 1} contains values beyond the header columns.")
+                values = raw_values[:len(headers)]
                 if all(value is None or str(value).strip() == "" for value in values):
                     continue
                 if len(records) >= max_records:
