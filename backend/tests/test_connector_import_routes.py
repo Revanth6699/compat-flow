@@ -89,7 +89,7 @@ def clear_connector_auth():
 
 
 def test_authenticated_connector_preview_runs_validation_without_persisting(monkeypatch):
-    organization_id, _, _ = install_connector_auth(monkeypatch)
+    _, _, _ = install_connector_auth(monkeypatch)
     async def fake_load_source(payload):
         return (
             b'[{"sku":"001","name":"Widget","manufacturer":"Acme","part_number":"A-1","category":"Parts"}]',
