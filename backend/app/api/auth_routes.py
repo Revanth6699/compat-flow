@@ -1,9 +1,11 @@
-from datetime import datetime, timedelta, timezone\nimport json
+from datetime import datetime, timedelta, timezone
+import json
 from hashlib import sha256
 import secrets
 from uuid import uuid4, UUID
 
-import httpx\nfrom fastapi import APIRouter, Depends, HTTPException
+import httpx
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
@@ -18,7 +20,9 @@ from app.core.auth import (
     get_active_plan,
     require_verified_supabase_email,
 )
-from app.core.database import get_db\nfrom app.core.config import settings\nfrom app.services.razorpay_client import razorpay_request
+from app.core.database import get_db
+from app.core.config import settings
+from app.services.razorpay_client import razorpay_request
 from app.models import Organization, Payment, PaymentWebhookEvent, Subscription, SubscriptionPlan, User, UserInvitation
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -77,7 +81,8 @@ def delete_account(
     if profile.role == "owner":
         if payload.confirmation != "DELETE ORGANIZATION":
             raise HTTPException(status_code=422, detail="As the organization owner, type DELETE ORGANIZATION to remove the company workspace and all associated data.")
-        db.scalar(select(Organization.id).where(Organization.id == profile.organization_id).with_for_update())\n        members = list(db.scalars(select(User).where(User.organization_id == profile.organization_id)).all())
+        db.scalar(select(Organization.id).where(Organization.id == profile.organization_id).with_for_update())
+        members = list(db.scalars(select(User).where(User.organization_id == profile.organization_id)).all())
         subscriptions = list(db.scalars(
             select(Subscription).where(Subscription.organization_id == profile.organization_id).with_for_update()
         ).all())
@@ -100,7 +105,14 @@ def delete_account(
         for member in members:
             if member.auth_user_id:
                 _delete_supabase_user(member.auth_user_id)
-        db.execute(delete(Payment).where(Payment.organization_id == profile.organization_id))\n        provider_ids = [item.provider_subscription_id for item in subscriptions if item.provider_subscription_id]\n        if provider_ids:\n            for event in db.scalars(select(PaymentWebhookEvent)).all():\n                payload_text = json.dumps(event.payload, default=str)\n                if any(provider_id in payload_text for provider_id in provider_ids):\n                    db.delete(event)\n        db.execute(delete(Organization).where(Organization.id == profile.organization_id))
+        db.execute(delete(Payment).where(Payment.organization_id == profile.organization_id))
+        provider_ids = [item.provider_subscription_id for item in subscriptions if item.provider_subscription_id]
+        if provider_ids:
+            for event in db.scalars(select(PaymentWebhookEvent)).all():
+                payload_text = json.dumps(event.payload, default=str)
+                if any(provider_id in payload_text for provider_id in provider_ids):
+                    db.delete(event)
+        db.execute(delete(Organization).where(Organization.id == profile.organization_id))
         db.commit()
         return {"deleted": True, "scope": "organization", "deleted_accounts": len(members)}
 
