@@ -19,7 +19,7 @@ from app.core.auth import (
     require_verified_supabase_email,
 )
 from app.core.database import get_db\nfrom app.core.config import settings\nfrom app.services.razorpay_client import razorpay_request
-from app.models import Organization, Subscription, SubscriptionPlan, User, UserInvitation
+from app.models import Organization, Payment, Subscription, SubscriptionPlan, User, UserInvitation
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 invitation_router = APIRouter(prefix="/invitations", tags=["invitations"])
@@ -100,7 +100,7 @@ def delete_account(
         for member in members:
             if member.auth_user_id:
                 _delete_supabase_user(member.auth_user_id)
-        db.execute(delete(Organization).where(Organization.id == profile.organization_id))
+        db.execute(delete(Payment).where(Payment.organization_id == profile.organization_id))\n        db.execute(delete(Organization).where(Organization.id == profile.organization_id))
         db.commit()
         return {"deleted": True, "scope": "organization", "deleted_accounts": len(members)}
 
