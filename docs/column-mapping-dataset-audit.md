@@ -580,3 +580,105 @@ Continue inspecting datasets individually and append each verified file here. Af
 - Added regression tests for the new SKU aliases, brand/description safety, and placeholder handling.
 - CI run 43558661844 passed completely for the previous alias batch. The latest changes from commits 04846d2 and 201ee42 are in a new CI run and remain unverified until that run completes.
 - No ML model has been trained or connected. The AI design is being separated from deterministic validation; see `docs/column-mapping-ai-design.md`.
+
+
+### 51. PairSight sandbox product identity dataset
+
+- Source: https://github.com/naisxx/pairsight/blob/a46525f15ff64ebe626ae992496980008a7c20f9/prisma/demo/sandbox-products.csv
+- Type: product identity/variant matching benchmark
+- Delimiter: comma
+- Header: `record_id,product_name,brand,manufacturer,gtin,mpn,sku,model_number,category,color,size`
+- Mapping observations: record_id, SKU, GTIN, MPN, model number, brand, and manufacturer are separate fields. The same product name appears across size/color variants with different GTIN/SKU values; manufacturer and MPN are often blank. Product-name casing varies across records. This is strong evidence for variant identity and identifier separation, though the synthetic names/values should be tagged as benchmark data.
+- Current mapper gap: record ID, GTIN, model, color, size, and product-variant grouping are outside the current canonical model.
+
+### 52. Tailwagg product dimension
+
+- Source: https://github.com/PDRWeb/tailwagg/blob/dd45342b769e2ba7674fb929f5a1bc18d0557447/data/raw/dim_product.csv
+- Type: pet retail product dimension
+- Delimiter: comma
+- Header: `product_id,sku,name,category_id,brand_id,is_active,attributes,created_at,discontinued_at`
+- Mapping observations: product_id and SKU are distinct. Name is explicit. The columns called category_id and brand_id contain text-like values in the sample, but the names still imply references rather than canonical labels; do not map them automatically. The attributes cell is a Python-dict-like string using single quotes, not valid JSON, so a JSON-only extractor will fail. Active/discontinued dates are lifecycle attributes.
+- Current mapper gap: category/brand references, lifecycle dates, and safe parsing of non-JSON structured attribute strings are unsupported. Do not pass Python literal strings to eval.
+
+### 53. Novexa home analytics product dimension
+
+- Source: https://github.com/mmoudoulaud-cyber/novexa-home-analytics/blob/000e38bf83497662d12bc1636102e2d694c81c7f/data/raw/Dim_Product.csv
+- Type: home retail data-warehouse product dimension
+- Delimiter: comma
+- Header: `Product_ID,SKU,Product_Name,Brand,Supplier_ID,Category,Subcategory,Price_Segment,Unit_Cost,Unit_Price,Base_Margin_Rate,Launch_Date,Product_Status`
+- Mapping observations: Product ID, SKU, product name, brand, supplier ID, category, and subcategory are distinct. Brand is not manufacturer; supplier_id is a foreign key. Unit cost, unit price, and base margin are separate financial measures. Some category/subcategory combinations appear semantically mismatched in the synthetic sample.
+- Current mapper gap: category hierarchy, supplier references, price segment, cost/price/margin, launch date, and product status are not represented.
+
+### 54. LH Nautical product/variant dimension
+
+- Source: https://github.com/LeoRam0s/lh-nautical/blob/b786421ac3756b26be8ddf2acfefdc9d7ab4deb5/data/2-lh_nautical_gold/dim_product.csv
+- Type: marine equipment product/variant export
+- Delimiter: comma
+- Header: `product_variant_id,product_id,sku,barcode_ean,sale_price,cost_price,weight_kg,icms_rate,ipi_rate,is_active_variant,product_name,description,brand_id,category_id,ncm_code,unit_of_measure,is_active_product,category_name,slug,parent_category_id,is_active_category,brand_name,country,is_active_brand`
+- Mapping observations: product_variant_id, product_id, and SKU are separate; several variant rows share a parent product name and product_id. Barcode/EAN values are represented as floating-point numbers with trailing .0, which risks losing leading zeros and exact identifier digits. Brand/category IDs coexist with brand/category labels. Sale price, cost price, taxes, NCM code, unit, and status fields are distinct.
+- Current mapper gap: variant identity, exact barcode preservation, category/brand references, taxes, customs classification, and unit-of-measure fields need domain-aware support. Numeric barcode coercion must be flagged.
+
+### 55. Tudzai Power BI product dimension fixture
+
+- Source: https://github.com/Tudzai/powerbi-fpa-analytics-portfolio/blob/325b58155b8e4eb110d74d8b15e334cffa9fe044/Project%2004%20-%20Customer%20Funnel%20Conversion/bi_customer_funnel_conversion_dashboard/data/powerbi_template_compat/dim_product.csv
+- Type: Power BI compatibility product dimension
+- Delimiter: comma
+- Header: UTF-8 BOM-prefixed `product_id,product_name,category,subcategory,brand,base_price,launch_date,unit_cost,active_flag`
+- Mapping observations: product_id values resemble SKU strings (SKU_1001 etc.) but the header is explicitly product_id and no SKU field exists. Brand, category, and subcategory are separate. The BOM appears only at the beginning of the first header and must not prevent recognition. Base price, unit cost, and active flag are distinct.
+- Current mapper gap: no surrogate product ID, subcategory, price/cost, launch date, or active-state fields. Do not infer SKU from product_id based on value pattern alone.
+
+### 56. Supply Chain Analytics product dimension
+
+- Source: https://github.com/amanydv09/Supply-Chain-Analytics-and-Business-Intelligence/blob/38b054ee0b615aa1c9bfedd2a402424eb252dae2/Dim_Product.csv
+- Type: compact supply-chain product dimension
+- Delimiter: comma
+- Header: `Product_ID,Product_Name,Category,Brand,Unit_Cost`
+- Mapping observations: product ID, product name, category, brand, and unit cost are explicit. No SKU, manufacturer, or MPN is provided. Sample names/brands contain obvious synthetic cross-brand/model combinations (for example, an Apple-branded Galaxy or Vivo-branded iPhone), so this is a useful data-quality anomaly fixture but not reliable semantic training data.
+- Current mapper gap: no SKU, manufacturer, MPN, or unit-cost field. Brand must remain distinct from manufacturer.
+
+### 57. Retail Trend Tracker product dimension
+
+- Source: https://github.com/AnirudhHanda/retail_trend_tracker_infosys_winternship/blob/0f02a0a9c293026c9099ca84460f5ee94a756af1/retail_trend_tracker_data/dim_product.csv
+- Type: retail analytics product dimension
+- Delimiter: comma
+- Header: `product_id,subcategory_id,brand_id,product_name,product_description,product_price,product_cost,product_weight,product_upc,product_sku,product_launch_date,is_active`
+- Mapping observations: product_id, subcategory_id, brand_id, UPC, and SKU are separate. product_sku is a direct SKU candidate; product_upc is a barcode identifier and must not map to SKU or MPN. Brand/category references are IDs, not labels. Product description is separate from product name. UPC values are numeric-looking and some start with zero, so they must remain strings.
+- Current mapper gap: UPC, surrogate/reference IDs, product price/cost/weight, launch date, active status, and subcategory hierarchy are unsupported.
+
+### 58. Quick-commerce dark-store inventory test dataset
+
+- Source: https://github.com/Cheeku29/AI-Inventory-Management-System/blob/2b08f278b438bd2245749c0ed88e101c2f11a6d6/frontend/public/sample_datasets/quick_commerce_darkstore_inventory.csv
+- Type: store-level inventory and anomaly test fixture
+- Delimiter: comma
+- Header: `item_code,product_name,category,store_code,available_qty,expected_inventory,daily_demand,retail_price,cost_price,delivery_days,moq,pack_size,supplier_name,test_case_note`
+- Mapping observations: item_code is an explicit operational item identifier and can be mapped to SKU only under a source-specific contract; supplier_name is not manufacturer. Available and expected inventory are separate. The sample deliberately contains zero/negative stock and mismatches between recorded and expected inventory. test_case_note contains prewritten anomaly labels and should not be treated as independently computed ground truth without verification.
+- Current mapper gap: store location, stock reconciliation, daily demand, MOQ, pack size, supplier, and test annotations belong to an inventory profile, not the current product master.
+
+### 59. SupplyGuard AI inventory sample
+
+- Source: https://github.com/mohamednafrisnrs-source/supplyguard-ai/blob/3c90b37129cf5bf183631185d4fd04ae1c7ca7a3/src/data/inventory.csv
+- Type: replenishment/safety-stock inventory feed
+- Delimiter: comma
+- Header: `sku,product_name,current_stock,average_daily_demand,lead_time_days,safety_stock,supplier`
+- Mapping observations: SKU and product name are explicit. Current stock, average daily demand, lead time, and safety stock are separate inventory measures. Supplier is not manufacturer. The compact sample is useful for inventory schema discovery but cannot satisfy the current general product profile.
+- Current mapper gap: inventory and replenishment fields require a separate inventory profile and validation rules.
+
+### 60. AWS retail intelligence product master
+
+- Source: https://github.com/aws-samples/sample-amazon-qbusiness-and-quicksight-for-retail-intelligence/blob/b6ed997d28a9531c3a47456f6fcbad45431a486d/csv/product_master.csv
+- Type: retail product master with supplier and inventory measures
+- Delimiter: comma
+- Header: `product_id,sku,product_name,top_category,sub_category,brand,unit_price,unit_cost,current_stock,min_stock_level,max_stock_level,supplier,launch_date,is_active,margin`
+- Mapping observations: Product ID and SKU are separate; product name and top/subcategory are separate. Brand and supplier are separate from manufacturer. Unit price, unit cost, stock bounds, and margin are distinct. The sample margin is consistent with a derived gross-margin percentage for the inspected rows, but the source value should still be recalculated from price/cost for validation rather than trusted. Some product names and SKU strings appear synthetic or malformed.
+- Current mapper gap: top_category, subcategory, supplier, inventory bounds, unit price/cost, launch date, active status, and margin are outside the current canonical model.
+
+## Findings after 60 individually inspected files
+
+1. Product ID and SKU are separate even when product_id values look like SKUs. Do not infer identity from formatting alone.
+2. Product variants are distinct records: parent product ID, variant ID, SKU, GTIN, size/color, and product name can have different cardinalities.
+3. Numeric coercion of GTIN/EAN/UPC can corrupt identifiers through decimal suffixes, scientific notation, precision loss, or dropped leading zeros. Identifier columns must be preserved as strings and validated separately.
+4. Brand, manufacturer, supplier, and seller are distinct roles. Do not auto-map one to another.
+5. Structured attributes may be JSON or Python-literal-like strings. Never use eval; use a safe parser and require a recognized format before extracting fields.
+6. Inventory fields such as available/current/expected stock, daily demand, safety stock, lead time, and MOQ require inventory-specific validation and metrics.
+7. Data quality test fixtures sometimes contain prewritten issue labels. Treat those labels as test metadata, not as ground truth for model training or measured validation outcomes.
+8. A product master with top_category and sub_category provides evidence for a top_category alias, but the hierarchy must be preserved separately when both fields exist.
