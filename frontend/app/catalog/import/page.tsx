@@ -82,7 +82,7 @@ export default function CatalogImportPage() {
       const formData = new FormData(); formData.append("file", file);
       const extension = file.name.split(".").pop()?.toLowerCase();
       if (!user) {
-        const profileResponse = await fetch(`${API_BASE.replace(/\\/$/, "")}/api/v1/catalog/import/profile`, { method: "POST", body: formData });
+        const profileResponse = await fetch(`${API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE}/api/v1/catalog/import/profile`, { method: "POST", body: formData });
         const profileData = await profileResponse.json();
         if (!profileResponse.ok) throw new Error(typeof profileData.detail === "string" ? profileData.detail : "The dataset could not be profiled.");
         const profile = profileData as DatasetProfile;
@@ -93,7 +93,7 @@ export default function CatalogImportPage() {
       }
       if (extension !== "csv" || recordType !== "products" || Object.keys(manualMapping).some((field) => !canonicalFields.includes(field))) {
         if (!user && ["xlsx", "xls"].includes(extension ?? "") && recordType === "products") {
-          const response = await fetch(`${API_BASE.replace(/\/$/, "")}/api/v1/catalog/import/preview-records`, { method: "POST", body: formData });
+          const response = await fetch(`${API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE}/api/v1/catalog/import/preview-records`, { method: "POST", body: formData });
           const data = await response.json();
           if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The backend could not validate this spreadsheet.");
           setMultiResult(data as MultiResult);
@@ -114,7 +114,7 @@ export default function CatalogImportPage() {
         setResult(data);
         setManualMapping(Object.fromEntries(data.column_mappings.map((item) => [item.field, item.source_header])));
       } else {
-        const response = await fetch(`${API_BASE.replace(/\/$/, "")}/api/v1/catalog/import/preview`, { method: "POST", body: formData });
+        const response = await fetch(`${API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE}/api/v1/catalog/import/preview`, { method: "POST", body: formData });
         const data = await response.json();
         if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The backend could not validate this CSV.");
         const parsed = data as PreviewResponse;
