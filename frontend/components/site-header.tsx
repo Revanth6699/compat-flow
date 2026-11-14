@@ -19,7 +19,6 @@ export function SiteHeader() {
               <Link href="/workspace">Workspace</Link>
               <Link href="/catalog/import">Catalog</Link>
               <Link href="/catalog/sources">Data sources</Link>
-
               <Link href="/pricing">Plans</Link>
             </>
           ) : (
@@ -29,7 +28,6 @@ export function SiteHeader() {
               <Link href="/#workflow">How it works</Link>
               <Link href="/pricing">Pricing</Link>
               <Link href="/contact?intent=demo">Request demo</Link>
-              <Link href="/catalog/import">Public CSV demo</Link>
               <Link href="/reviews">Reviews</Link>
             </>
           )}
