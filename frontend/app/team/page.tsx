@@ -53,7 +53,7 @@ function TeamContent() {
     }
   }, []);
 
-  useEffect(() => { void loadTeam(); }, [loadTeam]);
+  useEffect(() => { void Promise.resolve().then(loadTeam); }, [loadTeam]);
 
   async function createInvitation(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -106,7 +106,7 @@ function TeamContent() {
     <main id="main" className="page">
       <div className="container account-settings">
         <header className="workspace-heading">
-          <div><span className="eyebrow">ORGANIZATION</span><h1>Team access</h1><p>Manage who can enter this organization's CompatFlow workspace.</p></div>
+          <div><span className="eyebrow">ORGANIZATION</span><h1>Team access</h1><p>Manage who can enter this organization CompatFlow workspace.</p></div>
           <Link className="button button-secondary" href="/workspace">Back to workspace</Link>
         </header>
         {error && <p className="auth-error" role="alert">{error}</p>}
@@ -145,8 +145,8 @@ function TeamContent() {
               <h2>Invitations</h2>
               {invitations.length === 0 ? <p>No invitations have been created for this organization yet.</p> : <div className="table-wrap"><table><thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Expires</th><th>Action</th></tr></thead><tbody>
                 {invitations.map(item => {
-                  const status = item.accepted_at ? "Accepted" : item.revoked_at ? "Revoked" : new Date(item.expires_at).getTime() <= Date.now() ? "Expired" : "Pending";
-                  return <tr key={item.id}><td>{item.email}</td><td>{item.role}</td><td>{status}</td><td>{new Date(item.expires_at).toLocaleString()}</td><td>{canManage && status === "Pending" ? <button className="button button-secondary" disabled={busy} onClick={() => void revokeInvitation(item.id)}>Revoke</button> : "—"}</td></tr>;
+                  const status = item.accepted_at ? "Accepted" : item.revoked_at ? "Revoked" : "Awaiting response";
+                  return <tr key={item.id}><td>{item.email}</td><td>{item.role}</td><td>{status}</td><td>{new Date(item.expires_at).toLocaleString()}</td><td>{canManage && status === "Awaiting response" ? <button className="button button-secondary" disabled={busy} onClick={() => void revokeInvitation(item.id)}>Revoke</button> : "—"}</td></tr>;
                 })}
               </tbody></table></div>}
               <p className="settings-description">Accepted employees are linked to this organization. This page currently lists invitations and seat usage; active member directory and role changes are not yet available.</p>
