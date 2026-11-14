@@ -432,14 +432,6 @@ def test_postgres_enforces_tenant_isolation_for_all_catalog_record_types():
     organization_a = Organization(name=f"Catalog tenant A {uuid4().hex[:8]}")
     organization_b = Organization(name=f"Catalog tenant B {uuid4().hex[:8]}")
     plan_code = f"catalog_test_{uuid4().hex[:12]}"
-    owner = User(
-        organization_id=organization_a.id,
-        auth_user_id=uuid4(),
-        email=f"catalog-owner-{uuid4().hex[:8]}@example.test",
-        role="member",
-        is_active=True,
-        account_type="subscriber",
-    )
     plan = SubscriptionPlan(
         code=plan_code,
         name=f"Catalog test plan {uuid4().hex[:8]}",
@@ -449,6 +441,17 @@ def test_postgres_enforces_tenant_isolation_for_all_catalog_record_types():
     )
     try:
         db.add_all([organization_a, organization_b, plan])
+        db.flush()
+
+        owner = User(
+            organization_id=organization_a.id,
+            auth_user_id=uuid4(),
+            email=f"catalog-owner-{uuid4().hex[:8]}@example.test",
+            role="member",
+            is_active=True,
+            account_type="subscriber",
+        )
+        db.add(owner)
         db.flush()
 
         supplier_a = Supplier(
