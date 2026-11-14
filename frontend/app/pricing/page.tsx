@@ -85,7 +85,7 @@ export default function PricingPage() {
         <section className="pricing-grid" aria-label="CompatFlow plans">
           {plans.map(plan => {
             const href = plan.code
-              ? (user ? plan.href : `/sign-up?plan=${plan.code}`)
+              ? (user ? `/workspace?plan=${plan.code}` : `/sign-up?plan=${plan.code}`)
               : plan.href;
             const action = plan.code && user ? "Manage subscription" : plan.action;
             return (
