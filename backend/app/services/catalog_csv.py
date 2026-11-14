@@ -22,6 +22,7 @@ HEADER_ALIASES = {
         "sku": 1.0, "product_sku": 0.98, "item_sku": 0.98,
         "product_code": 0.96, "item_code": 0.96, "item_number": 0.92,
         "part_id": 0.90, "stock_code": 0.90, "sku_number": 0.98,
+        "sku_pioneer_part_number": 0.95,
     },
     "name": {
         "name": 1.0, "product_name": 0.99, "item_name": 0.98,
@@ -129,6 +130,18 @@ def _normalize_header(value: str) -> str:
     return value.strip("_")
 
 
+MISSING_VALUE_MARKERS = {
+    "n/a", "not available", "non disponible", "no disponible",
+    "not provided", "null", "none", "-", "--", "—", "–",
+}
+
+
+def _normalize_cell_value(value: str) -> str:
+    """Normalize common source placeholders to empty values before validation."""
+    normalized = (value or "").strip()
+    return "" if normalized.casefold() in MISSING_VALUE_MARKERS else normalized
+
+
 def _detect_delimiter(content: str) -> str:
     """Detect common supplier-feed delimiters without splitting quoted values."""
     sample = content[:65_536]
@@ -203,7 +216,7 @@ def _detect_columns(headers: list[str], required_fields=REQUIRED_FIELDS, column_
             "Could not map required product fields: "
             + ", ".join(missing)
             + ". Recognized headers include common aliases such as product_sku, "
-              "product_name, brand, mpn and product_category. Rename or map the "
+              "product_name, manufacturer, mpn and product_category. Rename or map the "
               "missing source columns before validating."
         )
 
@@ -265,7 +278,7 @@ def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS, profile_id: str = 
             for header, value in zip(normalized_headers, values)
         }
         row = {
-            field: source_row[normalized_headers[index]]
+            field: _normalize_cell_value(source_row[normalized_headers[index]])
             for field, (index, _) in detected.items()
         }
         for field in required_fields:
