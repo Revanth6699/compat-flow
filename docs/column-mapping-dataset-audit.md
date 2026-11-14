@@ -792,3 +792,104 @@ Continue inspecting datasets individually and append each verified file here. Af
 - CI run 43559764619 is checking the latest SKU ID/code alias tests. Backend container initialization and frontend setup have started; test and build steps are still pending.
 - No barcode/GTIN aliases were added. UPC, EAN, GTIN-14, ASIN, and marketplace item identifiers remain distinct from SKU and MPN.
 - The AI mapping design remains a controlled suggestion layer; no model or external AI provider is active.
+
+
+### 71. Meridian industrial multi-warehouse inventory
+
+- Source: https://github.com/prachi-shah-ds/DBS-/blob/e8cbe988833e0520142b187767a34d4dc5078fc7/SAMPLE_DATA/meridian_industrial_supply_data/inventory.csv
+- Type: industrial SKU-by-warehouse inventory snapshot
+- Delimiter: comma
+- Header: `sku_id,product_name,category,warehouse_id,warehouse_name,current_stock,safety_stock,reorder_point,unit_cost,supplier_id,lead_time_days,last_restock_date,stockout_flag,obsolete_flag`
+- Mapping observations: sku_id, product name, and category are explicit. The same SKU repeats across several warehouse rows, so it is not a duplicate product-master record. Warehouse ID/name, current stock, safety stock, reorder point, supplier ID, lead time, restock date, stockout and obsolete flags are separate inventory facts.
+- Current mapper gap: inventory grain must include SKU + warehouse (and potentially snapshot date), not SKU alone. Supplier/warehouse IDs and replenishment metrics need an inventory profile.
+
+### 72. Superlinked supplier product matching feed
+
+- Source: https://github.com/superlinked/cookbook/blob/45369d88d617babb4c69352c29f03db85eb1aa1d/ecommerce/match_products_to_catalog/data/supplier_feed.csv
+- Type: incoming supplier offers for product matching
+- Delimiter: comma
+- Header: `record_id,brand,title,gtin,model_number,color,size,pack_count,plug,material,x,y,w,h`
+- Mapping observations: record_id is a feed-record ID, not SKU. Brand and title are explicit; GTIN/model_number are often blank. Color, size, pack count, plug, and material describe variant identity. Coordinates x/y/w/h refer to image tiles, not product dimensions. The feed deliberately includes near-duplicate titles (different cable lengths, charger plugs, salted vs unsalted cashews, sandal colors/sizes).
+- Current mapper gap: supplier-offer record type, variant attributes, image provenance, and product-match outcomes (same product / variant / new) are separate from the current canonical product mapping.
+
+### 73. Superlinked PIM product catalog
+
+- Source: https://github.com/superlinked/cookbook/blob/45369d88d617babb4c69352c29f03db85eb1aa1d/ecommerce/match_products_to_catalog/data/pim_products.csv
+- Type: product information management catalog with parent/variant structure
+- Delimiter: comma
+- Header: `record_id,parent_id,product_line,brand,title,gtin,model_number,color,size,pack_count,plug,material,x,y,w,h`
+- Mapping observations: record_id, parent_id, and product_line are separate identity/grouping concepts. Brand and title are explicit. GTIN/model_number are identifiers, while color/size/pack_count/plug/material define variants. A single parent product can have multiple variant records. The example README documents exact GTIN/model matching and review for ambiguous near-matches.
+- Current mapper gap: parent-child catalog relationships, variant attributes, GTIN/model identity and source-specific record IDs need an extended PIM model. Do not map record_id or parent_id to SKU.
+
+### 74. Superlinked manufacturing parts catalog
+
+- Source: https://github.com/superlinked/cookbook/blob/45369d88d617babb4c69352c29f03db85eb1aa1d/manufacturing/fill_work_order_from_notes/data/parts_catalog.csv
+- Type: maintenance storeroom spare-parts catalog
+- Delimiter: comma
+- Header: `part_no,description,unit`
+- Mapping observations: part_no is an explicit spare-part identifier and description is a part description; unit is the issue/stock unit. Values include gasket, bearing, seal, impeller, contactor, belt, coupling guard, and grease. No manufacturer or product SKU is supplied.
+- Current mapper gap: a maintenance-parts profile needs part identity, unit, equipment compatibility, and storeroom context. Description is not automatically a product name.
+
+### 75. Superlinked retail shelf-price product catalog
+
+- Source: https://github.com/superlinked/cookbook/blob/45369d88d617babb4c69352c29f03db85eb1aa1d/retail/check_shelf_from_photo/data/catalog.csv
+- Type: grocery UPC-to-product and shelf-price reference
+- Delimiter: comma
+- Header: `upc,brand,product,regular_price`
+- Mapping observations: UPC is the product identifier; brand and product name are separate; regular_price is a shelf price. UPC values are fixed-width strings with leading zeros. Some product names are close or near-identical (multiple granola, cheesecake, beet juice and whipped-topping variants), and brand casing is inconsistent.
+- Current mapper gap: UPC/GTIN, price, and brand fields are outside the current schema. The generic `product` header is a contextual name candidate here, but should not be a global alias without additional source evidence.
+
+### 76. Pharmacy scraped product listing dataset
+
+- Source: https://github.com/mouniksai/pharmacy-stockout-prediction/blob/737a0cb52b3f9d6878c3e6eec2db612783c215da/data/scraped_pharmacy_data_raw.csv
+- Type: public pharmacy catalog extraction
+- Delimiter: comma
+- Header: `Medicine_Name,Category,Manufacturer,Pack_Size,Composition,Scraped_Price_INR,Scraped_Availability,Source_Portal,Source_URL`
+- Mapping observations: Medicine_Name, Category, and Manufacturer are explicit. There is no SKU/MPN field. Pack size and composition distinguish strengths/formulations; scraped price and availability are time-sensitive observations, while source portal and URL are provenance. Product names and compositions contain variable whitespace.
+- Current mapper gap: medicine-name alias, pack/composition, INR price, availability, source provenance, and scrape timestamp require a pharmacy profile.
+
+### 77. Pharmacy stockout modeling raw dataset
+
+- Source: https://github.com/mouniksai/pharmacy-stockout-prediction/blob/737a0cb52b3f9d6878c3e6eec2db612783c215da/data/pharmacy_stockout_raw.csv
+- Type: pharmacy product plus replenishment/stockout modeling dataset
+- Delimiter: comma
+- Header: `Medicine_ID,Medicine_Name,Category,Manufacturer,Pack_Size,Composition,Unit_Price_INR,Criticality,Seasonal_Demand,Source_Portal,Source_URL,Current_Stock,Daily_Sales,Supplier_Lead_Time,Reorder_Level,Expiry_Date,Minimum_Order_Quantity,Storage_Condition,Stock_Status`
+- Mapping observations: Medicine_ID is a source record ID, not a confirmed SKU. Manufacturer is explicit; pack size and composition identify formulation. Current stock, daily sales, supplier lead time, reorder level, expiry, MOQ, storage, and stock status are operational data. The source describes a modeled/expanded cohort; derived or simulated inventory fields must be tagged separately from scraped catalog facts.
+- Current mapper gap: medicine identity and operational stockout features need separate source lineage and a pharmacy inventory profile.
+
+### 78. StockWise sample inventory upload
+
+- Source: https://github.com/kirtibhushanIIMBG/StockWise-AI/blob/80a15be7bbd56968c1a8bbfd1483abfd171790d1/data/sample_inventory.csv
+- Type: Indian SMB inventory upload example
+- Delimiter: comma
+- Header: `sku,product_name,category,supplier,current_stock,avg_daily_demand,lead_time_days,unit_cost,selling_price,safety_stock,demand_std,incoming_stock,backorders`
+- Mapping observations: SKU, product name, and category are explicit. Supplier is not manufacturer. Current stock, average daily demand, lead time, cost, selling price, safety stock, demand standard deviation, incoming stock, and backorders are distinct. Some demo rows have missing demand_std/safety_stock, zero stock, and zero demand; these are legitimate edge cases, not necessarily malformed product identity.
+- Current mapper gap: inventory and demand planning need separate profile fields. Missing operational values must not be confused with missing product identity.
+
+### 79. WR Bryan inventory accuracy product master
+
+- Source: https://github.com/wrbryan/data-analysis-showcase/blob/e0bfd3846889207d1588745c6f4e4109ea89cacb/projects/01-inventory-accuracy-stockout-risk/data/sample/product_master.csv
+- Type: industrial inventory accuracy product master
+- Delimiter: comma
+- Header: `sku,product_name,category,supplier,unit_cost,lead_time_days,reorder_point,safety_stock,annual_demand_estimate,active_flag`
+- Mapping observations: SKU, product name, category, and supplier are explicit. Supplier is not manufacturer. Unit cost, lead time, reorder point, safety stock, annual demand estimate, and active flag are separate fields. This is synthetic sample data and should be tagged as such.
+- Current mapper gap: supplier, cost, lead time, stock thresholds, demand estimate, and active state belong to an inventory profile.
+
+### 80. WR Bryan multi-location inventory snapshot
+
+- Source: https://github.com/wrbryan/data-analysis-showcase/blob/e0bfd3846889207d1588745c6f4e4109ea89cacb/projects/01-inventory-accuracy-stockout-risk/data/sample/inventory_snapshot.csv
+- Type: dated physical-vs-system inventory snapshot
+- Delimiter: comma
+- Header: `snapshot_date,sku,location,zone,system_qty,physical_qty,unit_cost`
+- Mapping observations: SKU is a reference to the product master. Snapshot date, location, and zone define the row grain; multiple rows per SKU are expected. system_qty and physical_qty are separate observed quantities, and discrepancies are meaningful. This file is not a product master and must not be validated with product-level duplicate rules.
+- Current mapper gap: snapshot lineage, compound uniqueness, system/physical quantity reconciliation, location hierarchy, and inventory valuation are separate validation capabilities.
+
+## Findings after 80 individually inspected files
+
+1. Inventory row grain is now repeatedly confirmed as SKU + location/warehouse + snapshot date (and sometimes lot). Duplicate SKU rows are often valid.
+2. Supplier feeds and PIM catalogs need matching/variant semantics: record IDs, parent IDs, product lines, GTIN/model numbers, and variant attributes are not interchangeable.
+3. UPC/GTIN values with leading zeros must remain strings. Exact identifier matching should normalize to a defined canonical representation without numeric coercion.
+4. Product description fields are not product names; the generic product header can only be a contextual AI/manual suggestion.
+5. Pharmacy catalog facts and modeled inventory fields need separate provenance. Scraped price/availability, manufacturer, pack size and composition should not be mixed with synthetic or derived stockout metrics.
+6. Product identity validation and inventory reconciliation are different product capabilities. Inventory profile rules need composite keys and deterministic reconciliation metrics.
+7. The same-source PIM and supplier files provide a valuable paired matching benchmark, but their synthetic identifiers and attribute labels must be tagged; do not count correlated files as independent evidence for model generalization.
