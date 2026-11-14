@@ -40,7 +40,6 @@ HEADER_ALIASES = {
     },
     "category": {
         "category": 1.0, "product_category": 0.99, "category_name": 0.98, "top_category": 0.97,
-        "product_type": 0.92, "item_type": 0.88,
     },
     "compatibility": {
         "compatibility": 1.0, "compatible_with": 0.98,
