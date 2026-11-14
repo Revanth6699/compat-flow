@@ -283,3 +283,68 @@ def test_sql_server_connector_reads_only_selected_bounded_columns(monkeypatch):
     assert calls["limit"] == 25
     assert calls["executed"] is True
     assert calls["disposed"] is True
+
+
+
+def test_api_connector_rejects_private_dns_targets(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.source_connectors.socket.getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("127.0.0.1", 443))],
+    )
+    with pytest.raises(SourceConnectorError, match="Private and local"):
+        _validate_https_url("https://supplier.example/api", {"supplier.example"})
+
+
+def test_api_connector_rejects_invalid_url_port():
+    with pytest.raises(SourceConnectorError, match="invalid port"):
+        _validate_https_url("https://supplier.example:bad/api", {"supplier.example"})
+
+
+def test_sql_server_connector_enforces_serialized_result_byte_limit(monkeypatch):
+    class ColumnCollection:
+        def __getitem__(self, name):
+            return name
+
+    class FakeTable:
+        c = ColumnCollection()
+
+    class Statement:
+        def limit(self, value):
+            return self
+
+    class MappingResult:
+        def all(self):
+            return [{"sku": "001", "description": "x" * 100}]
+
+    class ExecutionResult:
+        def mappings(self):
+            return MappingResult()
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def execute(self, statement):
+            return ExecutionResult()
+
+    class Engine:
+        def connect(self):
+            return Connection()
+
+        def dispose(self):
+            pass
+
+    monkeypatch.setattr(connectors, "create_engine", lambda *args, **kwargs: Engine())
+    monkeypatch.setattr(connectors, "Table", lambda *args, **kwargs: FakeTable())
+    monkeypatch.setattr(connectors, "MetaData", lambda: object())
+    monkeypatch.setattr(connectors, "select", lambda *columns: Statement())
+
+    with pytest.raises(SourceConnectorError, match="size limit"):
+        fetch_sql_server_rows(
+            "mssql+pyodbc://user:pass@host/db?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no",
+            schema="dbo", table="Products", columns=["sku", "description"],
+            limit=10, max_bytes=20,
+        )
