@@ -6,9 +6,9 @@ import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/auth-client";
 
 type Overview = {
-  users: number; organizations: number; subscriptions: number; reviews: number;
+  users: number; active_users: number; organizations: number; subscriptions: number; active_subscriptions: number; reviews: number;
   demo_requests: number; pending_demo_requests: number; approved_demo_requests: number;
-  complaints: number | null; complaints_note: string;
+  complaints: number | null; complaints_note: string; subscription_usage: number | null; subscription_usage_note: string;
 };
 type DemoRequest = {
   id: string; name: string; email: string; organization: string; role: string;
@@ -62,7 +62,7 @@ export default function PlatformAdminPage() {
     <div className="import-heading"><div className="eyebrow">RESTRICTED CONSOLE</div><h1>Platform overview</h1><p>Platform-level metrics and demo access decisions. Authorization is enforced by the API.</p></div>
     {error && <p className="form-error" role="alert">{error}</p>}
     {overview && <div className="result-stats">
-      {([["Users", overview.users], ["Organizations", overview.organizations], ["Subscriptions", overview.subscriptions], ["Reviews", overview.reviews], ["Demo requests", overview.demo_requests], ["Pending requests", overview.pending_demo_requests], ["Approved demos", overview.approved_demo_requests]] as [string, number][]).map(([label, value]) => <div className="panel stat-card" key={label}><span>{label}</span><strong>{value.toLocaleString()}</strong></div>)}
+      {([["Users", overview.users], ["Active users", overview.active_users], ["Organizations", overview.organizations], ["Subscriptions", overview.subscriptions], ["Active subscriptions", overview.active_subscriptions], ["Reviews", overview.reviews], ["Demo requests", overview.demo_requests], ["Pending requests", overview.pending_demo_requests], ["Approved demos", overview.approved_demo_requests]] as [string, number][]).map(([label, value]) => <div className="panel stat-card" key={label}><span>{label}</span><strong>{value.toLocaleString()}</strong></div>)}
     </div>}
     <section className="panel result-section"><h2>Demo access requests</h2>
       {requests.length === 0 ? <p>No demo requests have been submitted.</p> : <div className="table-scroll"><table className="preview-table"><thead><tr><th>Requester</th><th>Organization</th><th>Message</th><th>Status</th><th>Actions</th></tr></thead><tbody>
@@ -73,6 +73,6 @@ export default function PlatformAdminPage() {
         </td></tr>)}
       </tbody></table></div>}
     </section>
-    <section className="panel result-section"><h2>Complaints and support</h2><p>{overview?.complaints_note || "Complaint tracking is not implemented yet."}</p></section>
+    <section className="panel result-section"><h2>Complaints and support</h2><p>{overview?.complaints_note || "Complaint tracking is not implemented yet."}</p></section>\n    <section className="panel result-section"><h2>Subscription usage</h2><p>{overview?.subscription_usage_note || "Usage metering is not implemented yet."}</p></section>
   </div></main>;
 }
