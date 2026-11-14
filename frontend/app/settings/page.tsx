@@ -8,7 +8,13 @@ import { useAuth } from "@/components/auth-provider";
 import { apiRequest, updatePassword, updateProfile } from "@/lib/auth-client";
 
 function SettingsContent() {
-  const { user, signOut } = useAuth();\n  const router = useRouter();\n  const [accountRole, setAccountRole] = useState<string | null>(null);\n  const [deleteConfirmation, setDeleteConfirmation] = useState("");\n  const [deleteError, setDeleteError] = useState("");\n  const [deleting, setDeleting] = useState(false);\n  const requiredDeleteText = accountRole === "owner" ? "DELETE ORGANIZATION" : "DELETE MY ACCOUNT";
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+  const [accountRole, setAccountRole] = useState<string | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const requiredDeleteText = accountRole === "owner" ? "DELETE ORGANIZATION" : "DELETE MY ACCOUNT";
   const metadata = user?.user_metadata || {};
   const [fullName, setFullName] = useState(metadata.full_name || "");
   const [jobTitle, setJobTitle] = useState(metadata.job_title || "");
@@ -23,7 +29,11 @@ function SettingsContent() {
   const [passwordMessage, setPasswordMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [busyProfile, setBusyProfile] = useState(false);
-  const [busyPassword, setBusyPassword] = useState(false);\n\n  useEffect(() => {\n    void apiRequest<{ role: string }>("/api/v1/auth/me").then(profile => setAccountRole(profile.role)).catch(() => setAccountRole(null));\n  }, []);
+  const [busyPassword, setBusyPassword] = useState(false);
+
+  useEffect(() => {
+    void apiRequest<{ role: string }>("/api/v1/auth/me").then(profile => setAccountRole(profile.role)).catch(() => setAccountRole(null));
+  }, []);
 
   async function deleteAccount() {
     setDeleteError("");
