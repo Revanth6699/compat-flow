@@ -20,6 +20,7 @@ export function SiteHeader() {
               <Link href="/catalog/import">Catalog</Link>
               <Link href="/catalog/sources">Data sources</Link>
               <Link href="/pricing">Plans</Link>
+              {user.email?.toLowerCase() === "sarvasettyrevanth.66@gmail.com" && <Link href="/platform-admin">Platform admin</Link>}
             </>
           ) : (
             <>
