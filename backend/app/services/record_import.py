@@ -57,6 +57,8 @@ class RecordImportResult:
     record_type: str
     total_records: int
     valid_records: list[dict[str, Any]]
+    valid_source_locations: list[str]
+    valid_source_keys: list[str | None]
     errors: list[dict[str, Any]]
     mappings: list[dict[str, Any]]
     unmapped_headers: list[str]
@@ -134,6 +136,8 @@ def validate_parsed_records(
     )
     model = RECORD_MODELS[record_type]
     valid: list[dict[str, Any]] = []
+    valid_source_locations: list[str] = []
+    valid_source_keys: list[str | None] = []
     errors: list[dict[str, Any]] = []
     seen: dict[tuple[Any, ...], str] = {}
     populated: Counter[str] = Counter()
@@ -172,6 +176,7 @@ def validate_parsed_records(
                 for detail in exc.errors():
                     errors.append({
                         "source_location": record.source_location,
+                        "source_key": record.source_key,
                         "field": ".".join(str(part) for part in detail.get("loc", ())) or None,
                         "error_code": str(detail.get("type", "invalid_value")).upper(),
                         "message": detail.get("msg", "Invalid value."),
@@ -197,6 +202,7 @@ def validate_parsed_records(
             if len(errors) < error_limit:
                 errors.append({
                     "source_location": record.source_location,
+                    "source_key": record.source_key,
                     "field": duplicate_key[0],
                     "error_code": "DUPLICATE_IN_FILE",
                     "message": f"Duplicate key matches {seen[duplicate_key]}.",
@@ -205,6 +211,8 @@ def validate_parsed_records(
         if duplicate_key:
             seen[duplicate_key] = record.source_location
         valid.append(values)
+        valid_source_locations.append(record.source_location)
+        valid_source_keys.append(record.source_key)
 
     completeness = [
         {
@@ -220,6 +228,8 @@ def validate_parsed_records(
         record_type=record_type,
         total_records=len(parsed.records),
         valid_records=valid,
+        valid_source_locations=valid_source_locations,
+        valid_source_keys=valid_source_keys,
         errors=errors,
         mappings=mapping_details,
         unmapped_headers=unmapped,
