@@ -4,7 +4,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
-export type AuthUser = { id: string; email?: string; user_metadata?: { full_name?: string; organization_name?: string } };
+export type AuthUser = { id: string; email?: string; user_metadata?: { full_name?: string; organization_name?: string; job_title?: string; phone?: string; company_website?: string; industry?: string; team_size?: string } };
 type AuthSession = { access_token: string; refresh_token: string; expires_at?: number; expires_in?: number; user: AuthUser };
 let accessToken: string | null = null;
 let currentUser: AuthUser | null = null;
@@ -80,7 +80,7 @@ export async function signIn(email: string, password: string) {
   applySession(session);
   return session.user;
 }
-export async function signUp(email: string, password: string, fullName: string, organizationName: string, redirectPath = "/workspace") {
+export async function signUp(email: string, password: string, fullName: string, organizationName: string, redirectPath = "/workspace", profileDetails: { job_title: string; phone: string; company_website: string; industry: string; team_size: string } = { job_title: "", phone: "", company_website: "", industry: "", team_size: "" }) {
   const { url, key } = config();
   const safeNext = redirectPath.startsWith("/") && !redirectPath.startsWith("//") ? redirectPath : "/workspace";
   const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(safeNext)}`;
@@ -90,7 +90,7 @@ export async function signUp(email: string, password: string, fullName: string, 
   const response = await fetch(signupUrl.toString(), {
     method: "POST",
     headers: { apikey: key, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: email.trim().toLowerCase(), password, data: { full_name: fullName.trim(), organization_name: organizationName.trim() }, code_challenge: codeChallenge, code_challenge_method: "s256" }),
+    body: JSON.stringify({ email: email.trim().toLowerCase(), password, data: { full_name: fullName.trim(), organization_name: organizationName.trim(), ...profileDetails }, code_challenge: codeChallenge, code_challenge_method: "s256" }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -130,13 +130,13 @@ export async function updatePassword(password: string) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.msg || data.message || "Could not update your password.");
 }
-export async function updateProfile(fullName: string) {
+export async function updateProfile(fullName: string, profileDetails: { job_title: string; phone: string; company_website: string; industry: string; team_size: string }) {
   if (!accessToken) throw new Error("Your session has expired. Sign in again before updating your profile.");
   const { url, key } = config();
   const response = await fetch(`${url}/auth/v1/user`, {
     method: "PUT",
     headers: { apikey: key, "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ data: { full_name: fullName.trim() } }),
+    body: JSON.stringify({ data: { full_name: fullName.trim(), ...profileDetails } }),
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.msg || data.message || "Could not update your profile.");
