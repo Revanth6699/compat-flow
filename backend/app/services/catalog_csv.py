@@ -146,7 +146,7 @@ def _detect_columns(headers: list[str], required_fields=REQUIRED_FIELDS, column_
     }
     detected: dict[str, tuple[int, float]] = {}
     unmapped = []
-    for index, header in enumerate(normalized):
+    for index, header in (enumerate(normalized) if column_mapping is None else []):
         match = alias_lookup.get(header)
         if match is None:
             unmapped.append(headers[index])
@@ -312,7 +312,7 @@ def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS, profile_id: str = 
         valid_row_numbers.append(line_number)
 
     field_metrics = []
-    for field in REQUIRED_FIELDS:
+    for field in required_fields:
         populated = field_populated[field]
         missing_count = total_rows - populated
         pct = round((populated / total_rows) * 100, 2) if total_rows else 100.0
