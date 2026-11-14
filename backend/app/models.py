@@ -1,5 +1,6 @@
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import (
     Boolean,
@@ -159,6 +160,7 @@ class SupplierOffer(Base):
             ["products.organization_id", "products.id"],
             name="fk_supplier_offers_org_product",
         ),
+        UniqueConstraint("organization_id", "id", name="uq_supplier_offers_org_id"),
         UniqueConstraint(
             "organization_id", "supplier_id", "supplier_sku",
             name="uq_supplier_offers_org_supplier_sku",
@@ -178,7 +180,7 @@ class SupplierOffer(Base):
     product_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     supplier_sku: Mapped[str | None] = mapped_column(String(120))
     supplier_product_id: Mapped[str | None] = mapped_column(String(160))
-    unit_price: Mapped[object | None] = mapped_column(Numeric(18, 4))
+    unit_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 4))
     currency: Mapped[str | None] = mapped_column(String(3))
     unit_of_measure: Mapped[str | None] = mapped_column(String(40))
     minimum_order_quantity: Mapped[object | None] = mapped_column(Numeric(18, 4))
