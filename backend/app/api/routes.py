@@ -49,7 +49,7 @@ def health():
     return HealthResponse(status="ok", service="compatflow-api")
 
 
-async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", column_mapping=None) -> ImportPreviewResponse:
+async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", column_mapping=None, max_bytes: int | None = None) -> ImportPreviewResponse:
     filename = (file.filename or "").strip()
     if not filename.lower().endswith(".csv"):
         await file.close()
@@ -58,12 +58,13 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
         await file.close()
         raise HTTPException(status_code=400, detail="Filename must not exceed 255 characters.")
 
+    upload_limit = max_bytes if max_bytes is not None else settings.import_max_upload_bytes
     try:
-        raw = await file.read(settings.import_max_upload_bytes + 1)
+        raw = await file.read(upload_limit + 1)
     finally:
         await file.close()
 
-    if len(raw) > settings.import_max_upload_bytes:
+    if len(raw) > upload_limit:
         raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded CSV is empty.")
@@ -174,7 +175,7 @@ async def preview_catalog_import(
     except (ValueError, TypeError):
         await file.close()
         raise HTTPException(status_code=422, detail="Manual mapping must be a JSON object of canonical fields to source headers.") from None
-    return await _validate_catalog_csv(file, profile_id, mapping)
+    return await _validate_catalog_csv(file, profile_id, mapping, max_bytes=min(settings.import_max_upload_bytes, 5 * 1024 * 1024))
 
 
 
