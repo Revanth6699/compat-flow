@@ -146,14 +146,23 @@ def _detect_columns(headers: list[str], required_fields=REQUIRED_FIELDS, column_
     }
     detected: dict[str, tuple[int, float]] = {}
     unmapped = []
+    ambiguous_fields = set()
     for index, header in (enumerate(normalized) if column_mapping is None else []):
         match = alias_lookup.get(header)
         if match is None:
             unmapped.append(headers[index])
             continue
         field, confidence = match
+        if field in ambiguous_fields:
+            unmapped.append(headers[index])
+            continue
         if field in detected:
             previous_index, _ = detected[field]
+            if allow_incomplete_mapping:
+                unmapped.extend([headers[previous_index], headers[index]])
+                del detected[field]
+                ambiguous_fields.add(field)
+                continue
             raise CatalogCSVValidationError(
                 f"Ambiguous column mapping: '{headers[previous_index]}' and "
                 f"'{headers[index]}' both map to '{field}'. Rename one column "
