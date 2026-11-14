@@ -247,8 +247,13 @@ def parse_xml(data: bytes, *, record_tag: str | None = None,
         if len(repeated_groups) == 1:
             selected_tag, elements = repeated_groups[0]
         elif len(children) == 1 and list(children[0]):
-            selected_tag = _local_name(children[0].tag)
-            elements = children
+            wrapper_children = list(children[0])
+            if len(wrapper_children) == 1 and list(wrapper_children[0]):
+                selected_tag = _local_name(wrapper_children[0].tag)
+                elements = wrapper_children
+            else:
+                selected_tag = _local_name(children[0].tag)
+                elements = children
         else:
             selected_tag = _local_name(root.tag)
             elements = [root]
