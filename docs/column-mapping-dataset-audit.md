@@ -902,3 +902,104 @@ Continue inspecting datasets individually and append each verified file here. Af
 - The medicine_name change is being checked in CI run 43560138904; backend and frontend jobs are running. No success is claimed until completion.
 - No new generic aliases were added for `record_id`, `medicine_id`, `parent_id`, `warehouse_id`, `supplier_id`, `amazon_sku`, `rakuten_item_code`, or barcode fields.
 - The audit now distinguishes product master, supplier feed, PIM parent/variant catalog, warehouse inventory, inventory snapshot, pharmacy catalog, and replenishment data. These need separate validation grains and profiles.
+
+
+### 81. Amazon Honest Company scraped product listings
+
+- Source: https://github.com/cordelldb/amazon-crawler-scrapy/blob/8983e2b47ac14dba1733ab62b4af0b3c1fa31c77/product_crawler/spiders/honest_products.csv
+- Type: marketplace product listing scrape
+- Delimiter: comma
+- Header: `product_id,marketplace_id,product_title,title_desc,product_price,list_price,manufacturer,upc,model_name,product_dimensions,product_weight,customer_ratings,average_rating,listing_url,image_url,seller_name,seller_url`
+- Mapping observations: product_id values are Amazon ASIN-like marketplace IDs, not supplier SKUs. Product title, manufacturer, UPC, model name, and seller are distinct. Seller_name is a marketplace seller, not manufacturer. Customer ratings are count-like strings with thousands separators, while average_rating is a separate rating value. Many UPC/model/manufacturer cells are blank.
+- Current mapper gap: marketplace ID, UPC, model, seller, listing/image URLs, rating counts, and price types require a marketplace listing profile.
+
+### 82. JeelPatel warehouse inventory stock feed
+
+- Source: https://github.com/JeelPatel-045/etl-checker/blob/bc9aa491283acb097d87620d1bd1159051e884ca7/sample-data/inventory_stock.csv
+- Type: multi-warehouse stock position
+- Delimiter: comma
+- Header: `sku,product_name,category,warehouse,quantity_on_hand,quantity_reserved,quantity_available,reorder_point,reorder_quantity,unit_cost,last_updated,supplier,lead_days`
+- Mapping observations: SKU, product name, category, and warehouse are explicit. Quantity on hand, reserved, and available are distinct measures; available should reconcile to on_hand minus reserved. Supplier is not manufacturer. A row has blank quantity_on_hand while available is zero, which should be reported as missing source data rather than inferred.
+- Current mapper gap: inventory grain, quantity reconciliation, reorder quantity, cost, supplier, and lead-time validation need an inventory profile.
+
+### 83. FlowGrid Flipkart catalog template
+
+- Source: https://github.com/adityapatil400/ADITYA-SGU-3rd/blob/4e362d5a2df5dc63f85974242b7b5dc9d3d33dd8/flowgrid_flipkart_100sku/templates/flipkart_product_catalog.csv
+- Type: Flipkart listing/catalog template
+- Delimiter: comma
+- Header only: `sku_id,product_name,brand,category_id,pack_size_text,unit_of_measure,listing_price_inr,source_listing_url,source_capture_date,source_platform,price_snapshot_status,price_note,logistics_weight_kg,logistics_volume_l,weight_basis,logistics_specs_source,estimated_total_shelf_life_days,min_remaining_shelf_life_days,storage_class,catalog_data_status,data_origin`
+- Mapping observations: the file has headers but no data rows. SKU_ID is explicitly an SKU candidate; category_id is a reference key, not category text. Listing price and logistics values include source/estimation metadata. Without rows, value formats, null rates, and referential validity cannot be assessed.
+- Current mapper gap: source listing snapshots, estimated logistics values, category references, and data provenance are not represented.
+
+### 84. Tower demo product catalog
+
+- Source: https://github.com/tower/tower-demo/blob/ad67d13255ece2f973c5312e0d5c7099c64add56/data/product_catalog.csv
+- Type: retail product catalog with size/color variants
+- Delimiter: comma
+- Header: `sku,product_name,category,subcategory,brand,unit_price,weight_kg,dimensions_cm,color,size,description,supplier_id,created_date,status`
+- Mapping observations: SKU and product name are explicit. Category/subcategory, brand, and supplier ID are separate. The same product name appears in multiple rows with different sizes/colors and distinct SKUs; these are variants, not duplicates. Description is not product name.
+- Current mapper gap: variant attributes, supplier references, price, weight/dimensions, created date, and lifecycle status need separate fields.
+
+### 85. MarketMind Indonesian beauty catalog
+
+- Source: https://github.com/zidanarsyad/marketmind/blob/e2fbc1bfe237f6323827a68b8c159e9344a4ea92/data/raw/product_catalog.csv
+- Type: Indonesian skincare/beauty product catalog
+- Delimiter: comma
+- Header: `sku_id,brand,product_name,category,key_ingredient,size_ml,price_idr,launch_month,fragrance_free,spf,price_per_ml_idr,halal_certified,bpom_registered,rating_avg,review_count,units_sold_estimate`
+- Mapping observations: SKU_ID, brand, product name, and category are explicit. Key ingredient, size, price, launch month, fragrance-free, SPF, halal certification, BPOM registration, ratings, reviews, and estimated units sold are distinct attributes. price_per_ml_idr is derived and should be recalculated from price and size. Brand is not manufacturer.
+- Current mapper gap: beauty-specific ingredients, regulatory certification, size, IDR pricing, rating, review, and sales estimate fields require a beauty/marketplace profile.
+
+### 86. AI Agent Workflow product catalog duplicate fixture
+
+- Source: https://github.com/theonlyaks/ai_agent_workflow/blob/775cff619219a9a3ed43ede68c37404c31c0e07e/data/samples/product_catalog.csv
+- Type: product deduplication and matching fixture
+- Delimiter: comma
+- Header: `sku,product_name,brand,category,color,size,material,price`
+- Mapping observations: SKU, product name, brand, and category are explicit. The sample intentionally includes a duplicate-like SKU with lowercase and trailing whitespace (`sku-1001 `), near-identical names (Slim Fit Denim Jeans vs Slim-Fit Denim Jeans), same product/variant rows, and different materials. Normalization must be conservative: trim surrounding whitespace and compare case-insensitively for duplicate detection, but retain the original source value and distinguish true variants from duplicate records.
+- Current mapper gap: normalized identifier comparisons, duplicate candidate explanations, and variant-aware matching are outside the current parser.
+
+### 87. RAGOps Copilot knowledge-base product catalog
+
+- Source: https://github.com/shivakhoshhal94/ragops-copilot/blob/fba3835f89b880e73f6b9e5230a6496f0a3469f8/data/knowledge_base/product_catalog.csv
+- Type: compact retrieval knowledge-base product catalog
+- Delimiter: comma
+- Header: `sku,product_name,category,brand,price,currency,stock_quantity,main_image_url,description`
+- Mapping observations: SKU, product name, category, and brand are explicit. Price and currency are separate; stock quantity and image URL are not identity fields. Brand is not manufacturer. This is a clean compact knowledge-base fixture but lacks manufacturer and MPN.
+- Current mapper gap: currency, stock, image, and descriptive content are not represented in the current canonical model.
+
+### 88. Vietnamese data-agent retail catalog
+
+- Source: https://github.com/dauvannam1804/data-agent-demo/blob/fb128c33c4b0e00dc55923e4cf6e3944f400e465/data-code/sale_data/product_catalog.csv
+- Type: Vietnamese multi-category retail product/sales catalog
+- Delimiter: comma
+- Header: `Product_Name,SKU,Category,Brand,Supplier,Cost_Price,Selling_Price,Profit_Margin_Percent,Stock_Quantity,Reorder_Level,Launch_Date,Warranty_Months,Avg_Rating,Total_Reviews`
+- Mapping observations: Product name, SKU, category, brand, and supplier are separate. Brand and supplier are not manufacturer. Cost, selling price, and profit margin are distinct; margin should be recalculated from cost/selling price. Stock/reorder, launch date, warranty, rating, and review count are operational/commercial fields. Category values include Vietnamese text; parsing and validation must preserve Unicode.
+- Current mapper gap: Unicode category values, supplier, price/margin, stock, warranty, ratings, and review count need an extended retail profile.
+
+### 89. Power BI smart retail product catalog
+
+- Source: https://github.com/1234-ad/powerbi-smart-retail-analytics-dashboard/blob/5821e81afe298e39e094ced6c8086d1aebde6192/data/product_catalog.csv
+- Type: compact Power BI retail product dimension
+- Delimiter: comma
+- Header: `ProductID,ProductName,SKU,Category,SubCategory,Brand,UnitPrice,Cost,LaunchDate,Status,PriceTier`
+- Mapping observations: ProductID and SKU are separate. ProductName, Category, SubCategory, and Brand are distinct. UnitPrice and Cost are separate; Status and PriceTier are classifications. No manufacturer/MPN is present.
+- Current mapper gap: product ID, subcategory, unit price/cost, launch date, status, and price tier are outside the canonical schema.
+
+### 90. GridScout laptop product knowledge catalog
+
+- Source: https://github.com/juanmh10/gridscout/blob/9ab90929fa0c81b1897d17e20aeb5b7c30d9dc53/fixtures/product_knowledge/notebook_catalog.csv
+- Type: enriched laptop product knowledge catalog
+- Delimiter: comma
+- Header: 45+ fields including `product_id,brand,family,series,model,full_name,manufacturer_code,sku,mpn,ean,gtin,aliases,cpu_brand,cpu_model,cpu_generation,ram_gb,ram_type,storage_gb,storage_type,gpu,screen_size_inches,screen_resolution,screen_type,wifi_standard,keyboard_type,operating_system,price_brl,condition,source,source_product_id,url,title_raw,model_raw,cpu_raw,screen_raw,wifi_raw,keyboard_raw,sources,collection_status,created_at,updated_at`
+- Mapping observations: Product ID, brand, model, full name, manufacturer code, SKU, MPN, EAN, GTIN, source product ID, and aliases are all distinct. The sample has records where EAN/GTIN are literal `unknown`, and others contain numeric strings. Manufacturer_code is a code, not a manufacturer name. Full_name is the clearest product-name candidate; model and raw model are separate. The file also preserves source and raw extraction values, which is useful for provenance and AI-assisted extraction review.
+- Current mapper gap: identifier registry, aliases, laptop specifications, condition, price/currency, raw extraction provenance, and source reconciliation require a specialized product-knowledge model.
+
+## Findings after 90 individually inspected files
+
+1. Marketplace product IDs such as ASIN and product_id are not canonical SKUs. Marketplace IDs, supplier SKUs, manufacturer codes, MPNs, GTIN/EAN/UPC, and source product IDs need separate identifier types.
+2. Full-name/title fields can be stronger product-name candidates than model fields; model and manufacturer_code must not be mistaken for MPN.
+3. SKU normalization should trim surrounding whitespace and compare case-insensitively for duplicate detection while preserving the original value for audit and display.
+4. Duplicate detection needs separate outcomes for exact duplicate, normalization collision, same product variant, and possible near-match. Similar titles alone are insufficient.
+5. Multi-currency prices and derived metrics must retain currency/formula context. Margins and price-per-unit fields should be recomputed from their source values.
+6. Empty template files provide schema evidence only; they cannot support value-pattern confidence or data-quality claims.
+7. Multilingual content and identifiers must be preserved exactly; normalization should target comparison keys, not rewrite source text.
