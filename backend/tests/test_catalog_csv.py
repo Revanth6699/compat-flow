@@ -205,3 +205,43 @@ def test_first_pass_preview_surfaces_ambiguous_aliases_for_manual_mapping():
     assert "sku" not in {mapping.field for mapping in result.column_mappings}
     assert "sku" in result.unmapped_headers
     assert "product_sku" in result.unmapped_headers
+
+
+
+def test_semicolon_delimited_supplier_feed_is_detected():
+    content = (
+        "product_code;name;price_gross;vat;currency;stock\\n"
+        "SKU-1;Electric guitar;129.99;21;EUR;4\\n"
+    )
+    result = parse_catalog_csv(
+        content,
+        column_mapping={"sku": "product_code", "name": "name"},
+        allow_incomplete_mapping=True,
+    )
+    assert result.total_rows == 1
+    assert result.valid_count == 0
+    assert {item.field: item.source_header for item in result.column_mappings} == {
+        "sku": "product_code",
+        "name": "name",
+    }
+    assert result.unmapped_headers == ["price_gross", "vat", "currency", "stock"]
+
+
+def test_tab_delimited_feed_is_detected():
+    content = (
+        "sku\\tname\\tmanufacturer\\tpart_number\\tcategory\\n"
+        "SKU-1\\tBrake Pad\\tMaker A\\tBP-100\\tBrakes\\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.total_rows == 1
+    assert result.valid_count == 1
+
+
+def test_pipe_delimited_feed_is_detected():
+    content = (
+        "sku|name|manufacturer|part_number|category\\n"
+        "SKU-1|Brake Pad|Maker A|BP-100|Brakes\\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.total_rows == 1
+    assert result.valid_count == 1
