@@ -53,8 +53,8 @@ def test_product_mpn_header_maps_to_part_number():
 
 def test_camel_case_manufacturer_part_number_header_is_recognized():
     content = (
-        "SKU,Name,ManufacturerPartNumber,Manufacturer,Category\\n"
-        "SKU-1,Brake Pad,BP-100,Maker A,Brakes\\n"
+        "SKU,Name,ManufacturerPartNumber,Manufacturer,Category\n"
+        "SKU-1,Brake Pad,BP-100,Maker A,Brakes\n"
     )
     result = parse_catalog_csv(content)
     assert result.valid_count == 1
@@ -63,8 +63,8 @@ def test_camel_case_manufacturer_part_number_header_is_recognized():
 
 def test_model_number_is_not_assumed_to_be_manufacturer_part_number():
     content = (
-        "sku,name,manufacturer,model_number,category\\n"
-        "SKU-1,Phone,Maker A,Model X,Electronics\\n"
+        "sku,name,manufacturer,model_number,category\n"
+        "SKU-1,Phone,Maker A,Model X,Electronics\n"
     )
     result = parse_catalog_csv(content, allow_incomplete_mapping=True)
     assert "part_number" not in {item.field for item in result.column_mappings}
