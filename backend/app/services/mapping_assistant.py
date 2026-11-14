@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+from urllib.parse import urlsplit
 from dataclasses import dataclass
 from typing import Any
 
@@ -62,7 +63,11 @@ async def suggest_field_mappings(
     base_url = os.getenv("MAPPING_AI_BASE_URL", "").rstrip("/")
     api_key = os.getenv("MAPPING_AI_API_KEY", "")
     model = os.getenv("MAPPING_AI_MODEL", "")
-    if not base_url or not api_key or not model:
+    parsed_url = urlsplit(base_url)
+    if (not base_url or parsed_url.scheme != "https" or not parsed_url.hostname
+            or parsed_url.username or parsed_url.password or parsed_url.fragment):
+        return MappingAssistantResult("provider_unconfigured", [], "Configure an HTTPS AI provider endpoint. No source data was sent.")
+    if not api_key or not model:
         return MappingAssistantResult(
             "provider_unconfigured", [],
             "No AI provider is configured. Use deterministic/manual mapping; no data was sent.",
