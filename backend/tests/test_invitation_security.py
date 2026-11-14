@@ -415,8 +415,10 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
             is_active=True,
         )
         db.add_all([owner_a, owner_b, plan])
-        db.flush()
+        db.commit()
 
+        # Persist the valid tenant fixtures before each expected constraint
+        # violation; PostgreSQL rolls back the entire transaction on failure.
         bad_invitation = UserInvitation(
             organization_id=organization_a.id,
             email=f"cross-inviter-{uuid4().hex[:8]}@example.com",
