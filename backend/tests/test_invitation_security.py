@@ -173,3 +173,72 @@ def test_admin_cannot_revoke_an_administrator_invitation():
         assert invitation.revoked_at is None
     finally:
         clear_overrides()
+
+
+class QueryCaptureDB:
+    def __init__(self):
+        self.statements = []
+        self.committed = False
+
+    def scalar(self, statement):
+        self.statements.append(statement)
+        return None
+
+    def scalars(self, statement):
+        self.statements.append(statement)
+        return SimpleNamespace(all=lambda: [])
+
+    def commit(self):
+        self.committed = True
+
+
+def make_current(role="owner"):
+    profile = SimpleNamespace(
+        id=uuid4(),
+        organization_id=uuid4(),
+        email="owner@example.com",
+        role=role,
+        is_active=True,
+    )
+    return AuthenticatedUser(
+        identity=SupabaseIdentity(uuid4(), profile.email, "token"),
+        profile=profile,
+    )
+
+
+def test_invitation_list_query_is_scoped_to_current_organization():
+    from sqlalchemy.dialects import postgresql
+
+    current = make_current()
+    db = QueryCaptureDB()
+    app.dependency_overrides[get_current_user] = lambda: current
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        response = TestClient(app).get("/api/v1/invitations")
+        assert response.status_code == 200
+        statement = db.statements[-1]
+        compiled = statement.compile(dialect=postgresql.dialect())
+        assert current.profile.organization_id in compiled.params.values()
+        assert "user_invitations.organization_id" in str(compiled)
+    finally:
+        clear_overrides()
+
+
+def test_cannot_revoke_invitation_from_another_organization():
+    from sqlalchemy.dialects import postgresql
+
+    current = make_current()
+    foreign_invitation_id = uuid4()
+    db = QueryCaptureDB()
+    app.dependency_overrides[get_current_user] = lambda: current
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        response = TestClient(app).delete(f"/api/v1/invitations/{foreign_invitation_id}")
+        assert response.status_code == 404
+        statement = db.statements[-1]
+        compiled = statement.compile(dialect=postgresql.dialect())
+        assert current.profile.organization_id in compiled.params.values()
+        assert "user_invitations.organization_id" in str(compiled)
+        assert db.committed is False
+    finally:
+        clear_overrides()
