@@ -175,6 +175,7 @@ export default function CatalogImportPage() {
           <div className="eyebrow">Public product demo</div>
           <h1>Validate a supplier catalog</h1>
           <p>Validate supplier product files, identify data-quality issues and review clear recommendations before importing.</p>
+          {user && <p className="import-description"><a href="/catalog/sources">Connect a REST API, SFTP server or SQL Server source →</a></p>}
         </div>
 
         <section className="panel import-panel">
