@@ -13,7 +13,6 @@ import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
-from xml.etree.ElementTree import iterparse
 
 from defusedxml.ElementTree import fromstring
 
