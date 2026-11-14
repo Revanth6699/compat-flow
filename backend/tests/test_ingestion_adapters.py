@@ -110,9 +110,10 @@ def test_json_rejects_malformed_payload_and_missing_record_path():
         parse_json(b'{"data": []}', record_path="missing.items")
 
 
-def test_json_enforces_record_and_cell_limits():
+def test_json_enforces_record_and_cell_limits(monkeypatch):
     with pytest.raises(IngestionParseError, match="record limit"):
         parse_json(b'[{"sku":"A"},{"sku":"B"}]', max_records=1)
+    monkeypatch.setattr("app.services.ingestion_adapters.MAX_CELL_CHARS", 10)
     with pytest.raises(IngestionParseError, match="maximum cell size"):
         parse_json(('{"sku":"' + ("x" * 20) + '"}').encode(), max_records=1)
 
