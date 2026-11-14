@@ -100,7 +100,6 @@ function TeamContent() {
 
   const canManage = role === "owner" || role === "admin";
   const canInviteAdmin = role === "owner";
-  const pending = invitations.filter(item => !item.accepted_at && !item.revoked_at && new Date(item.expires_at).getTime() > Date.now());
 
   return (
     <main id="main" className="page">
