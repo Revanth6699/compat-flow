@@ -147,9 +147,7 @@ export default function CatalogImportPage() {
       ["Duplicate SKU rate (%)", result.duplicate_rate],
       ["Issue density (issues per record)", result.issue_density],
       ["Critical record rate (%)", result.critical_record_rate],
-      ["Catalog profile", result.profile_id],
-      [],
-      ["Canonical field", "Detected source header", "Mapping confidence"],
+            ["Canonical field", "Detected source header", "Mapping confidence"],
       ...result.column_mappings.map((m) => [m.field, m.source_header, m.confidence]),
       [],
       ["Field", "Populated", "Missing", "Completeness (%)"],
@@ -280,7 +278,7 @@ export default function CatalogImportPage() {
 
             <div className="panel result-section">
               <h3>Column mapping</h3>
-              <p className="import-description">Confidence indicates how closely a source header matches a known alias. It is not a measure of data accuracy. Unrecognized columns are preserved in the source file but are not used by this product-catalog profile.</p>
+              <p className="import-description">Confidence indicates how closely a source header matches a known alias. It is not a measure of data accuracy. Unrecognized columns are preserved in the source file but are not part of this product validation check.</p>
               <div className="table-scroll"><table className="preview-table"><thead><tr><th>Product field</th><th>Source column</th><th>Mapping confidence</th></tr></thead>
                 <tbody>{result.column_mappings.map((mapping) => <tr key={mapping.field}>
                   <td>{mapping.field.replaceAll("_", " ")}</td><td>{mapping.source_header}</td><td>{(mapping.confidence * 100).toFixed(0)}%</td>
