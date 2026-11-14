@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from app.services.ingestion_adapters import parse_json
 from app.services.record_import import validate_parsed_records
 
