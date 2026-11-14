@@ -110,3 +110,8 @@ A first manually reviewed benchmark seed now exists at docs/column-mapping-bench
 ## Benchmark regression coverage
 
 The backend test suite now checks the 72 reviewed examples against the deterministic alias map. Positive examples must resolve to the reviewed canonical field; negative and manual-review examples must not be auto-mapped. This guards against reintroducing risky brand/manufacturer, product_type/category, model/MPN, and product_id/SKU substitutions while the AI suggestion layer is developed.
+
+
+## Catalog record-type foundation
+
+See [catalog record model](catalog-record-model.md). The product master, sellable variants, supplier commercial offers, and point-in-time inventory snapshots now have separate database models and tenant-scoped API resources. AI-assisted mapping must identify the target record type before suggesting field mappings; it must not flatten supplier-specific price/stock/variant data into the product master.
