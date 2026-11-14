@@ -247,7 +247,7 @@ def test_cannot_revoke_invitation_from_another_organization():
 def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
     """Exercise invitation creation, listing, revocation, acceptance and reuse in PostgreSQL."""
     from app.core.database import SessionLocal
-    from app.models import Organization, User, UserInvitation
+    from app.models import Organization, Subscription, SubscriptionPlan, User, UserInvitation
 
     db = SessionLocal()
     organization_a = Organization(name=f"Invite tenant A {uuid4().hex[:8]}")
@@ -274,6 +274,20 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         owner_a.organization_id = organization_a.id
         owner_b.organization_id = organization_b.id
         db.add_all([owner_a, owner_b])
+        seat_plan = SubscriptionPlan(
+            code=f"seat-{uuid4().hex[:8]}",
+            name=f"Seat Test Plan {uuid4().hex[:8]}",
+            entitlements={"member_seats": 2},
+            is_active=True,
+        )
+        db.add(seat_plan)
+        db.flush()
+        db.add(Subscription(
+            organization_id=organization_a.id,
+            user_id=owner_a.id,
+            plan_code=seat_plan.code,
+            status="active",
+        ))
         db.commit()
 
         app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
@@ -289,6 +303,13 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         })
         assert created_a.status_code == 201, created_a.text
         invitation_a = created_a.json()
+
+        over_limit = client.post("/api/v1/invitations", json={
+            "email": f"extra-member-{uuid4().hex[:8]}@example.com",
+            "role": "viewer",
+        })
+        assert over_limit.status_code == 409, over_limit.text
+        assert "member-seat limit" in over_limit.text
 
         app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
             identity=SupabaseIdentity(owner_b.auth_user_id, owner_b.email, "owner-b-token"),
@@ -340,6 +361,7 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
             db.rollback()
             db.delete(organization_a)
             db.delete(organization_b)
+            db.delete(seat_plan)
             db.commit()
         finally:
             db.close()
