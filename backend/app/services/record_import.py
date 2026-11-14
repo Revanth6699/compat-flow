@@ -123,7 +123,10 @@ def _resolve_mapping(
         {"field": field, "source_header": source, "confidence": confidence}
         for field, source in mapping.items()
     ]
-    return mapping, [header for header in headers if header not in mapped_sources], details
+    unmapped = [header for header in headers if header not in mapped_sources]
+    if record_type == "product_variants":
+        unmapped = [header for header in unmapped if not header.startswith("attributes.")]
+    return mapping, unmapped, details
 
 
 def validate_parsed_records(
@@ -161,12 +164,11 @@ def validate_parsed_records(
                     pass
             nested_attributes = {
                 key.removeprefix("attributes."): value
-                for key, value in row.items()
+                for key, value in record.values.items()
                 if key.startswith("attributes.")
             }
             if nested_attributes:
                 row["attributes"] = nested_attributes
-                row = {key: value for key, value in row.items() if not key.startswith("attributes.")}
         for field in required_fields:
             if row.get(field) not in (None, ""):
                 populated[field] += 1
