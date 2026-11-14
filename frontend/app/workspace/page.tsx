@@ -45,7 +45,7 @@ function WorkspaceContent() {
     }
   }, [router]);
 
-  useEffect(() => { void loadProfile(); }, [loadProfile]);
+  useEffect(() => { void Promise.resolve().then(loadProfile); }, [loadProfile]);
 
   async function createOrganization(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
