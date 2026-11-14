@@ -60,7 +60,7 @@ export default function CatalogImportPage() {
   const canonicalFields = ["sku", "name", "manufacturer", "part_number", "category", "compatibility", "replacement_sku"];
 
   function handleFileChange(selectedFile: File | null) {
-    setFile(selectedFile); setResult(null); setMultiResult(null); setAiResult(null); setError("");
+    setFile(selectedFile); setResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setError("");
     if (!selectedFile) return;
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
     if (!["csv", "xlsx", "xls", "json", "xml"].includes(extension ?? "")) {
@@ -199,7 +199,7 @@ export default function CatalogImportPage() {
               {loading ? "Validating..." : "Validate file"}
             </button>
             <button className="button button-secondary" type="button" disabled={loading} onClick={() => {
-              setFile(null); setResult(null); setError("");
+              setFile(null); setResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setError("");
               const input = document.getElementById("catalog-file") as HTMLInputElement | null;
               if (input) input.value = "";
             }}>Clear</button>
