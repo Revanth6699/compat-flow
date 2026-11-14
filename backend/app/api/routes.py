@@ -31,7 +31,8 @@ from app.schemas import (
     ProductIdentifierCreateRequest,
     ProductIdentifierResponse,
 )
-from app.services.ingestion_adapters import IngestionParseError, parse_source\nfrom app.services.catalog_csv import (
+from app.services.ingestion_adapters import IngestionParseError, parse_source
+from app.services.catalog_csv import (
     CatalogCSVValidationError,
     CATALOG_PROFILES,
     parse_catalog_csv,
