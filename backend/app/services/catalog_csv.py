@@ -27,7 +27,7 @@ HEADER_ALIASES = {
     },
     "name": {
         "name": 1.0, "product_name": 0.99, "item_name": 0.98,
-        "title": 0.94, "product_title": 0.98, "device_name": 0.98, "medicine_name": 0.97,
+        "title": 0.94, "product_title": 0.98, "full_name": 0.98, "device_name": 0.98, "medicine_name": 0.97,
     },
     "manufacturer": {
         "manufacturer": 1.0, "manufacturer_name": 0.99, "mfr": 0.97,
