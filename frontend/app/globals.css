@@ -749,7 +749,7 @@ small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs)
   border-color: #9BB1C6; box-shadow: 0 8px 22px rgba(32,40,51,.06);
   transform: translateY(-2px);
 }
-.pricing-card-featured { border-top: 3px solid #16877F; padding-top: 20px; }
+.pricing-card-featured { border-top: 3px solid var(--navy); padding-top: 20px; }\n.billing-plan { border-top: 3px solid var(--line-strong); }\n.billing-plan.selected { border-top-color: var(--navy); }
 .billing-plan { align-items: flex-start; gap: 12px; width: 100%; text-align: left; color: #202833; font: inherit; cursor: pointer; }
 .billing-plan:disabled { cursor: not-allowed; opacity: .58; }
 .billing-plan.selected { border-color: #00689C; box-shadow: 0 0 0 2px rgba(0,104,156,.12); }
@@ -977,3 +977,13 @@ button:disabled, .button:disabled {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Dataset profiling and semantic validation colors */
+.metric-valid { color: var(--green) !important; font-weight: 750; }
+.metric-invalid { color: var(--red) !important; font-weight: 750; }
+.metric-warning { color: #B7791F !important; font-weight: 750; }
+.metric-bar { width: 100%; height: 12px; overflow: hidden; border-radius: 999px; background: #E8EEF4; }
+.metric-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--green); transition: width 240ms ease; }
+.metric-bar-small { display: inline-block; width: 90px; height: 7px; margin-right: 8px; vertical-align: middle; }
+.result-status.success { color: var(--green); }
+.result-status.warning { color: #B7791F; }
