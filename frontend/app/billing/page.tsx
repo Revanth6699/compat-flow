@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Script from "next/script";
 import { AuthRequired } from "@/components/auth-required";
@@ -55,9 +56,12 @@ const plans = [
 ];
 
 function BillingContent() {
+  const search = useSearchParams();
+  const requestedPlan = search.get("plan");
+  const initialPlan = requestedPlan && plans.some(plan => plan.code === requestedPlan) ? requestedPlan : "starter";
   const [role, setRole] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState("starter");
+  const [selectedPlan, setSelectedPlan] = useState(initialPlan);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -80,11 +84,7 @@ function BillingContent() {
     }
   }, []);
 
-  useEffect(() => {
-    const requestedPlan = new URLSearchParams(window.location.search).get("plan");
-    if (requestedPlan && plans.some(plan => plan.code === requestedPlan)) setSelectedPlan(requestedPlan);
-    void Promise.resolve().then(() => loadSubscription());
-  }, [loadSubscription]);
+  useEffect(() => { void Promise.resolve().then(() => loadSubscription()); }, [loadSubscription]);
 
   async function startCheckout() {
     setError("");
@@ -227,5 +227,5 @@ function BillingContent() {
 }
 
 export default function BillingPage() {
-  return <AuthRequired><BillingContent /></AuthRequired>;
+  return <Suspense fallback={<main id="main" className="page">Loading billing…</main>}><AuthRequired><BillingContent /></AuthRequired></Suspense>;
 }
