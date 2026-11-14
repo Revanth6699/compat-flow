@@ -53,9 +53,9 @@ HEADER_ALIASES = {
 REQUIRED_FIELDS = ("sku", "name", "manufacturer", "part_number", "category")
 CATALOG_PROFILES = {
     "general": ("sku", "name", "manufacturer", "part_number", "category"),
-    "automotive": ("sku", "name", "manufacturer", "part_number", "compatibility"),
+    "automotive": ("sku", "name", "manufacturer", "part_number", "category", "compatibility"),
     "electronics": ("sku", "name", "manufacturer", "part_number", "category", "replacement_sku"),
-    "industrial": ("sku", "name", "manufacturer", "part_number", "category"),
+    "industrial": ("sku", "name", "manufacturer", "part_number", "category", "compatibility", "replacement_sku"),
 }
 
 
