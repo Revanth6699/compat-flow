@@ -146,6 +146,26 @@ def test_pioneer_compound_sku_header_maps_to_sku():
     assert {item.field: item.source_header for item in result.column_mappings}["sku"] == "SKU / Pioneer part number"
 
 
+def test_top_category_header_maps_to_category():
+    content = (
+        "sku,product_name,manufacturer,mpn,top_category\n"
+        "SKU-1,Widget,Maker A,MPN-1,Electronics\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.valid_count == 1
+    assert {item.field: item.source_header for item in result.column_mappings}["category"] == "top_category"
+
+
+def test_utf8_bom_is_ignored_in_first_header():
+    content = (
+        "\ufeffsku,product_name,manufacturer,mpn,top_category\n"
+        "SKU-1,Widget,Maker A,MPN-1,Electronics\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.valid_count == 1
+    assert {item.field for item in result.column_mappings} >= {"sku", "name", "manufacturer", "part_number", "category"}
+
+
 def test_header_normalization_accepts_spaces_and_punctuation():
     content = (
         " Product SKU , Product Name , Manufacturer Name , Part No. , Category Name \n"
