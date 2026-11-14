@@ -467,3 +467,105 @@ Continue inspecting datasets individually and append each verified file here. Af
 - Added regression tests for all three aliases.
 - CI run 43558312383 completed successfully after the newline fixture correction: backend and frontend jobs passed. The newer alias changes are in CI run 43558661844 and have not completed yet.
 - The ML/AI direction remains a mapping assistant, not an automated validator: inspect header meaning, value shapes, related columns, and source context; rank suggestions with evidence; require confirmation for ambiguous mappings. Deterministic validation and metric computation remain authoritative.
+
+
+### 41. BuildWithBharat multi-source product extraction export
+
+- Source: https://github.com/Atul-Kumar29/buildwithbharat/blob/49e4c35e55df1e1e4bc91f1000655691a9723653/backend/data/output/products.csv
+- Type: manufacturer/seller product extraction and enrichment feed
+- Delimiter: comma
+- Header: `product_name,brand,model_number,source_type,seller_name,price,currency,product_url,image_url,specifications,scraped_at,sku,mpn,gtin,error`
+- Mapping observations: SKU, MPN, and GTIN have separate top-level columns. Manufacturer and seller records are distinguished by `source_type`; `seller_name` must not be treated as manufacturer. The `specifications` cell is JSON containing nested raw/normalized values. Some top-level SKU/MPN/GTIN fields are blank even when identifiers appear inside the JSON attributes.
+- Current mapper gap: nested JSON extraction, source provenance, seller identity, GTIN, currency, and multi-source reconciliation are unsupported. Do not use model_number as MPN.
+
+### 42. Instagram product publishing feed
+
+- Source: https://github.com/Hari99-ai/software-assigment/blob/2da03b4dea86697898c67c862be79f8faac36a2e/instagram-automation/products.csv
+- Type: product content and social publishing workflow feed
+- Delimiter: comma
+- Header: `product_id,product_name,category,description,features,price,product_image_url,publication_status,scheduled_date,generated_caption,published_post_url,error_message,publication_timestamp`
+- Mapping observations: `product_id` values such as WP001 are workflow record IDs, not proven supplier SKUs. Product model/SKU appears embedded in free-text `features` (for example `Model / SKU: 111192`). Product name and category are explicit. Scheduled dates are future test values, not inventory or availability evidence.
+- Current mapper gap: no social publication state, scheduled content, product image, or embedded feature extraction. Do not map product_id to SKU or the full features field to MPN.
+
+### 43. Pioneer industrial catalog demo
+
+- Source: https://github.com/My-Catalyst-Innovations/pioneer-industrial-catalog-demo/blob/098a0ae71659019b95a9f576037a5cca0cc6a3cd/data/demo_products.csv
+- Type: industrial distributor catalog
+- Delimiter: comma
+- Header: `product_id,SKU / Pioneer part number,manufacturer,manufacturer_part_number,product_name,category,subcategory,description,specs,unit_of_measure,quantity_in_stock,reorder_point,price,customer_specific_price,image_ref,lead_time,warehouse_location,is_icc_supply,tags,safety_stock_status`
+- Mapping observations: Product ID, Pioneer SKU/part number, manufacturer, and manufacturer part number are distinct fields even when the sample values happen to match. Category and subcategory are separate. Price and customer-specific price are separate. Quantity, reorder point, warehouse, lead time, and supply flags are operational data.
+- Current mapper gap: the compound SKU/Pioneer part number header needs explicit manual or source-specific mapping; customer pricing, unit, stock, reorder point, lead time, and warehouse need an industrial inventory profile.
+
+### 44. Aïcha semicolon-delimited product extraction record
+
+- Source: https://github.com/JusteOgodja/Stage-Redmac-Consulting-Docs/blob/6b2b982d96e12bb9dc4bbde80236eafbfac51796/Scraping/07_Campagne_Finale_Expert/results/aicha/products.csv
+- Type: FMCG web extraction/provenance export
+- Delimiter: semicolon
+- Header: 60+ fields including `platform_name,product_name,product_url,product_id,sku,brand,seller_or_supplier,manufacturer,variant_name,main_category,sub_category,price,currency,availability,stock_status,barcode,ingredients,allergens,nutritional_information,field_provenance,data_completeness_score,extraction_status,record_hash,data_origin`
+- Mapping observations: the inspected row represents a category/brand landing page rather than a specific SKU-level product. Many fields contain the literal French placeholder `Non disponible`; the record still reports a completeness score of 60.0. `field_provenance` is a JSON object and records the extraction strategy. This file is useful for testing semicolon parsing, placeholders, provenance, and distinction between a product page and a product record, but not for training SKU/MPN mapping.
+- Current mapper gap: placeholder normalization, provenance, page-type classification, multilingual content, FMCG attributes, and extraction-status fields are absent.
+
+### 45. Easy ACP sample product catalog
+
+- Source: https://github.com/raft-2025-hackseoul/easy-acp/blob/949179a797df6285035806c2f9af627179382fa2/example-products.csv
+- Type: general commerce product feed
+- Delimiter: comma
+- Header: `product_id,product_name,product_description,price_usd,stock_status,brand_name,category,main_image,product_url,upc_code,color,size,rating,review_count,weight_lb,manufacturer,warranty_months`
+- Mapping observations: Product name, category, manufacturer, UPC, and brand are separate. `product_id` values resemble SKU strings (SKU001, SKU002) but the header explicitly says product_id and there is no separate SKU field. UPC is a separate identifier. Manufacturer and brand differ for some rows (e.g. a Hydro Flask brand item lists Helen of Troy as manufacturer).
+- Current mapper gap: no product ID, UPC, stock status, USD price, images, reviews, warranty, color, size, or weight fields. Treat product_id as a candidate SKU only after source confirmation.
+
+### 46. Auto Ontology Evaluation product dimension
+
+- Source: https://github.com/arananet/auto-ontology-eval/blob/ca6e19792958b1d3e9392e3fab2a7bc12160a5dc/fixture/source_a/seeds/dim_product.csv
+- Type: compact retail product dimension
+- Delimiter: comma
+- Header: `sku,product_name,brand,category,list_price`
+- Mapping observations: SKU, product name, category, and brand are explicit. No manufacturer field is present. Brand must not be automatically promoted to manufacturer. This is a compact fixture useful for testing incomplete general profiles.
+- Current mapper gap: no manufacturer, part number, or profile-specific missing-field strategy.
+
+### 47. FEC Sales Analysis Power BI product dimension
+
+- Source: https://github.com/skx56/fec-sales-analysis/blob/5b09a7502e660ce6e7d331315307b0582964ef09/data/powerbi/dim_product.csv
+- Type: retail data-warehouse product dimension
+- Delimiter: comma
+- Header: `product_id,sku,product_name,category,subcategory,brand_type,uom,standard_cost,list_price`
+- Mapping observations: product_id and SKU are separate. Category and subcategory are separate. `brand_type` values such as Branded/Private Label describe a classification, not a brand name or manufacturer. Standard cost and list price are distinct measures.
+- Current mapper gap: no product surrogate ID, subcategory, unit of measure, cost, list price, or branded/private-label classification.
+
+### 48. Magic Store product dimension fixture
+
+- Source: https://github.com/shr-eddie/magic_store/blob/790e6f5ab1e59c8e9fa605e41363be4522c18eca/data/dim_product.csv
+- Type: compact product dimension with explicit brand/manufacturer split
+- Delimiter: comma
+- Header: `product_id,product_name,list_price,cost,weight,category,sub_category,manufacturer,brand,sku`
+- Mapping observations: product ID, product name, SKU, manufacturer, and brand are separate. Category and sub_category are separate. List price and cost are distinct. The dataset is fictional/demo content, so it supports schema semantics but not realistic value-distribution learning.
+- Current mapper gap: no product ID, subcategory, list price, cost, or weight fields. This file further confirms that brand and manufacturer cannot be globally merged.
+
+### 49. E-commerce data warehouse product dimension
+
+- Source: https://github.com/shivamdubey2310/E-commerce_data_warehouse/blob/d829a77589b998ecea56d61fd92b1d7de6c10038/data/DimProduct.csv
+- Type: broad retail/warehouse product dimension
+- Delimiter: comma
+- Header: `product_key,sku_number,product_name,brand_name,subcategory_name,category_name,department_name,package_type,package_size,weight,shelf_life_days,storage_requirement`
+- Mapping observations: `sku_number` is explicitly the SKU field; `product_key` is a warehouse surrogate key. Brand, subcategory, category, and department are separate dimensions. Package type/size, shelf life, and storage requirement are attributes. Sample product names and weight values appear synthetic/inconsistent, so don't use them as realistic value-distribution ground truth.
+- Current mapper gap: recognize `sku_number`; warehouse key, brand, category hierarchy, packaging, shelf life, and storage requirements need separate fields.
+
+### 50. FoodMart reduced product dimension
+
+- Source: https://github.com/DAINTINESS-Group/DelianCubeEngine/blob/4f9c86a6d72ab176aba396c1147f51812c7ce719/InputFiles/foodmart_reduced/Data/product.csv
+- Type: FoodMart-style grocery/retail product dimension
+- Delimiter: comma
+- Header: `product_id,product_class_id,brand_name,product_name,SKU,SRP,gross_weight,net_weight,recyclable_package,low_fat,units_per_case,cases_per_pallet,shelf_width,shelf_height,shelf_depth,product_subcategory,product_category,product_department,product_family,All`
+- Mapping observations: Product ID and product class ID are surrogate/foreign keys; SKU is a distinct business identifier. Brand, product name, category, subcategory, department, and family are separate. SRP is suggested retail price; gross/net weight, case quantities, dimensions, and package/food flags are separate attributes. Do not map product_class_id to category or SRP to generic cost.
+- Current mapper gap: grocery-specific packaging, hierarchy, nutrition/package flags, SRP, weights, dimensions, and case/pallet quantities are outside the current schema.
+
+## Findings after 50 individually inspected files
+
+1. SKU evidence is stronger when the header is explicit (`sku`, `sku_number`) than when the value merely looks like a SKU under `product_id`. Product IDs and warehouse surrogate keys remain separate.
+2. Brand and manufacturer repeatedly appear as distinct fields, including rows where the brand is Sony/Hydro Flask while the manufacturer is a different legal company. Remove brand/brand_name from automatic manufacturer mapping; manual confirmation remains available.
+3. Descriptions and short descriptions are not product names. Remove them from automatic name mapping; do not satisfy a required product name with a long descriptive paragraph.
+4. Product variants, parent groups, supplier offers, social publishing records, warehouse dimensions, and inventory performance require different record types/profiles. The single generic product profile cannot safely absorb all of them.
+5. Semicolon-delimited multilingual extraction files may contain placeholders such as `Non disponible`, provenance JSON, and category-page records without an actual SKU. Parsing successfully is not the same as having a valid product record.
+6. Nested JSON and free-text fields sometimes contain identifiers that are absent from top-level columns. AI can suggest extracting these fields, but must show the source path and exact value and require confirmation.
+7. Warehouse dimension tables contain surrogate keys, business SKUs, and foreign keys together. A model must not map a key to SKU solely because its values resemble SKU strings.
+8. Synthetic/demo datasets are useful for schema and edge-case discovery but should be tagged and excluded or separately weighted in any training/evaluation corpus.
