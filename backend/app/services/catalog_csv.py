@@ -134,10 +134,10 @@ def _detect_delimiter(content: str) -> str:
     """Detect common supplier-feed delimiters without splitting quoted values."""
     sample = content[:65_536]
     try:
-        return csv.Sniffer().sniff(sample, delimiters=",;\\t|").delimiter
+        return csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
     except csv.Error:
         first_line = next((line for line in sample.splitlines() if line.strip()), "")
-        counts = {delimiter: first_line.count(delimiter) for delimiter in (",", ";", "\\t", "|")}
+        counts = {delimiter: first_line.count(delimiter) for delimiter in (",", ";", "\t", "|")}
         delimiter, count = max(counts.items(), key=lambda item: item[1])
         return delimiter if count else ","
 
