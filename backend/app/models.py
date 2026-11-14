@@ -43,6 +43,7 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         UniqueConstraint("organization_id", "email", name="uq_users_org_email"),
+        UniqueConstraint("organization_id", "id", name="uq_users_org_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -309,6 +310,7 @@ class ImportJob(Base):
             ["suppliers.organization_id", "suppliers.id"],
             name="fk_import_jobs_org_supplier",
         ),
+        UniqueConstraint("organization_id", "id", name="uq_import_jobs_org_id"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -373,6 +375,11 @@ class ImportRecordLineage(Base):
     __tablename__ = "import_record_lineage"
     __table_args__ = (
         UniqueConstraint("job_id", "source_location", name="uq_import_lineage_job_location"),
+        ForeignKeyConstraint(
+            ["organization_id", "job_id"],
+            ["import_jobs.organization_id", "import_jobs.id"],
+            name="fk_import_lineage_org_job",
+        ),
         Index("ix_import_lineage_org_job", "organization_id", "job_id"),
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -387,7 +394,14 @@ class ImportRecordLineage(Base):
 
 class UserInvitation(Base):
     __tablename__ = "user_invitations"
-    __table_args__ = (Index("ix_user_invitations_org_email", "organization_id", "email"),)
+    __table_args__ = (
+        Index("ix_user_invitations_org_email", "organization_id", "email"),
+        ForeignKeyConstraint(
+            ["organization_id", "invited_by_user_id"],
+            ["users.organization_id", "users.id"],
+            name="fk_user_invitations_org_inviter",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
@@ -434,6 +448,12 @@ class Subscription(Base):
         Index("ix_subscriptions_org_status", "organization_id", "status"),
         Index("ix_subscriptions_user_status", "user_id", "status"),
         Index("uq_subscriptions_one_current_per_org", "organization_id", unique=True, postgresql_where=text("status IN ('active', 'trialing')")),
+        UniqueConstraint("organization_id", "id", name="uq_subscriptions_org_id"),
+        ForeignKeyConstraint(
+            ["organization_id", "user_id"],
+            ["users.organization_id", "users.id"],
+            name="fk_subscriptions_org_user",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -459,6 +479,16 @@ class Payment(Base):
         UniqueConstraint("provider", "provider_payment_id", name="uq_payments_provider_payment"),
         Index("ix_payments_org_created", "organization_id", "created_at"),
         Index("ix_payments_subscription", "subscription_id"),
+        ForeignKeyConstraint(
+            ["organization_id", "user_id"],
+            ["users.organization_id", "users.id"],
+            name="fk_payments_org_user",
+        ),
+        ForeignKeyConstraint(
+            ["organization_id", "subscription_id"],
+            ["subscriptions.organization_id", "subscriptions.id"],
+            name="fk_payments_org_subscription",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
