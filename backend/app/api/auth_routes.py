@@ -151,12 +151,18 @@ def _member_seat_limit(db: Session, organization_id: UUID) -> int | None:
             (Subscription.current_period_end.is_(None)) | (Subscription.current_period_end > now),
         ).order_by(Subscription.created_at.desc())
     )
+    # An unsubscribed organization gets one seat for its owner only.
+    # Missing entitlement data fails closed; explicit JSON null means unlimited
+    # seats (reserved for the Enterprise plan).
     if subscription is None:
-        return None
+        return 1
     plan = db.get(SubscriptionPlan, subscription.plan_code)
     if plan is None or not plan.is_active:
-        return None
-    limit = (plan.entitlements or {}).get("member_seats")
+        return 1
+    entitlements = plan.entitlements or {}
+    if "member_seats" not in entitlements:
+        return 1
+    limit = entitlements["member_seats"]
     if limit is None:
         return None
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
