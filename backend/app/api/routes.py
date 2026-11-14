@@ -11,7 +11,7 @@ from uuid import UUID
 
 from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.database import get_db
-from app.models import InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer
+from app.models import DemoAccessRequest, InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer
 from app.core.config import settings
 from app.schemas import (
     HealthResponse,
