@@ -120,6 +120,43 @@ class Product(Base):
     )
 
 
+class ProductIdentifier(Base):
+    """A typed external identifier; leading zeros and namespace are significant."""
+
+    __tablename__ = "product_identifiers"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "product_id"],
+            ["products.organization_id", "products.id"],
+            name="fk_product_identifiers_org_product",
+        ),
+        UniqueConstraint(
+            "organization_id", "identifier_type", "namespace", "value",
+            name="uq_product_identifiers_org_type_namespace_value",
+        ),
+        CheckConstraint(
+            "identifier_type IN ('upc', 'ean', 'gtin', 'asin', 'marketplace_id', "
+            "'manufacturer_code', 'source_product_id', 'other')",
+            name="ck_product_identifiers_type",
+        ),
+        Index("ix_product_identifiers_org_product", "organization_id", "product_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    identifier_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    namespace: Mapped[str] = mapped_column(String(80), nullable=False, default="global", server_default="global")
+    value: Mapped[str] = mapped_column(String(160), nullable=False)
+    source_reference: Mapped[str | None] = mapped_column(String(255))
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+
+
 class ProductVariant(Base):
     """A sellable variation belonging to a product master record."""
 
