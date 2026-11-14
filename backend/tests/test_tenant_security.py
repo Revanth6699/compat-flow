@@ -681,27 +681,42 @@ def test_postgres_role_permission_matrix_for_catalog_read_and_write():
             status="active",
             billing_interval="month",
         ))
+        # Build detached-safe auth snapshots before commit expires ORM attributes.
+        role_identities = [
+            (
+                user.role,
+                SupabaseIdentity(user.auth_user_id, user.email, "role-matrix-token"),
+                SimpleNamespace(
+                    id=user.id,
+                    organization_id=user.organization_id,
+                    email=user.email,
+                    role=user.role,
+                    is_active=user.is_active,
+                ),
+            )
+            for user in users
+        ]
         db.commit()
 
         client = TestClient(app)
-        for user in users:
-            app.dependency_overrides[get_current_user] = lambda user=user: AuthenticatedUser(
-                identity=SupabaseIdentity(user.auth_user_id, user.email, "role-matrix-token"),
-                profile=user,
+        for role, identity, profile in role_identities:
+            app.dependency_overrides[get_current_user] = lambda identity=identity, profile=profile: AuthenticatedUser(
+                identity=identity,
+                profile=profile,
             )
             read_response = client.get("/api/v1/products")
-            assert read_response.status_code == 200, (user.role, read_response.text)
+            assert read_response.status_code == 200, (role, read_response.text)
 
             write_response = client.post("/api/v1/products", json={
-                "sku": f"ROLE-{user.role.upper()}-{uuid4().hex[:8]}",
-                "name": f"Created by {user.role}",
+                "sku": f"ROLE-{role.upper()}-{uuid4().hex[:8]}",
+                "name": f"Created by {role}",
                 "manufacturer": "CompatFlow test",
-                "part_number": f"{user.role}-{uuid4().hex[:6]}",
+                "part_number": f"{role}-{uuid4().hex[:6]}",
                 "category": "Security test",
             })
-            expected_status = 403 if user.role == "viewer" else 201
+            expected_status = 403 if role == "viewer" else 201
             assert write_response.status_code == expected_status, (
-                user.role, write_response.status_code, write_response.text
+                role, write_response.status_code, write_response.text
             )
 
         persisted_products = db.query(Product).filter(
