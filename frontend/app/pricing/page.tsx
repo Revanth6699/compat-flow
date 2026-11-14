@@ -4,50 +4,71 @@ import Link from "next/link";
 
 const plans = [
   {
+    name: "Demo",
+    price: "Free",
+    description: "Evaluate the core validation workflow before creating an account.",
+    featured: false,
+    features: [
+      ["CSV upload and validation", true],
+      ["Required-field and duplicate checks", true],
+      ["On-screen quality metrics", true],
+      ["Issue details and recommendations", true],
+      ["Downloadable validation report", false],
+      ["Excel, JSON and XML inputs", false],
+      ["Supplier API, SFTP and database connections", false],
+      ["Organization workspace and team access", false],
+    ],
+    action: "Try the demo",
+    href: "/catalog/import",
+  },
+  {
     name: "Starter",
     price: "$27",
-    description: "For small teams validating supplier product data.",
-    items: [
-      ["CSV catalog validation", "Available in demo"],
-      ["Required-field and structure checks", "Available in demo"],
-      ["Duplicate SKU detection", "Available in demo"],
-      ["Validation metrics and issue report", "Available in demo"],
+    description: "For individuals and small teams that need repeatable validation and shareable results.",
+    featured: true,
+    features: [
+      ["CSV upload and validation", true],
+      ["Required-field and duplicate checks", true],
+      ["On-screen quality metrics", true],
+      ["Issue details and recommendations", true],
+      ["Downloadable validation report", true],
+      ["Excel, JSON and XML inputs", false],
+      ["Supplier API, SFTP and database connections", false],
+      ["Organization workspace and team access", true],
     ],
+    action: "Create an account",
+    href: "/sign-up",
   },
   {
     name: "Growth",
     price: "$64",
-    description: "For teams managing recurring supplier catalog updates.",
-    items: [
-      ["Everything in Starter", "Planned"],
-      ["Multiple supplier catalogs", "Planned"],
-      ["Catalog version comparison", "Planned"],
-      ["Custom validation rules", "Planned"],
-      ["Recurring validation", "Planned"],
+    description: "For teams handling multiple supplier feeds and structured catalog inputs.",
+    featured: false,
+    features: [
+      ["Everything in Starter", true],
+      ["Excel, JSON and XML inputs", true],
+      ["Supplier API, SFTP and database connections", true],
+      ["Multiple supplier catalogs", true],
+      ["Recurring validation and change comparison", true],
+      ["Team review and issue assignment", false],
     ],
+    action: "Discuss Growth",
+    href: "/contact?intent=pricing&plan=growth",
   },
   {
     name: "Business",
     price: "$153",
-    description: "For teams coordinating catalog quality across operations.",
-    items: [
-      ["Everything in Growth", "Planned"],
-      ["Team review and issue assignment", "Planned"],
-      ["Approval workflows", "Planned"],
-      ["Audit history and exports", "Planned"],
-      ["Advanced integrations", "Planned"],
+    description: "For operations teams coordinating catalog quality across people and systems.",
+    featured: false,
+    features: [
+      ["Everything in Growth", true],
+      ["Team review and issue assignment", true],
+      ["Approval workflows and audit history", true],
+      ["Advanced integrations", true],
+      ["Custom governance and support", false],
     ],
-  },
-  {
-    name: "Enterprise",
-    price: "Custom",
-    description: "For organizations with higher volume and integration needs.",
-    items: [
-      ["Custom catalog and validation limits", "Planned"],
-      ["Integration and governance options", "Planned"],
-      ["Security and support requirements", "Planned"],
-      ["Commercial and SLA discussions", "Planned"],
-    ],
+    action: "Discuss Business",
+    href: "/contact?intent=pricing&plan=business",
   },
 ];
 
@@ -56,71 +77,58 @@ export default function PricingPage() {
     <main id="main" className="page pricing-page">
       <div className="container">
         <section className="pricing-intro">
-          <div className="eyebrow">Global, capability-based plans</div>
-          <h1>Pricing that grows with your catalog operations.</h1>
+          <div className="eyebrow">Simple plan boundaries</div>
+          <h1>Start with a demo. Upgrade when the workflow earns its place.</h1>
           <p>
-            Reference prices are shown in USD per month. Local taxes may apply.
-            Paid subscriptions and billing are not yet available.
+            Reference prices are in USD per month. These are proposed early-access
+            prices; paid checkout is not enabled yet. Feature access is enforced
+            by the subscription on the backend when billing is activated.
           </p>
-          <div className="pricing-note" role="note">
-            <strong>Early-access pricing:</strong> These are proposed prices,
-            not active subscription offers. Feature availability is labelled
-            honestly below.
-          </div>
         </section>
 
-        <section className="pricing-grid" aria-label="CompatFlow pricing plans">
+        <section className="pricing-grid" aria-label="CompatFlow plans">
           {plans.map((plan) => (
-            <article className="pricing-card" key={plan.name}>
+            <article className={`pricing-card${plan.featured ? " pricing-card-featured" : ""}`} key={plan.name}>
               <div className="pricing-card-top">
+                <div className="eyebrow">{plan.name === "Demo" ? "No account required" : plan.featured ? "For small teams" : "For growing operations"}</div>
                 <h2>{plan.name}</h2>
                 <p>{plan.description}</p>
                 <div className="pricing-amount">
                   <strong>{plan.price}</strong>
-                  {plan.price !== "Custom" && <span>/ month</span>}
+                  {plan.price !== "Free" && <span>/ month</span>}
                 </div>
               </div>
-              <div className="pricing-includes">Plan scope</div>
+              <div className="pricing-includes">Included capabilities</div>
               <ul className="pricing-feature-list">
-                {plan.items.map(([item, status]) => (
-                  <li key={item}>
-                    <span>{item}</span>
-                    <span className={status === "Available in demo" ? "pricing-status available" : "pricing-status planned"}>
-                      {status}
-                    </span>
+                {plan.features.map(([feature, included]) => (
+                  <li key={feature}>
+                    <span>{feature}</span>
+                    <span className={included ? "pricing-status available" : "pricing-status planned"}>{included ? "Included" : "Not included"}</span>
                   </li>
                 ))}
               </ul>
               <div className="pricing-card-action">
-                {plan.name === "Starter" ? (
-                  <Link className="button button-secondary" href="/catalog/import">
-                    Try CSV demo
-                  </Link>
-                ) : (
-                  <a className="button button-secondary" href="mailto:sarvasettyrevanth.66@gmail.com?subject=CompatFlow%20early%20access%20enquiry">
-                    Register interest
-                  </a>
-                )}
+                <Link className={plan.featured ? "button" : "button button-secondary"} href={plan.href}>{plan.action}</Link>
               </div>
             </article>
           ))}
         </section>
 
         <section className="pricing-footnote">
-          <h2>What is available today?</h2>
+          <h2>What is the difference between Demo and Starter?</h2>
           <p>
-            The current public demo supports in-memory CSV validation. Detailed
-            quality metrics and issue-level recommendations are being expanded.
-            Persistent imports, recurring checks, collaboration, integrations
-            and subscription billing are not yet available.
+            The public demo is a limited, temporary evaluation: CSV only, no
+            account, no downloadable report and no organization workspace.
+            Starter adds a signed-in workspace and downloadable validation
+            reports. It does not unlock connector ingestion or the additional
+            structured file formats.
           </p>
           <p>
-            Do not upload confidential supplier files, personal information or
-            production catalog data to the public demo.
+            Growth and Business capabilities shown above are plan targets, not
+            claims that every workflow is currently live. Subscription checkout
+            and provider configuration are still being completed.
           </p>
-          <Link className="pricing-text-link" href="/catalog/import">
-            Explore the current CSV demo
-          </Link>
+          <Link className="pricing-text-link" href="/catalog/import">Try the public CSV demo</Link>
         </section>
       </div>
     </main>
