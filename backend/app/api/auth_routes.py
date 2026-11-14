@@ -372,7 +372,7 @@ def accept_invitation(
 
 class MemberResponse(BaseModel):
     id: UUID
-    email: EmailStr
+    email: str
     role: str
     is_active: bool
     created_at: datetime
