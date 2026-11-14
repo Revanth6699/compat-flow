@@ -1,5 +1,4 @@
 import sys
-from types import SimpleNamespace
 
 import pytest
 
@@ -30,7 +29,7 @@ def test_api_connector_rejects_embedded_credentials():
         _validate_https_url("https://user:password@supplier.example/api", {"supplier.example"})
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_api_connector_fetches_and_extracts_records_path(monkeypatch):
     class Response:
         headers = {"content-length": "30"}
@@ -152,7 +151,9 @@ def test_sftp_connector_downloads_with_known_host_verification(monkeypatch):
             calls["closed"] = True
 
     class Paramiko:
-        RejectPolicy = lambda self: "reject-unknown-host"
+        def RejectPolicy(self):
+            return "reject-unknown-host"
+
         SSHClient = Client
 
     monkeypatch.setitem(sys.modules, "paramiko", Paramiko())
@@ -184,7 +185,9 @@ def test_sftp_connector_rejects_unknown_host_key(monkeypatch):
             pass
 
     class Paramiko:
-        RejectPolicy = lambda self: "reject"
+        def RejectPolicy(self):
+            return "reject"
+
         SSHClient = Client
 
     monkeypatch.setitem(sys.modules, "paramiko", Paramiko())
