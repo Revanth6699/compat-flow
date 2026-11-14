@@ -125,9 +125,37 @@ def decide_demo_request(
     request = db.get(DemoAccessRequest, request_id)
     if request is None:
         raise HTTPException(status_code=404, detail="Demo request not found.")
-    request.status = {"approve": "approved", "revoke": "revoked", "reject": "rejected"}[decision]
+    now = datetime.now(timezone.utc)
+    if decision == "revoke":
+        active_approvals = db.scalars(
+            select(DemoAccessRequest).where(
+                DemoAccessRequest.email == request.email,
+                DemoAccessRequest.status == "approved",
+            )
+        ).all()
+        for approval in active_approvals:
+            approval.status = "revoked"
+            approval.reviewed_by = admin.identity.email
+            approval.reviewed_at = now
+    elif decision == "approve":
+        previous_approvals = db.scalars(
+            select(DemoAccessRequest).where(
+                DemoAccessRequest.email == request.email,
+                DemoAccessRequest.status == "approved",
+                DemoAccessRequest.id != request.id,
+            )
+        ).all()
+        for approval in previous_approvals:
+            approval.status = "revoked"
+            approval.reviewed_by = admin.identity.email
+            approval.reviewed_at = now
+        request.status = "approved"
+    else:
+        request.status = "rejected"
+    if decision == "revoke":
+        request.status = "revoked"
     request.reviewed_by = admin.identity.email
-    request.reviewed_at = datetime.now(timezone.utc)
+    request.reviewed_at = now
     db.commit()
     db.refresh(request)
     return request
