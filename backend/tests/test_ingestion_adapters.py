@@ -88,18 +88,19 @@ def test_xml_single_record_inside_collection_wrapper():
     assert parsed.records[0].values == {"SKU": "001", "Name": "Widget"}
 
 
+
 def test_csv_rejects_non_utf8_and_record_limit():
     with pytest.raises(IngestionParseError, match="UTF-8"):
-        parse_csv(b"\\xff\\xfe")
+        parse_csv(b"\xff\xfe")
     with pytest.raises(IngestionParseError, match="record limit"):
-        parse_csv(b"sku\\nA\\nB\\n", max_records=1)
+        parse_csv(b"sku\nA\nB\n", max_records=1)
 
 
 def test_csv_rejects_empty_headers_and_duplicate_headers():
     with pytest.raises(IngestionParseError, match="empty or missing header"):
-        parse_csv(b"sku,,name\\n1,2,3\\n")
+        parse_csv(b"sku,,name\n1,2,3\n")
     with pytest.raises(IngestionParseError, match="Duplicate headers"):
-        parse_csv(b"sku,SKU\\n1,2\\n")
+        parse_csv(b"sku,SKU\n1,2\n")
 
 
 def test_json_rejects_malformed_payload_and_missing_record_path():
