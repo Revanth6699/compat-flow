@@ -1115,3 +1115,13 @@ Continue inspecting datasets individually and append each verified file here. Af
 7. Data-quality metrics must be calculated from the actual parsed values. Source-supplied margins, price-per-unit, test-case labels, or notes are not automatically ground truth.
 8. The 100 files are a discovery and benchmark-seeding set, not 100 independent schemas and not a sufficiently reviewed supervised training corpus. Several files are synthetic, adversarial, empty templates, or correlated within the same repository/source family.
 9. The AI-assisted mapping layer should now be built against a reviewed source-separated benchmark. It should suggest mappings and nested extraction paths with evidence, require confirmation, and never generate validation metrics or suppress deterministic parser errors.
+
+
+## Implementation update after the first 100 samples
+
+- Added the exact normalized `manufacturer_part` alias for the observed `Manufacturer Part #` header. The separate `Ferguson Part #` distributor identifier remains unmapped.
+- Added a regression test for the manufacturer part-number shorthand.
+- CI run 43560421156 passed completely for the full_name alias and all prior changes.
+- The latest manufacturer_part alias/test changes are in the newest CI run; final status is pending.
+- The parser already rejects ragged rows with COLUMN_COUNT_MISMATCH, so the malformed comma examples from datasets 99 and 100 are useful regression fixtures rather than a reason to loosen parsing.
+- Headerless input currently cannot satisfy the required mapped profile; it must not silently treat the first data record as a header. Explicit headerless-schema support would need a separate user-selected template.
