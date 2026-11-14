@@ -51,6 +51,12 @@ HEADER_ALIASES = {
     },
 }
 REQUIRED_FIELDS = ("sku", "name", "manufacturer", "part_number", "category")
+CATALOG_PROFILES = {
+    "general": ("sku", "name", "manufacturer", "part_number", "category"),
+    "automotive": ("sku", "name", "manufacturer", "part_number", "compatibility"),
+    "electronics": ("sku", "name", "manufacturer", "part_number", "category", "replacement_sku"),
+    "industrial": ("sku", "name", "manufacturer", "part_number", "category"),
+}
 
 
 class CatalogCSVValidationError(ValueError):
@@ -98,6 +104,12 @@ class CatalogCSVResult:
     data_quality_score: float
     critical_issues: int
     warning_issues: int
+    profile_id: str = "general"
+    records_with_issues: int = 0
+    duplicate_sku_count: int = 0
+    duplicate_rate: float = 0.0
+    issue_density: float = 0.0
+    critical_record_rate: float = 0.0
 
     @property
     def valid_count(self) -> int:
@@ -118,7 +130,7 @@ def _normalize_header(value: str) -> str:
     return value.strip("_")
 
 
-def _detect_columns(headers: list[str]):
+def _detect_columns(headers: list[str], required_fields=REQUIRED_FIELDS, column_mapping=None):
     normalized = [_normalize_header(header or "") for header in headers]
     if any(not header for header in normalized):
         raise CatalogCSVValidationError("CSV contains an empty column header.")
@@ -149,7 +161,23 @@ def _detect_columns(headers: list[str]):
             )
         detected[field] = (index, confidence)
 
-    missing = [field for field in REQUIRED_FIELDS if field not in detected]
+    if column_mapping is not None:
+        allowed = set(HEADER_ALIASES)
+        if set(column_mapping) - allowed:
+            raise CatalogCSVValidationError("Manual mapping contains unsupported canonical fields.")
+        indexes = {header: index for index, header in enumerate(headers)}
+        selected = {}
+        for field, source_header in column_mapping.items():
+            if not isinstance(source_header, str) or source_header not in indexes:
+                raise CatalogCSVValidationError(f"Mapped source column '{source_header}' does not exist.")
+            selected[field] = (indexes[source_header], 1.0)
+        target_indexes = [value[0] for value in selected.values()]
+        if len(target_indexes) != len(set(target_indexes)):
+            raise CatalogCSVValidationError("A source column cannot be mapped to more than one canonical field.")
+        detected = selected
+        unmapped = [header for index, header in enumerate(headers) if index not in target_indexes]
+
+    missing = [field for field in required_fields if field not in detected]
     if missing:
         raise CatalogCSVValidationError(
             "Could not map required product fields: "
@@ -166,14 +194,17 @@ def _detect_columns(headers: list[str]):
     return normalized, detected, mappings, unmapped
 
 
-def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS) -> CatalogCSVResult:
+def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS, profile_id: str = "general", column_mapping: dict[str, str] | None = None) -> CatalogCSVResult:
+    if profile_id not in CATALOG_PROFILES:
+        raise CatalogCSVValidationError(f"Unknown catalog profile '{profile_id}'.")
+    required_fields = CATALOG_PROFILES[profile_id]
     stream = io.StringIO(content, newline="")
     reader = csv.reader(stream, strict=True)
     headers = next(reader, None)
     if not headers:
         raise CatalogCSVValidationError("CSV header row is missing.")
 
-    normalized_headers, detected, mappings, unmapped_headers = _detect_columns(headers)
+    normalized_headers, detected, mappings, unmapped_headers = _detect_columns(headers, required_fields, column_mapping)
     valid_rows = []
     valid_row_numbers = []
     errors = []
@@ -216,9 +247,18 @@ def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS) -> CatalogCSVResul
             field: source_row[normalized_headers[index]]
             for field, (index, _) in detected.items()
         }
-        for field in REQUIRED_FIELDS:
+        for field in required_fields:
             if row.get(field, "").strip():
                 field_populated[field] += 1
+
+        missing_profile_fields = [field for field in required_fields if not row.get(field, "").strip()]
+        if missing_profile_fields:
+            for field in missing_profile_fields:
+                add_issue(line_number, field, "PROFILE_REQUIRED_FIELD_MISSING",
+                    f"Required field '{field}' is empty for the {profile_id} profile.",
+                    "critical", "field_validation",
+                    f"Provide a non-empty {field} value for this profile.")
+            continue
 
         try:
             parsed = ImportPreviewRow.model_validate(row)
@@ -279,6 +319,9 @@ def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS) -> CatalogCSVResul
         field_metrics.append(CatalogCSVFieldMetric(field, populated, missing_count, pct))
 
     critical = sum(issue.severity == "critical" for issue in row_errors)
+    records_with_issues = len({issue.row_number for issue in row_errors})
+    duplicate_sku_count = sum(issue.error_code == "DUPLICATE_SKU_IN_FILE" for issue in row_errors)
+    critical_records = len({issue.row_number for issue in row_errors if issue.severity == "critical"})
     warnings = sum(issue.severity == "warning" for issue in row_errors)
     pass_rate = round((len(valid_rows) / total_rows) * 100, 2) if total_rows else 100.0
     completeness = (
@@ -304,4 +347,10 @@ def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS) -> CatalogCSVResul
         data_quality_score=quality_score,
         critical_issues=critical,
         warning_issues=warnings,
+        profile_id=profile_id,
+        records_with_issues=records_with_issues,
+        duplicate_sku_count=duplicate_sku_count,
+        duplicate_rate=round(duplicate_sku_count / total_rows * 100, 2) if total_rows else 0.0,
+        issue_density=round((critical + warnings) / total_rows, 3) if total_rows else 0.0,
+        critical_record_rate=round(critical_records / total_rows * 100, 2) if total_rows else 0.0,
     )
