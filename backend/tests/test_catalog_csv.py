@@ -71,6 +71,30 @@ def test_model_number_is_not_assumed_to_be_manufacturer_part_number():
     assert "model_number" in result.unmapped_headers
 
 
+
+def test_device_name_header_maps_to_name():
+    content = (
+        "sku,device_name,manufacturer,manufacturer_number,category\n"
+        "DEV-1,Smart Camera,Acme,AC-100,Smart Home\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.valid_count == 1
+    mapped = {item.field: item.source_header for item in result.column_mappings}
+    assert mapped["name"] == "device_name"
+    assert mapped["part_number"] == "manufacturer_number"
+
+
+def test_shopify_google_shopping_mpn_header_maps_to_part_number():
+    content = (
+        "sku,title,manufacturer,Google Shopping / Manufacturer part number (MPN),category\n"
+        "SKU-1,Stoneware Mug,Hearth & Clay,HC-MUG-01,Home\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.valid_count == 1
+    mapped = {item.field: item.source_header for item in result.column_mappings}
+    assert mapped["part_number"] == "Google Shopping / Manufacturer part number (MPN)"
+
+
 def test_header_normalization_accepts_spaces_and_punctuation():
     content = (
         " Product SKU , Product Name , Manufacturer Name , Part No. , Category Name \n"
