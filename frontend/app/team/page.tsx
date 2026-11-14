@@ -129,7 +129,7 @@ function TeamContent() {
     <main id="main" className="page">
       <div className="container account-settings">
         <header className="workspace-heading">
-          <div><span className="eyebrow">ORGANIZATION</span><h1>Team access</h1><p>Manage who can enter this organization CompatFlow workspace.</p></div>
+          <div><span className="eyebrow">ORGANIZATION</span><h1>Team access</h1><p>Manage access to this company&apos;s CompatFlow workspace.</p></div>
           <Link className="button button-secondary" href="/workspace">Back to workspace</Link>
         </header>
         {error && <p className="auth-error" role="alert">{error}</p>}
