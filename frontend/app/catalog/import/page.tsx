@@ -68,8 +68,8 @@ export default function CatalogImportPage() {
     if (!(user ? ["csv", "xlsx", "xls", "json", "xml"] : ["csv"]).includes(extension ?? "")) {
       setFile(null); setError(user ? "Supported formats: CSV, XLSX, XLS, JSON and XML. Your plan determines which formats you can process." : "The public demo accepts CSV files only. Create an account and choose a plan for additional formats."); return;
     }
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      setFile(null); setError("The file exceeds the 5 MB limit.");
+    if (selectedFile.size > (user ? 25 : 5) * 1024 * 1024) {
+      setFile(null); setError(`The file exceeds the ${user ? "25 MB" : "5 MB"} limit for this access level.`);
     }
   }
 
@@ -179,7 +179,7 @@ export default function CatalogImportPage() {
 
         <section className="panel import-panel">
           <h2>Catalog file validation</h2>
-          <p className="import-description">Public demo: CSV only · Maximum 5 MB. Signed-in formats and connector access depend on your active subscription.</p>
+          <p className="import-description">Public demo: CSV only · Maximum 5 MB. Subscribed imports: up to 25 MB, subject to plan entitlements.</p>
           <div className="import-description">
             Product catalog validation. CompatFlow detects common supplier column names automatically.
             Public demo access is limited to CSV; additional formats and connected sources depend on your subscription.
