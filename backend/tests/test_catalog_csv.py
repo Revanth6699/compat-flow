@@ -123,6 +123,29 @@ def test_sku_number_header_maps_to_sku():
     assert {item.field: item.source_header for item in result.column_mappings}["sku"] == "sku_number"
 
 
+def test_unavailable_placeholders_count_as_missing_required_values():
+    content = (
+        "sku,name,manufacturer,mpn,category\n"
+        "SKU-1,Widget,Non disponible,MPN-1,Parts\n"
+    )
+    result = parse_catalog_csv(content, allow_incomplete_mapping=True)
+    assert result.valid_count == 0
+    assert any(
+        issue.field == "manufacturer" and issue.error_code == "PROFILE_REQUIRED_FIELD_MISSING"
+        for issue in result.row_errors
+    )
+
+
+def test_pioneer_compound_sku_header_maps_to_sku():
+    content = (
+        "SKU / Pioneer part number,product_name,manufacturer,manufacturer_part_number,category\n"
+        "TIM-32210,Bearing,Timken,TIM-32210,Bearings\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.valid_count == 1
+    assert {item.field: item.source_header for item in result.column_mappings}["sku"] == "SKU / Pioneer part number"
+
+
 def test_header_normalization_accepts_spaces_and_punctuation():
     content = (
         " Product SKU , Product Name , Manufacturer Name , Part No. , Category Name \n"
