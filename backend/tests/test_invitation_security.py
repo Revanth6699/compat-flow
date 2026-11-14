@@ -492,3 +492,123 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
             db.delete(plan)
         db.commit()
         db.close()
+
+
+def test_postgres_downgrade_retains_existing_members_and_blocks_new_seats(monkeypatch):
+    """A lower seat cap never disables current members; new joins remain blocked."""
+    from hashlib import sha256
+    from app.core.database import SessionLocal
+    from app.models import Organization, Subscription, SubscriptionPlan, User, UserInvitation
+
+    db = SessionLocal()
+    organization = Organization(name=f"Downgrade tenant {uuid4().hex[:8]}")
+    plan = SubscriptionPlan(
+        code=f"downgrade-{uuid4().hex[:8]}",
+        name=f"Downgrade Plan {uuid4().hex[:8]}",
+        entitlements={"member_seats": 3},
+        is_active=True,
+    )
+    owner = None
+    member = None
+    invitation = None
+    raw_token = "downgrade-test-token-" + uuid4().hex
+    try:
+        db.add_all([organization, plan])
+        db.flush()
+        owner = User(
+            organization_id=organization.id,
+            auth_user_id=uuid4(),
+            email=f"downgrade-owner-{uuid4().hex[:8]}@example.com",
+            role="owner",
+            is_active=True,
+            account_type="subscriber",
+        )
+        member = User(
+            organization_id=organization.id,
+            auth_user_id=uuid4(),
+            email=f"downgrade-member-{uuid4().hex[:8]}@example.com",
+            role="member",
+            is_active=True,
+            account_type="subscriber",
+        )
+        db.add_all([owner, member])
+        db.flush()
+        db.add(Subscription(
+            organization_id=organization.id,
+            user_id=owner.id,
+            plan_code=plan.code,
+            status="active",
+        ))
+        invitation = UserInvitation(
+            organization_id=organization.id,
+            email=f"downgrade-invitee-{uuid4().hex[:8]}@example.com",
+            role="viewer",
+            token_hash=sha256(raw_token.encode("utf-8")).hexdigest(),
+            invited_by_user_id=owner.id,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+        )
+        db.add(invitation)
+        db.commit()
+
+        owner_auth = AuthenticatedUser(
+            identity=SupabaseIdentity(owner.auth_user_id, owner.email, "owner-token"),
+            profile=owner,
+        )
+        app.dependency_overrides[get_current_user] = lambda: owner_auth
+        app.dependency_overrides[get_db] = lambda: db
+        client = TestClient(app)
+
+        before = client.get("/api/v1/invitations/seats")
+        assert before.status_code == 200, before.text
+        assert before.json()["member_seat_limit"] == 3
+        assert before.json()["active_members"] == 2
+        assert before.json()["pending_invitations"] == 1
+
+        plan.entitlements = {"member_seats": 1}
+        db.commit()
+
+        after = client.get("/api/v1/invitations/seats")
+        assert after.status_code == 200, after.text
+        usage = after.json()
+        assert usage["member_seat_limit"] == 1
+        assert usage["active_members"] == 2
+        assert usage["pending_invitations"] == 1
+        assert usage["over_limit"] is True
+        assert usage["active_members_over_limit"] is True
+        assert usage["available_seats"] == 0
+        assert usage["existing_members_retained"] is True
+
+        db.refresh(owner)
+        db.refresh(member)
+        assert owner.is_active is True
+        assert member.is_active is True
+
+        new_invitation = client.post("/api/v1/invitations", json={
+            "email": f"blocked-{uuid4().hex[:8]}@example.com",
+            "role": "member",
+        })
+        assert new_invitation.status_code == 409, new_invitation.text
+
+        invitee_identity = SupabaseIdentity(
+            uuid4(), invitation.email, "invitee-token"
+        )
+        app.dependency_overrides[get_supabase_identity] = lambda: invitee_identity
+        monkeypatch.setattr(auth_routes, "require_verified_supabase_email", lambda _: None)
+        acceptance = client.post("/api/v1/invitations/accept", json={"token": raw_token})
+        assert acceptance.status_code == 409, acceptance.text
+
+        db.refresh(invitation)
+        assert invitation.accepted_at is None
+        db.refresh(owner)
+        db.refresh(member)
+        assert owner.is_active is True
+        assert member.is_active is True
+    finally:
+        clear_overrides()
+        try:
+            db.rollback()
+            db.delete(organization)
+            db.delete(plan)
+            db.commit()
+        finally:
+            db.close()
