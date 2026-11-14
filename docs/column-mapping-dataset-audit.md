@@ -569,3 +569,14 @@ Continue inspecting datasets individually and append each verified file here. Af
 6. Nested JSON and free-text fields sometimes contain identifiers that are absent from top-level columns. AI can suggest extracting these fields, but must show the source path and exact value and require confirmation.
 7. Warehouse dimension tables contain surrogate keys, business SKUs, and foreign keys together. A model must not map a key to SKU solely because its values resemble SKU strings.
 8. Synthetic/demo datasets are useful for schema and edge-case discovery but should be tagged and excluded or separately weighted in any training/evaluation corpus.
+
+
+## Implementation update after the first 50 samples
+
+- Added `sku_number` and the exact observed `SKU / Pioneer part number` header as SKU aliases.
+- Removed `brand` and `brand_name` from automatic manufacturer mapping. Dataset 48 explicitly carries both columns, and dataset 45 shows that brand and manufacturer can be different legal entities.
+- Removed `description` and `short_description` from automatic product-name mapping. A description must not silently become a product title.
+- Added normalization for common unavailable markers (`N/A`, `not available`, `Non disponible`, `null`, and dash placeholders) so placeholder text is not counted as a populated required value.
+- Added regression tests for the new SKU aliases, brand/description safety, and placeholder handling.
+- CI run 43558661844 passed completely for the previous alias batch. The latest changes from commits 04846d2 and 201ee42 are in a new CI run and remain unverified until that run completes.
+- No ML model has been trained or connected. The AI design is being separated from deterministic validation; see `docs/column-mapping-ai-design.md`.
