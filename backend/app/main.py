@@ -23,6 +23,8 @@ class UploadBodyLimitMiddleware:
             "/api/v1/catalog/import/parse-preview",
             "/api/v1/catalog/import/validate-records",
             "/api/v1/catalog/import/suggest-mappings",
+            "/api/v1/catalog/import/connectors/preview",
+            "/api/v1/catalog/import/connectors/commit",
         }
         if (
             scope["type"] != "http"
