@@ -1012,3 +1012,106 @@ Continue inspecting datasets individually and append each verified file here. Af
 - The full_name change is in the latest CI run and remains pending until backend tests and frontend checks complete.
 - No generic alias was added for `product_id`, `record_id`, `manufacturer_code`, `model_name`, `source_product_id`, `seller_name`, or `supplier`.
 - The audit now includes 90 individually fetched CSV files. Several are correlated files from the same source family; they count as individual file inspections but will not be treated as independent evidence when evaluating model generalization.
+
+
+### 91. Ferguson industrial/RFQ product catalog
+
+- Source: https://github.com/Saifi691/RFQ_GOAT_QUOTE/blob/0f9d93b766c395e05f0ef17f90997429a998ddc7/data/product_catalog.csv
+- Type: industrial utility/marking-products RFQ catalog
+- Delimiter: comma
+- Header: BOM-prefixed 30+ fields including `product_id,Description,ANSI,Application,Color Finish,Length,Lettering,Material,Material Type,Tool Type,Weight,ASTM,Picture URL,Status,Brand,Manufacturer Part #,Ferguson Part #,UPC,Price (USD),Availability,Category,Ferguson URL,Spec Sheet URL,Product Family`
+- Mapping observations: product_id, manufacturer part number, Ferguson/distributor part number, UPC, brand, and category are distinct. The two part-number fields can have different owners; only Manufacturer Part # is an MPN candidate. Product details contain quoted pipe-separated prose and embedded escaped quotes. Product ID is not SKU. Manufacturer part values and Ferguson part values are separate namespaces.
+- Current mapper gap: recognize the exact Manufacturer Part # header; keep Ferguson Part # and UPC separate. Industrial specifications, standards, availability, source URLs, and product family need an industrial catalog profile.
+
+### 92. Kanoniv e-commerce product reconciliation catalog
+
+- Source: https://github.com/kanoniv/kanoniv/blob/430fb44c16cbf3e416e4dd4032dd16a991a3fbdd/examples/product-reconciliation/data/ecommerce_catalog.csv
+- Type: e-commerce product identity/reconciliation catalog
+- Delimiter: comma
+- Header: `product_id,product_name,upc,brand,category,price_usd,sku,status,created_at`
+- Mapping observations: product_id, SKU, and UPC are separate. UPC values are fixed-width strings with leading zeros; numeric coercion would destroy identity. Brand and category are separate. The source contains a large set of synthetic product records with status and creation timestamps; some category/product combinations appear intentionally varied for reconciliation tests.
+- Current mapper gap: UPC, product ID, status, creation date, and USD price are not in the canonical schema.
+
+### 93. ShelfReady demo catalog validation fixture
+
+- Source: https://github.com/jplogix/shelfReady/blob/41c8435cb34a836d1c9fd7eb752f3d3b9d892f8c/fixtures/demo_catalog.csv
+- Type: retail catalog validation test fixture
+- Delimiter: comma
+- Header: `sku,title,description,brand,color,category,product_type,price,currency,stock,image_filename,upc,mpn,model,size,pack_quantity`
+- Mapping observations: SKU, title, UPC, MPN, model, brand, and category are separate. The fixture deliberately includes a blank title/brand row, invalid UPC check digit, missing price, duplicate SKU with conflicting title/price, repeated UPC across distinct SKUs, and source values such as `unknown`. These are explicit test cases, not clean production records.
+- Current mapper gap: deterministic barcode check-digit validation, SKU conflict detection, unknown-value normalization, price/currency, model, size, and pack quantity need dedicated validation rules.
+
+### 94. Cravella bakery product catalog
+
+- Source: https://github.com/cravellabakehouse/cravella-order/blob/7ddd9d529606e45f9d00601f3f1df9256037d7f1/catalog.csv
+- Type: bakery/pre-order storefront catalog
+- Delimiter: comma
+- Header: `id,title,description,availability,condition,price,link,image_link,brand,product_type`
+- Mapping observations: id is a slug-like storefront key, not a supplier SKU. Title and product_type are explicit. Price is a text value with currency (for example 700.00 INR), not a bare decimal. Availability and condition are listing states. Product size/serving variants and pre-order lead time are described in free text rather than separate fields. Brand is the storefront business, not necessarily a manufacturer.
+- Current mapper gap: storefront ID, currency parsing, pre-order availability, variant size/options, links/images, and product type need a D2C storefront profile.
+
+### 95. Microsoft AdventureWorks learning product export
+
+- Source: https://github.com/MicrosoftLearning/dp-data/blob/e8a49698a1325005ee928e50adce084cfb090131/products.csv
+- Type: bicycle retail product/variant dimension
+- Delimiter: comma
+- Header: `ProductID,ProductName,Category,ListPrice`
+- Mapping observations: ProductID, ProductName, Category, and ListPrice are explicit. Product names embed model/color/size values; multiple product IDs represent size/color variants of the same model. ProductID is not SKU. ListPrice is a decimal monetary field. The quoted product names contain commas and must remain one field.
+- Current mapper gap: parent/variant identity, model/color/size extraction, price, and product ID require an extended catalog model.
+
+### 96. SAP GenAI Hub supplier product catalog
+
+- Source: https://github.com/SAP-archive/sap-genai-hub-with-sap-hana-cloud-vector-engine/blob/12e1a51c2a2701a74dd6416c35afa75f4c8c78b3/data/product_catalog.csv
+- Type: supplier catalog for procurement/GenAI demo
+- Delimiter: comma
+- Header: `Product ID,Product Name,Category,Description,Unit Price,Unit of Measure,Supplier ID,Supplier Name,Lead Time (Days),Minimum Order Quantity,Currency`
+- Mapping observations: Product ID, product name, category, supplier ID/name, unit price, UOM, lead time, and MOQ are distinct. Supplier is not manufacturer. Price must be interpreted with currency and unit of measure. No SKU or MPN is present.
+- Current mapper gap: supplier references, procurement terms, currency/UOM, lead time, and MOQ need a supplier-offer profile.
+
+### 97. SAP extended product catalog adversarial data
+
+- Source: https://github.com/SAP-archive/sap-genai-hub-with-sap-hana-cloud-vector-engine/blob/12e1a51c2a2701a74dd6416c35afa75f4c8c78b3/data/extended_product_catalog.csv
+- Type: intentionally inconsistent supplier catalog test data
+- Delimiter: comma
+- Header row: not present in the inspected file; records begin directly with values such as `P_0046,Ergonomic Keyboard,...`
+- Mapping observations: this file reuses the SAP base catalog's apparent 11-column shape but has no header row. Many records deliberately mismatch product name, category, description, supplier, and pricing (for example an ergonomic keyboard paired with a headphone description or a supplier name that does not match the product). A parser must not silently treat the first data record as a header without a headerless-file decision. Row-level consistency checks are separate from column mapping.
+- Current mapper gap: headerless-file handling, source-schema inheritance, and cross-field semantic validation are not implemented by the current CSV mapper.
+
+### 98. FMCG AI Business Assistant product master
+
+- Source: https://github.com/Ankitha0425/fmcg-ai-business-assistant/blob/f0ebc6f3175457a4b9fa831516118771d32011b7/product_master.csv
+- Type: FMCG beverage product master
+- Delimiter: comma
+- Header: `product_id,product_name,brand,category,sub_category,pack_size_ml,unit_price`
+- Mapping observations: product ID, product name, brand, category, and subcategory are distinct. product_id values resemble product codes but are not labeled SKU. The brand column contains generic flavor/ingredient-like terms (Cola, Lemon, Orange, Aqua) rather than a reliable manufacturer identity. Pack size and price are separate measures.
+- Current mapper gap: pack size, price, subcategory, and FMCG-specific product attributes are not in the current schema. Do not map brand to manufacturer or product_id to SKU.
+
+### 99. ProfJigar legacy malformed product master
+
+- Source: https://github.com/ProfJigarPandya/my-content/blob/eec76c7b0e1d46f5725fc3b9949773d8ef15467f/DatabaseManagementSystems/HandsOn/Lab01/csv/product_master.csv.baddata
+- Type: legacy procurement/inventory product master with malformed CSV rows
+- Delimiter: comma
+- Header: `Product_No,Desciption,Profit_Percent,Unit_Measure,Qty_on_hand,Reorder_lvl,Sell_price,Cost_price`
+- Mapping observations: Product_No, misspelled Desciption, profit, unit, quantity, reorder, sell price, and cost price are separate. Several descriptions contain unquoted commas (for example `1.22,floppies`, `CD,Drive`, `540,HDD`), shifting the remaining values into the wrong columns. A permissive parser can silently mis-map values; strict row-width validation must reject or quarantine these records.
+- Current mapper gap: legacy misspellings, product-number semantics, row-width mismatch detection, and inventory/procurement fields require dedicated handling.
+
+### 100. DA4BAM grocery product master
+
+- Source: https://github.com/DA4BAM/dataset/blob/ac1966a3836d2489bc5681c36060bce439f175b5/ts_product_master.csv
+- Type: grocery/household product-code dimension
+- Delimiter: comma
+- Header: `Product_ID,Product_Code,SubCategory,Category,LeadTime,Price`
+- Mapping observations: Product_ID and Product_Code are distinct; Product_Code is a plausible SKU/code candidate, while Product_ID is a source key. Category and SubCategory are separate. LeadTime and Price are numeric business attributes. Rows such as `Prepared,Food` and `Frozen,Food` contain unquoted commas, shifting fields and creating ragged rows.
+- Current mapper gap: exact product-code semantics, subcategory, lead time, price, and malformed row handling need separate mapping/validation support.
+
+## Findings after 100 individually inspected files
+
+1. The audit now covers product masters, supplier feeds, PIM catalogs, product variants, marketplace listings, D2C storefronts, industrial parts, CPG/GS1, pharmacy, retail, manufacturing, and warehouse/inventory records.
+2. A header match is not sufficient. Some files have no header row, some contain malformed unquoted commas, some have placeholder values, and some have deliberate cross-field contradictions. Parser structure checks must happen before semantic mapping.
+3. Exact manufacturer part headers such as `Manufacturer Part #` are MPN candidates. Distributor-specific identifiers such as Ferguson Part # remain separate.
+4. Product IDs, SKUs, supplier SKUs, marketplace IDs, manufacturer codes, MPNs, UPC/EAN/GTIN, and storefront slugs are distinct namespaces.
+5. Product identity, variant, supplier offer, storefront listing, and inventory snapshot are separate record types. A single seven-field product schema cannot validate all of them safely.
+6. Product/variant relationships and identifier-level matching are a separate capability from column mapping. The paired supplier-feed/PIM examples show that same product, variant, and new product decisions require exact identifiers plus attribute evidence and human review for ambiguity.
+7. Data-quality metrics must be calculated from the actual parsed values. Source-supplied margins, price-per-unit, test-case labels, or notes are not automatically ground truth.
+8. The 100 files are a discovery and benchmark-seeding set, not 100 independent schemas and not a sufficiently reviewed supervised training corpus. Several files are synthetic, adversarial, empty templates, or correlated within the same repository/source family.
+9. The AI-assisted mapping layer should now be built against a reviewed source-separated benchmark. It should suggest mappings and nested extraction paths with evidence, require confirmation, and never generate validation metrics or suppress deterministic parser errors.
