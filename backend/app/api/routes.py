@@ -11,7 +11,7 @@ from uuid import UUID
 
 from app.core.auth import AuthenticatedUser, require_demo_or_paid_access, require_permission, require_plan_feature
 from app.core.database import get_db
-from app.models import DemoAccessRequest, InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer
+from app.models import InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer
 from app.core.config import settings
 from app.schemas import (
     HealthResponse,
@@ -147,7 +147,7 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
 
 
 @router.post("/catalog/import/profile")
-async def profile_public_dataset(file: UploadFile = File(...)):
+async def profile_public_dataset(file: UploadFile = File(...), _access: AuthenticatedUser = Depends(require_demo_or_paid_access())):
     """Profile a bounded public-demo dataset without assuming it is a product catalog."""
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
@@ -258,8 +258,9 @@ async def preview_catalog_import(
     file: UploadFile = File(...),
     profile_id: str = Form("general"),
     column_mapping_json: str | None = Form(None),
+    _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
 ):
-    """Public stateless demo validation. Files are not persisted."""
+    """Approved-demo or subscribed stateless validation. Files are not persisted."""
     if profile_id not in CATALOG_PROFILES:
         await file.close()
         raise HTTPException(status_code=422, detail="Unknown catalog profile.")
@@ -275,7 +276,7 @@ async def preview_catalog_import(
 
 
 @router.post("/catalog/import/preview-records")
-async def preview_public_spreadsheet(file: UploadFile = File(...)):
+async def preview_public_spreadsheet(file: UploadFile = File(...), _access: AuthenticatedUser = Depends(require_demo_or_paid_access())):
     """Public, stateless XLS/XLSX product validation with the same small demo limits as CSV."""
     filename = (file.filename or "").strip()
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
