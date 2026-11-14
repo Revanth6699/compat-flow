@@ -198,6 +198,8 @@ def parse_json(data: bytes, *, record_path: str | None = None,
                       if isinstance(value, list) and (not value or isinstance(value[0], dict))]
         if len(candidates) == 1:
             payload = candidates[0]
+        elif len(candidates) > 1:
+            raise IngestionParseError("JSON contains multiple candidate record arrays; configure record_path.")
         else:
             payload = [payload]
     if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
