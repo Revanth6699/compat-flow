@@ -185,7 +185,7 @@ export default function CatalogImportPage() {
 
         <section className="panel import-panel">
           <h2>Catalog file validation</h2>
-          <p className="import-description">Public demo: CSV only · Maximum 5 MB. Subscribed imports: up to 25 MB, subject to plan entitlements.</p>
+          <p className="import-description">Public demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file. Subscribed imports: up to 25 MB, subject to plan entitlements.</p>
           <div className="import-description">
             Product catalog validation. CompatFlow detects common supplier column names automatically.
             Public demo access is limited to CSV; additional formats and connected sources depend on your subscription.
