@@ -141,6 +141,7 @@ export async function updateProfile(fullName: string, profileDetails: { job_titl
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.msg || data.message || "Could not update your profile.");
   currentUser = data as AuthUser;
+  if (typeof window !== "undefined") localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
   notify();
   return currentUser;
 }
