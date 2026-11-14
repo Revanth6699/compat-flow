@@ -407,3 +407,234 @@ def test_postgres_enforces_live_tenant_isolation_and_viewer_permissions():
             db.commit()
         finally:
             db.close()
+
+
+
+def test_postgres_enforces_tenant_isolation_for_all_catalog_record_types():
+    """Verify every catalog collection and cross-tenant reference against PostgreSQL."""
+    from decimal import Decimal
+
+    from app.core.database import SessionLocal
+    from app.models import (
+        InventorySnapshot,
+        Organization,
+        Product,
+        ProductIdentifier,
+        ProductVariant,
+        Subscription,
+        SubscriptionPlan,
+        Supplier,
+        SupplierOffer,
+        User,
+    )
+
+    db = SessionLocal()
+    organization_a = Organization(name=f"Catalog tenant A {uuid4().hex[:8]}")
+    organization_b = Organization(name=f"Catalog tenant B {uuid4().hex[:8]}")
+    plan_code = f"catalog_test_{uuid4().hex[:12]}"
+    owner = User(
+        organization_id=organization_a.id,
+        auth_user_id=uuid4(),
+        email=f"catalog-owner-{uuid4().hex[:8]}@example.test",
+        role="member",
+        is_active=True,
+        account_type="subscriber",
+    )
+    plan = SubscriptionPlan(
+        code=plan_code,
+        name=f"Catalog test plan {uuid4().hex[:8]}",
+        currency="USD",
+        is_active=True,
+        entitlements={"supplier_catalogs": True},
+    )
+    try:
+        db.add_all([organization_a, organization_b, plan])
+        db.flush()
+
+        supplier_a = Supplier(
+            organization_id=organization_a.id,
+            name=f"Tenant A supplier {uuid4().hex[:6]}",
+            feed_format="csv",
+        )
+        supplier_b = Supplier(
+            organization_id=organization_b.id,
+            name=f"Tenant B supplier {uuid4().hex[:6]}",
+            feed_format="csv",
+        )
+        db.add_all([supplier_a, supplier_b])
+        db.flush()
+
+        product_a = Product(
+            organization_id=organization_a.id,
+            supplier_id=supplier_a.id,
+            sku=f"CAT-A-{uuid4().hex[:8]}",
+            name="Tenant A catalog product",
+            manufacturer="Maker A",
+            part_number="A-200",
+            category="Test",
+        )
+        product_b = Product(
+            organization_id=organization_b.id,
+            supplier_id=supplier_b.id,
+            sku=f"CAT-B-{uuid4().hex[:8]}",
+            name="Tenant B catalog product",
+            manufacturer="Maker B",
+            part_number="B-200",
+            category="Test",
+        )
+        db.add_all([product_a, product_b])
+        db.flush()
+
+        variant_a = ProductVariant(
+            organization_id=organization_a.id,
+            product_id=product_a.id,
+            variant_sku=f"VAR-A-{uuid4().hex[:6]}",
+            attributes={"color": "blue"},
+        )
+        variant_b = ProductVariant(
+            organization_id=organization_b.id,
+            product_id=product_b.id,
+            variant_sku=f"VAR-B-{uuid4().hex[:6]}",
+            attributes={"color": "red"},
+        )
+        offer_a = SupplierOffer(
+            organization_id=organization_a.id,
+            supplier_id=supplier_a.id,
+            product_id=product_a.id,
+            supplier_sku=f"OFFER-A-{uuid4().hex[:6]}",
+            unit_price=Decimal("12.5000"),
+            currency="USD",
+        )
+        offer_b = SupplierOffer(
+            organization_id=organization_b.id,
+            supplier_id=supplier_b.id,
+            product_id=product_b.id,
+            supplier_sku=f"OFFER-B-{uuid4().hex[:6]}",
+            unit_price=Decimal("15.0000"),
+            currency="USD",
+        )
+        identifier_a = ProductIdentifier(
+            organization_id=organization_a.id,
+            product_id=product_a.id,
+            identifier_type="gtin",
+            namespace="global",
+            value=f"000{uuid4().int % 10**11:011d}",
+        )
+        identifier_b = ProductIdentifier(
+            organization_id=organization_b.id,
+            product_id=product_b.id,
+            identifier_type="gtin",
+            namespace="global",
+            value=f"000{uuid4().int % 10**11:011d}",
+        )
+        db.add_all([
+            variant_a, variant_b, offer_a, offer_b, identifier_a, identifier_b,
+        ])
+        db.flush()
+
+        snapshot_a = InventorySnapshot(
+            organization_id=organization_a.id,
+            product_id=product_a.id,
+            supplier_offer_id=offer_a.id,
+            warehouse_code="A-WH",
+            quantity_on_hand=Decimal("20"),
+            quantity_reserved=Decimal("2"),
+            quantity_available=Decimal("18"),
+        )
+        snapshot_b = InventorySnapshot(
+            organization_id=organization_b.id,
+            product_id=product_b.id,
+            supplier_offer_id=offer_b.id,
+            warehouse_code="B-WH",
+            quantity_on_hand=Decimal("30"),
+            quantity_reserved=Decimal("3"),
+            quantity_available=Decimal("27"),
+        )
+        db.add_all([snapshot_a, snapshot_b, owner])
+        db.flush()
+        db.add(Subscription(
+            organization_id=organization_a.id,
+            user_id=owner.id,
+            plan_code=plan_code,
+            status="active",
+            billing_interval="month",
+        ))
+        db.commit()
+
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            identity=SupabaseIdentity(owner.auth_user_id, owner.email, "catalog-integration-token"),
+            profile=owner,
+        )
+        app.dependency_overrides[get_db] = lambda: db
+        client = TestClient(app)
+
+        collection_expectations = (
+            ("/api/v1/product-variants", variant_a.id, variant_b.id),
+            ("/api/v1/supplier-offers", offer_a.id, offer_b.id),
+            ("/api/v1/inventory-snapshots", snapshot_a.id, snapshot_b.id),
+            ("/api/v1/product-identifiers", identifier_a.id, identifier_b.id),
+        )
+        for path, own_id, foreign_id in collection_expectations:
+            response = client.get(path)
+            assert response.status_code == 200, (path, response.text)
+            returned_ids = {row["id"] for row in response.json()}
+            assert returned_ids == {str(own_id)}, (path, returned_ids)
+            assert str(foreign_id) not in returned_ids
+
+        foreign_variant = client.post("/api/v1/product-variants", json={
+            "product_id": str(product_b.id),
+            "variant_sku": f"DENIED-VAR-{uuid4().hex[:6]}",
+            "attributes": {"color": "black"},
+        })
+        assert foreign_variant.status_code == 404
+
+        foreign_supplier_offer = client.post("/api/v1/supplier-offers", json={
+            "supplier_id": str(supplier_b.id),
+            "product_id": str(product_a.id),
+            "supplier_sku": f"DENIED-OFFER-{uuid4().hex[:6]}",
+            "unit_price": "9.99",
+            "currency": "USD",
+        })
+        assert foreign_supplier_offer.status_code == 404
+
+        foreign_product_offer = client.post("/api/v1/supplier-offers", json={
+            "supplier_id": str(supplier_a.id),
+            "product_id": str(product_b.id),
+            "supplier_sku": f"DENIED-PRODUCT-{uuid4().hex[:6]}",
+            "unit_price": "9.99",
+            "currency": "USD",
+        })
+        assert foreign_product_offer.status_code == 404
+
+        foreign_product_snapshot = client.post("/api/v1/inventory-snapshots", json={
+            "product_id": str(product_b.id),
+            "warehouse_code": "DENIED-WH",
+            "quantity_on_hand": "1",
+        })
+        assert foreign_product_snapshot.status_code == 404
+
+        foreign_offer_snapshot = client.post("/api/v1/inventory-snapshots", json={
+            "product_id": str(product_a.id),
+            "supplier_offer_id": str(offer_b.id),
+            "warehouse_code": "DENIED-OFFER-WH",
+            "quantity_on_hand": "1",
+        })
+        assert foreign_offer_snapshot.status_code == 404
+
+        foreign_identifier = client.post("/api/v1/product-identifiers", json={
+            "product_id": str(product_b.id),
+            "identifier_type": "gtin",
+            "namespace": "global",
+            "value": f"999{uuid4().int % 10**11:011d}",
+        })
+        assert foreign_identifier.status_code == 404
+    finally:
+        clear_overrides()
+        try:
+            db.rollback()
+            db.delete(organization_a)
+            db.delete(organization_b)
+            db.delete(plan)
+            db.commit()
+        finally:
+            db.close()
