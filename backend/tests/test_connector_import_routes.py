@@ -58,7 +58,7 @@ def test_connector_pipeline_rejects_bad_record_type():
 class ConnectorRouteDB:
     def __init__(self, permission_granted=True):
         self.permission_granted = permission_granted
-        self.subscription = SimpleNamespace(status="active")
+        self.subscription = SimpleNamespace(status="active", plan_code="growth", current_period_end=None)
         self.plan = SimpleNamespace(code="growth", is_active=True, entitlements={"supplier_catalogs": True})
 
     def scalar(self, statement):
