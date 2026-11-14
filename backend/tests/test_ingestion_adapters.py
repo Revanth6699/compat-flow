@@ -86,3 +86,50 @@ def test_xml_single_record_inside_collection_wrapper():
     parsed = parse_xml(b'<Products><Product><SKU>001</SKU><Name>Widget</Name></Product></Products>')
     assert len(parsed.records) == 1
     assert parsed.records[0].values == {"SKU": "001", "Name": "Widget"}
+
+
+def test_csv_rejects_non_utf8_and_record_limit():
+    with pytest.raises(IngestionParseError, match="UTF-8"):
+        parse_csv(b"\\xff\\xfe")
+    with pytest.raises(IngestionParseError, match="record limit"):
+        parse_csv(b"sku\\nA\\nB\\n", max_records=1)
+
+
+def test_csv_rejects_empty_headers_and_duplicate_headers():
+    with pytest.raises(IngestionParseError, match="empty or missing header"):
+        parse_csv(b"sku,,name\\n1,2,3\\n")
+    with pytest.raises(IngestionParseError, match="Duplicate headers"):
+        parse_csv(b"sku,SKU\\n1,2\\n")
+
+
+def test_json_rejects_malformed_payload_and_missing_record_path():
+    with pytest.raises(IngestionParseError, match="valid UTF-8 JSON"):
+        parse_json(b"{not-json}")
+    with pytest.raises(IngestionParseError, match="record path does not exist"):
+        parse_json(b'{"data": []}', record_path="missing.items")
+
+
+def test_json_enforces_record_and_cell_limits():
+    with pytest.raises(IngestionParseError, match="record limit"):
+        parse_json(b'[{"sku":"A"},{"sku":"B"}]', max_records=1)
+    with pytest.raises(IngestionParseError, match="maximum cell size"):
+        parse_json(('{"sku":"' + ("x" * 20) + '"}').encode(), max_records=1)
+
+
+def test_excel_rejects_missing_sheet_and_invalid_header_row():
+    openpyxl = pytest.importorskip("openpyxl")
+    output = io.BytesIO()
+    workbook = openpyxl.Workbook()
+    workbook.active.append(["sku", "name"])
+    workbook.save(output)
+    with pytest.raises(IngestionParseError, match="worksheet does not exist"):
+        parse_excel(output.getvalue(), ".xlsx", sheet_name="Missing")
+    with pytest.raises(IngestionParseError, match="header_row"):
+        parse_excel(output.getvalue(), ".xlsx", header_row=0)
+
+
+def test_parse_source_dispatches_xml_and_rejects_missing_extension():
+    parsed = parse_source(b"<Products><Product><sku>A</sku></Product></Products>", "feed.XML")
+    assert parsed.format == "xml"
+    with pytest.raises(IngestionParseError, match="extension is required"):
+        parse_source(b"sku,name", "catalog")
