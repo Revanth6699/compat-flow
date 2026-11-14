@@ -268,6 +268,7 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         is_active=True,
         account_type="demo",
     )
+    seat_plan = None
     try:
         db.add_all([organization_a, organization_b])
         db.flush()
@@ -361,7 +362,8 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
             db.rollback()
             db.delete(organization_a)
             db.delete(organization_b)
-            db.delete(seat_plan)
+            if seat_plan is not None:
+                db.delete(seat_plan)
             db.commit()
         finally:
             db.close()
