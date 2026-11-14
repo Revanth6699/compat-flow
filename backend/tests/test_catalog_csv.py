@@ -42,8 +42,8 @@ def test_alias_headers_are_mapped_to_canonical_fields():
 
 def test_product_mpn_header_maps_to_part_number():
     content = (
-        "product_sku,product_name,manufacturer,product_mpn,product_category\\n"
-        "SKU-1,Brake Pad,Maker A,BP-100,Brakes\\n"
+        "product_sku,product_name,manufacturer,product_mpn,product_category\n"
+        "SKU-1,Brake Pad,Maker A,BP-100,Brakes\n"
     )
     result = parse_catalog_csv(content)
     assert result.valid_count == 1
