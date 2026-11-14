@@ -50,12 +50,18 @@ type PreviewResponse = {
 export default function CatalogImportPage() {
   const { user, loading: authLoading } = useAuth();
   const [demoApproved, setDemoApproved] = useState(false);
+  const [accessType, setAccessType] = useState<"checking" | "demo" | "subscription" | "none">("checking");
   useEffect(() => {
-    if (!user) { setDemoApproved(false); return; }
+    if (!user) { setDemoApproved(false); setAccessType("none"); return; }
     let active = true;
-    apiRequest<{ approved: boolean }>("/api/v1/demo-requests/mine")
-      .then((data) => { if (active) setDemoApproved(data.approved); })
-      .catch(() => { if (active) setDemoApproved(false); });
+    setAccessType("checking");
+    apiRequest<{ allowed: boolean; access_type: "demo" | "subscription" | "none" }>("/api/v1/demo-access")
+      .then((data) => {
+        if (!active) return;
+        setAccessType(data.allowed ? data.access_type : "none");
+        setDemoApproved(data.access_type === "demo" && data.allowed);
+      })
+      .catch(() => { if (active) { setDemoApproved(false); setAccessType("none"); } });
     return () => { active = false; };
   }, [user]);
   const [file, setFile] = useState<File | null>(null);
@@ -75,11 +81,15 @@ export default function CatalogImportPage() {
     setFile(selectedFile); setResult(null); setDatasetResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setError("");
     if (!selectedFile) return;
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
-    if (!(user ? ["csv", "xlsx", "xls", "json", "xml"] : ["csv", "xlsx", "xls"]).includes(extension ?? "")) {
-      setFile(null); setError(user ? "Supported formats: CSV, XLSX, XLS, JSON and XML. Your plan determines which formats you can process." : "The public demo accepts CSV, XLSX and XLS files only."); return;
+    const allowed = demoApproved ? ["csv", "xlsx", "xls"] : ["csv", "xlsx", "xls", "json", "xml"];
+    if (!allowed.includes(extension ?? "")) {
+      setFile(null);
+      setError(demoApproved ? "Approved demo supports CSV, XLSX and XLS only." : "Supported formats: CSV, XLSX, XLS, JSON and XML. Your plan determines which formats you can process.");
+      return;
     }
-    if (selectedFile.size > (user ? 25 : 5) * 1024 * 1024) {
-      setFile(null); setError(`The file exceeds the ${user ? "25 MB" : "5 MB"} limit for this access level.`);
+    const limitMb = demoApproved ? 5 : 25;
+    if (selectedFile.size > limitMb * 1024 * 1024) {
+      setFile(null); setError(`The file exceeds the ${limitMb} MB limit for this access level.`);
     }
   }
 
@@ -192,6 +202,15 @@ export default function CatalogImportPage() {
         <h1>Demo access is not public</h1>
         <p>Submit a demo request. If approved, create an account or sign in with the same email address to use the upload workflow. Subscribed customers can sign in to access their plan features.</p>
         <div className="import-actions"><a className="button" href="/contact?intent=demo">Request demo access</a><a className="button button-secondary" href="/sign-in">Sign in</a></div>
+      </section>
+    </div></main>
+  );
+  if (accessType === "checking") return <main id="main" className="page"><div className="container"><p>Checking your upload entitlement...</p></div></main>;
+  if (accessType === "none") return (
+    <main id="main" className="page"><div className="container">
+      <section className="panel import-panel"><div className="eyebrow">UPLOAD ACCESS REQUIRED</div><h1>Your account does not have upload access</h1>
+        <p>Demo uploads are available only after an operator approves your request. Subscribed organizations can use the features included in their active plan.</p>
+        <div className="import-actions"><a className="button" href="/contact?intent=demo">Request demo access</a><a className="button button-secondary" href="/pricing">View plans</a></div>
       </section>
     </div></main>
   );
