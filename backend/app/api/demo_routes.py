@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.auth import AuthenticatedUser, get_active_plan, get_current_user
+from app.core.auth import AuthenticatedUser, get_active_plan, get_current_user, require_verified_supabase_email
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import DemoAccessRequest, Organization, Review, Subscription, User
@@ -47,6 +47,7 @@ def require_platform_admin(current: AuthenticatedUser = Depends(get_current_user
         raise HTTPException(status_code=503, detail="Platform administrator access is not configured.")
     if current.identity.email != allowed_email:
         raise HTTPException(status_code=403, detail="Platform administrator access is restricted.")
+    require_verified_supabase_email(current.identity)
     return current
 
 
