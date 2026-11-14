@@ -57,9 +57,24 @@ export default function PlatformAdminPage() {
 
   if (loading) return <main className="page"><div className="container">Checking account...</div></main>;
   if (!user) return <main className="page"><div className="container panel"><h1>Platform administration</h1><p>Sign in with the configured platform-owner account.</p><Link className="button" href="/sign-in">Sign in</Link></div></main>;
+  if ((user.email || "").trim().toLowerCase() !== "sarvasettyrevanth.66@gmail.com") {
+    return <main className="page"><div className="container panel"><h1>Access denied</h1><p>This account is not authorized to access platform administration.</p><Link className="button button-secondary" href="/">Return to website</Link></div></main>;
+  }
 
   return <main className="page"><div className="container">
     <div className="import-heading"><div className="eyebrow">RESTRICTED CONSOLE</div><h1>Platform overview</h1><p>Platform-level metrics and demo access decisions. Authorization is enforced by the API.</p></div>
+    <section className="panel result-section" aria-label="Platform owner profile">
+      <div className="eyebrow">OWNER ACCOUNT</div>
+      <div className="row" style={{ alignItems: "center", gap: "1rem" }}>
+        <div aria-hidden="true" style={{ width: 52, height: 52, borderRadius: "50%", display: "grid", placeItems: "center", fontWeight: 700, background: "var(--surface, #eeeeec)" }}>RK</div>
+        <div>
+          <h2 style={{ margin: 0 }}>Sarvasetty Revanth Kumar</h2>
+          <p style={{ margin: "0.25rem 0" }}>Platform Owner</p>
+          <p style={{ margin: 0 }}>sarvasettyrevanth.66@gmail.com</p>
+        </div>
+      </div>
+      <p><strong>Access level:</strong> Full platform administration</p>
+    </section>
     {error && <p className="form-error" role="alert">{error}</p>}
     {overview && <div className="result-stats">
       {([["Users", overview.users], ["Active users", overview.active_users], ["Organizations", overview.organizations], ["Subscriptions", overview.subscriptions], ["Active subscriptions", overview.active_subscriptions], ["Reviews", overview.reviews], ["Demo requests", overview.demo_requests], ["Pending requests", overview.pending_demo_requests], ["Approved demos", overview.approved_demo_requests]] as [string, number][]).map(([label, value]) => <div className="panel stat-card" key={label}><span>{label}</span><strong>{value.toLocaleString()}</strong></div>)}
