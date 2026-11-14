@@ -9,7 +9,7 @@ function ContactForm() {
  const planLabel=["starter","growth","business","enterprise"].includes(requestedPlan)?requestedPlan.charAt(0).toUpperCase()+requestedPlan.slice(1):"CompatFlow";
  const [status,setStatus]=useState<"idle"|"sending"|"success"|"error">("idle");
  const [message,setMessage]=useState("");
- const [form,setForm]=useState({name:"",email:"",organization:"",role:"",message:"",website:""});
+ const [form,setForm]=useState({name:"",email:"",organization:"",role:"",message:isPricing?`I am interested in the ${planLabel} plan. My team needs...`:"",website:""});
  function update(field:keyof typeof form,value:string){setForm(current=>({...current,[field]:value}));}
  async function submit(event:React.FormEvent<HTMLFormElement>){
   event.preventDefault();if(status==="sending")return;setStatus("sending");setMessage("");
