@@ -1011,3 +1011,13 @@ button:disabled, .button:disabled {
 .review-empty { max-width: 650px; }
 .review-form-page .settings-panel { max-width: 760px; }
 @media (max-width: 640px) { .reviews-grid { grid-template-columns: 1fr; } .review-card-top { align-items: flex-start; flex-direction: column; gap: 4px; } }
+
+.validation-chart { display: flex; width: 100%; height: 16px; overflow: hidden; border-radius: 999px; background: #E8EEF4; }
+.validation-chart span { display: block; height: 100%; transition: width 220ms ease; }
+.chart-valid { background: var(--green); }
+.chart-invalid { background: var(--red); }
+.field-chart-list { display: grid; gap: 12px; margin-top: 16px; }
+.field-chart-list > div { display: grid; grid-template-columns: minmax(120px, 180px) minmax(90px, 1fr) 64px; align-items: center; gap: 12px; }
+.field-chart-list > div > span { color: var(--muted); font-size: .82rem; }
+.field-chart-list strong { color: var(--navy); font-size: .8rem; text-align: right; }
+@media (max-width: 560px) { .field-chart-list > div { grid-template-columns: 1fr 60px; gap: 6px 10px; } .field-chart-list .metric-bar { grid-column: 1 / -1; grid-row: 2; } }
