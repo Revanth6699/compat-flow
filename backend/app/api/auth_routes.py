@@ -19,7 +19,7 @@ from app.core.auth import (
     require_verified_supabase_email,
 )
 from app.core.database import get_db
-from app.models import Organization, User, UserInvitation
+from app.models import Organization, Subscription, SubscriptionPlan, User, UserInvitation
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 invitation_router = APIRouter(prefix="/invitations", tags=["invitations"])
@@ -141,6 +141,67 @@ def get_me(current: AuthenticatedUser = Depends(get_current_user), db: Session =
     )
 
 
+
+def _member_seat_limit(db: Session, organization_id: UUID) -> int | None:
+    now = datetime.now(timezone.utc)
+    subscription = db.scalar(
+        select(Subscription).where(
+            Subscription.organization_id == organization_id,
+            Subscription.status.in_(("active", "trialing")),
+            (Subscription.current_period_end.is_(None)) | (Subscription.current_period_end > now),
+        ).order_by(Subscription.created_at.desc())
+    )
+    if subscription is None:
+        return None
+    plan = db.get(SubscriptionPlan, subscription.plan_code)
+    if plan is None or not plan.is_active:
+        return None
+    limit = (plan.entitlements or {}).get("member_seats")
+    if limit is None:
+        return None
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise HTTPException(status_code=503, detail="The subscription member-seat limit is misconfigured.")
+    return limit
+
+
+def _ensure_invitation_seat_available(
+    db: Session,
+    organization_id: UUID,
+    *,
+    include_pending_invitations: bool,
+) -> None:
+    limit = _member_seat_limit(db, organization_id)
+    if limit is None:
+        return
+    active_members = db.scalar(
+        select(func.count(User.id)).where(
+            User.organization_id == organization_id,
+            User.is_active.is_(True),
+        )
+    ) or 0
+    reserved_seats = 0
+    if include_pending_invitations:
+        now = datetime.now(timezone.utc)
+        reserved_seats = db.scalar(
+            select(func.count(UserInvitation.id)).where(
+                UserInvitation.organization_id == organization_id,
+                UserInvitation.accepted_at.is_(None),
+                UserInvitation.revoked_at.is_(None),
+                UserInvitation.expires_at > now,
+            )
+        ) or 0
+    if active_members + reserved_seats >= limit:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": "The subscription member-seat limit has been reached.",
+                "member_seat_limit": limit,
+                "active_members": active_members,
+                "reserved_invitations": reserved_seats,
+            },
+        )
+
+
 @invitation_router.post("", response_model=InvitationCreatedResponse, status_code=201)
 def create_invitation(
     payload: InvitationCreateRequest,
@@ -148,6 +209,16 @@ def create_invitation(
     db: Session = Depends(get_db),
 ):
     email = str(payload.email).strip().lower()
+    # Serialize membership reservations per organization. This closes the race
+    # between simultaneous invitation requests and seat-limit checks.
+    db.scalar(
+        select(Organization.id)
+        .where(Organization.id == current.profile.organization_id)
+        .with_for_update()
+    )
+    _ensure_invitation_seat_available(
+        db, current.profile.organization_id, include_pending_invitations=True
+    )
     if current.profile.role != "owner" and payload.role == "admin":
         raise HTTPException(status_code=403, detail="Only an organization owner can invite administrators.")
     existing = db.scalar(select(User).where(func.lower(User.email) == email))
@@ -208,6 +279,13 @@ def accept_invitation(
     now = datetime.now(timezone.utc)
     if invitation is None or invitation.revoked_at is not None or invitation.accepted_at is not None:
         raise HTTPException(status_code=400, detail="This invitation is invalid, revoked, or already used.")
+    # Serialize acceptance against other acceptances and new invitations in
+    # this organization so concurrent requests cannot oversubscribe seats.
+    db.scalar(
+        select(Organization.id)
+        .where(Organization.id == invitation.organization_id)
+        .with_for_update()
+    )
     if invitation.expires_at <= now:
         raise HTTPException(status_code=400, detail="This invitation has expired.")
     if invitation.email.lower() != identity.email:
@@ -216,6 +294,9 @@ def accept_invitation(
     existing = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
     if existing:
         raise HTTPException(status_code=409, detail="This Supabase account is already linked to a CompatFlow user.")
+    _ensure_invitation_seat_available(
+        db, invitation.organization_id, include_pending_invitations=False
+    )
 
     profile = User(
         id=uuid4(),
