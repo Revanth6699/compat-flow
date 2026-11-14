@@ -736,7 +736,7 @@ small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs)
 }
 .pricing-note strong { color: #202833; font-size: .84rem; }
 .pricing-grid {
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: stretch; gap: 14px; padding: 8px 0 40px;
 }
 .pricing-card {
@@ -750,6 +750,11 @@ small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs)
   transform: translateY(-2px);
 }
 .pricing-card-featured { border-top: 3px solid #16877F; padding-top: 20px; }
+.billing-plan { align-items: flex-start; gap: 12px; width: 100%; text-align: left; color: #202833; font: inherit; cursor: pointer; }
+.billing-plan:disabled { cursor: not-allowed; opacity: .58; }
+.billing-plan.selected { border-color: #00689C; box-shadow: 0 0 0 2px rgba(0,104,156,.12); }
+.billing-plan .pricing-amount { display: block; color: #202833; font-size: 1.6rem; font-weight: 700; }
+.billing-plan .pricing-amount small { color: #737E8B; font-size: .75rem; font-weight: 400; }
 .pricing-plan-name { color: #202833; font-size: 1.05rem; font-weight: 700; }
 .pricing-card-top > p { min-height: 84px; margin: 8px 0 14px; color: #647181; font-size: .78rem; line-height: 1.6; }
 .pricing-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px; }
@@ -894,3 +899,81 @@ small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs)
 .contact-honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 @media (max-width: 800px) { .contact-layout { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .contact-hero { padding-top: 42px; } .contact-form { padding: 20px; } .contact-form-grid { grid-template-columns: 1fr; } .contact-field-full { grid-column: auto; } }
+
+
+/* Authentication and account workspace */
+.auth-shell { min-height: 68vh; display: grid; place-items: center; padding: 72px 24px; background: var(--surface); }
+.auth-card { width: min(100%, 460px); padding: 38px; border: 1px solid var(--line); border-radius: 10px; background: #fff; box-shadow: var(--shadow); }
+.auth-card h1 { margin: 12px 0 8px; color: var(--navy); font-size: clamp(30px, 4vw, 40px); line-height: 1.15; }
+.auth-intro { margin: 0 0 24px; color: var(--muted); font-size: 14px; }
+.auth-form { display: flex; flex-direction: column; gap: 10px; }
+.auth-form label { margin-top: 8px; color: var(--ink); font-size: 12px; font-weight: 800; }
+.auth-form input { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 5px; background: #fff; color: var(--ink); }
+.auth-form input:focus { outline: 3px solid rgba(15,157,145,.18); border-color: var(--teal); }
+.auth-inline { display: flex; justify-content: flex-end; margin: 2px 0 8px; font-size: 12px; }
+.auth-inline a, .auth-switch a, .auth-card > a { color: var(--teal); font-weight: 800; }
+.auth-submit { width: 100%; margin-top: 8px; }
+.auth-submit:disabled { opacity: .6; cursor: wait; }
+.auth-switch { margin: 22px 0 0; color: var(--muted); text-align: center; font-size: 13px; }
+.auth-error, .auth-success { padding: 11px 13px; border-radius: 5px; font-size: 12px; }
+.auth-error { background: var(--red-soft); color: var(--red); }
+.auth-success { background: var(--green-soft); color: #166534; }
+.workspace-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 32px; }
+.workspace-heading h1 { margin: 8px 0; color: var(--navy); font-size: 42px; }
+.workspace-heading p { color: var(--muted); }
+.workspace-profile { max-width: 720px; padding: 28px; }
+.workspace-profile h2 { margin-top: 0; color: var(--navy); }
+.workspace-profile dl { margin: 20px 0; }
+.workspace-profile dl div { display: flex; justify-content: space-between; gap: 20px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.workspace-profile dt { color: var(--muted); font-weight: 700; }
+.workspace-profile dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
+@media (max-width: 640px) { .auth-card { padding: 26px 20px; } .workspace-heading { align-items: flex-start; flex-direction: column; } .workspace-profile dl div { flex-direction: column; gap: 4px; } .workspace-profile dd { text-align: left; } }
+
+
+/* Profile settings */
+.account-settings { max-width: 900px; padding-top: 52px; padding-bottom: 76px; }
+.settings-panel { max-width: 720px; margin: 0 0 18px; padding: 26px; }
+.settings-panel h2 { margin: 0 0 14px; color: var(--navy); font-size: 1.2rem; }
+.settings-panel .auth-form { max-width: 520px; }
+.settings-panel .auth-form small { color: var(--muted); font-size: .75rem; line-height: 1.6; }
+.settings-description { max-width: 620px; margin: 0 0 16px; color: var(--muted); font-size: .86rem; line-height: 1.7; }
+.settings-description a, .account-help-content a { color: var(--teal); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.workspace-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.account-help-content { padding-top: 38px; }
+@media (max-width: 640px) {
+ .account-settings { padding-top: 34px; }
+ .settings-panel { padding: 20px; }
+ .workspace-actions { width: 100%; }
+}
+
+
+/* Consistent, restrained motion across the marketing and workspace UI. */
+a, button, .button, .pricing-card, .home-capability-card, .home-step, .panel {
+  transition:
+    color var(--ease),
+    background-color var(--ease),
+    border-color var(--ease),
+    box-shadow var(--ease),
+    transform var(--ease),
+    opacity var(--ease);
+}
+.pricing-card:hover, .home-capability-card:hover, .home-step:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+button:disabled, .button:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+:focus-visible {
+  outline: 3px solid rgba(11, 143, 133, .42);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

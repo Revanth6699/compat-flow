@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     app_secret_key: str = "local-development-only-change-me"
     frontend_origin: str = "http://localhost:3001"
     allowed_hosts: str = "*"
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
 
     database_url: str = (
         "postgresql+psycopg://compatflow_local:"
@@ -22,7 +24,14 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/2"
 
     import_storage_dir: str = "/data/imports"
-    import_max_upload_bytes: int = 5 * 1024 * 1024
+    import_max_upload_bytes: int = 25 * 1024 * 1024
+    connector_allowed_hosts: str = ""
+    sftp_known_hosts_path: str = ""
+
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
+    razorpay_plan_ids_json: str = "{}"
 
     model_config = SettingsConfigDict(
         env_file="../.env",

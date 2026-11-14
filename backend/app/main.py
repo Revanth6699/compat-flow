@@ -4,21 +4,34 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import JSONResponse
 
 from app.api.routes import router
+from app.api.auth_routes import router as auth_router, invitation_router
+from app.api.connector_import_routes import router as connector_import_router
+from app.api.billing_routes import router as billing_router
 from app.core.config import settings
 
 
 class UploadBodyLimitMiddleware:
-    """Cap the full multipart request body before Starlette parses the upload."""
+    """Cap import request bodies before Starlette parses multipart uploads."""
 
     def __init__(self, app, max_bytes: int):
         self.app = app
         self.max_bytes = max_bytes
 
     async def __call__(self, scope, receive, send):
+        protected_paths = {
+            "/api/v1/catalog/import/preview",
+            "/api/v1/catalog/import/preview-records",
+            "/api/v1/catalog/import/validate",
+            "/api/v1/catalog/import/parse-preview",
+            "/api/v1/catalog/import/validate-records",
+            "/api/v1/catalog/import/suggest-mappings",
+            "/api/v1/catalog/import/connectors/preview",
+            "/api/v1/catalog/import/connectors/commit",
+        }
         if (
             scope["type"] != "http"
             or scope.get("method") != "POST"
-            or scope.get("path") != "/api/v1/catalog/import/preview"
+            or scope.get("path") not in protected_paths
         ):
             await self.app(scope, receive, send)
             return
@@ -28,7 +41,7 @@ class UploadBodyLimitMiddleware:
             try:
                 if int(content_length) > self.max_bytes:
                     response = JSONResponse(
-                        {"detail": "Request body exceeds the 5 MB upload limit."},
+                        {"detail": "Request body exceeds the configured import upload limit."},
                         status_code=413,
                     )
                     await response(scope, receive, send)
@@ -45,7 +58,7 @@ class UploadBodyLimitMiddleware:
             total_bytes += len(message.get("body", b""))
             if total_bytes > self.max_bytes:
                 response = JSONResponse(
-                    {"detail": "Request body exceeds the 5 MB upload limit."},
+                    {"detail": "Request body exceeds the configured CSV upload limit."},
                     status_code=413,
                 )
                 await response(scope, receive, send)
@@ -85,12 +98,19 @@ app.add_middleware(
     max_bytes=settings.import_max_upload_bytes + 64 * 1024,
 )
 
+staging_preview_origin_regex = (
+    r"https://compat-flow-[a-z0-9-]+-revanth-fbe6\.vercel\.app"
+    if settings.app_env.lower() == "staging"
+    else None
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=staging_preview_origin_regex,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=["Content-Type", "X-Request-ID"],
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
 
 allowed_hosts = [
@@ -116,6 +136,10 @@ async def security_headers(request, call_next):
 
 
 app.include_router(router, prefix="/api/v1")
+app.include_router(auth_router, prefix="/api/v1")
+app.include_router(invitation_router, prefix="/api/v1")
+app.include_router(connector_import_router, prefix="/api/v1")
+app.include_router(billing_router, prefix="/api/v1")
 
 
 @app.get("/", include_in_schema=False)

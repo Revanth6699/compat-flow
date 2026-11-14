@@ -1,4 +1,7 @@
+from io import BytesIO
+
 from fastapi.testclient import TestClient
+from openpyxl import Workbook
 
 from app.main import app
 
@@ -52,7 +55,7 @@ def test_preview_rejects_invalid_utf8():
     assert response.status_code == 400
 
 
-def test_preview_rejects_missing_required_columns():
+def test_preview_returns_row_errors_for_missing_required_mappings():
     response = client.post(
         "/api/v1/catalog/import/preview",
         files={
@@ -63,7 +66,10 @@ def test_preview_rejects_missing_required_columns():
             )
         },
     )
-    assert response.status_code == 422
+    assert response.status_code == 200
+    data = response.json()
+    assert data["invalid_rows"] == 1
+    assert any("manufacturer" in issue["message"] for issue in data["row_errors"])
 
 
 def test_preview_detects_duplicate_skus_within_uploaded_file():
@@ -107,3 +113,46 @@ def test_preview_rejects_upload_over_five_megabytes():
         files={"file": ("large.csv", oversized, "text/csv")},
     )
     assert response.status_code == 413
+
+
+def test_public_spreadsheet_preview_accepts_xlsx_without_authentication():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["sku", "name", "manufacturer", "part_number", "category"])
+    sheet.append(["SKU-EXCEL-1", "Brake Pad", "Maker A", "BP-100", "Brakes"])
+    stream = BytesIO()
+    workbook.save(stream)
+    response = client.post(
+        "/api/v1/catalog/import/preview-records",
+        files={"file": ("supplier.xlsx", stream.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["format"] == "xlsx"
+    assert data["record_type"] == "products"
+    assert data["total_records"] == 1
+    assert data["valid_records"] == 1
+    assert data["persisted"] is False
+
+
+def test_public_spreadsheet_preview_rejects_json():
+    response = client.post(
+        "/api/v1/catalog/import/preview-records",
+        files={"file": ("supplier.json", b'{"items":[]}', "application/json")},
+    )
+    assert response.status_code == 415
+
+
+def test_public_product_preview_rejects_seller_dataset_instead_of_scoring_every_row_invalid():
+    payload = (
+        "seller_id,seller_zip_code_prefix,seller_city,seller_state\\n"
+        "001,01001,sao paulo,SP\\n"
+        "002,02002,rio de janeiro,RJ\\n"
+    )
+    response = client.post(
+        "/api/v1/catalog/import/preview",
+        files={"file": ("olist_sellers_dataset.csv", payload.encode(), "text/csv")},
+    )
+    assert response.status_code == 422
+    assert "does not appear to contain product catalog columns" in response.json()["detail"]
+    assert "seller" in response.json()["detail"].lower()

@@ -1,13 +1,38 @@
+"use client";
+
 import Link from "next/link";
+import { useAuth } from "@/components/auth-provider";
+
 export function SiteHeader() {
- return <header className="site-header"><div className="container header-inner">
-  <Link className="brand" href="/" aria-label="CompatFlow home">compat<span className="brand-mark">flow</span></Link>
-  <nav className="nav" aria-label="Main navigation">
-   <Link href="/">Home</Link>
-   <Link href="/#capabilities">Capabilities</Link>
-   <Link href="/#workflow">How it works</Link>
-   <Link href="/pricing">Pricing</Link>
-   <Link className="nav-get-started" href="/contact?intent=demo">Request demo</Link>
-  </nav>
- </div></header>;
+  const { user, loading, signOut } = useAuth();
+
+  return (
+    <header className="site-header">
+      <div className="container header-inner">
+        <Link className="brand" href="/" aria-label="CompatFlow home">
+          compat<span className="brand-mark">flow</span>
+        </Link>
+        <nav className="nav" aria-label="Main navigation">
+          <Link href="/">Home</Link>
+          <Link href="/#capabilities">Capabilities</Link>
+          <Link href="/#workflow">How it works</Link>
+          <Link href="/pricing">Pricing</Link>
+          <Link href="/contact?intent=demo">Request demo</Link>
+          <Link href="/catalog/import">Public CSV demo</Link>
+          {!loading && (user ? (
+            <>
+              <Link href="/workspace">Workspace</Link>
+              <Link href="/settings">Profile</Link>
+              <Link href="/" onClick={() => void signOut()}>Sign out</Link>
+            </>
+          ) : (
+            <>
+              <Link href="/sign-in">Sign in</Link>
+              <Link className="nav-get-started" href="/sign-up">Create account</Link>
+            </>
+          ))}
+        </nav>
+      </div>
+    </header>
+  );
 }
