@@ -166,6 +166,26 @@ def test_utf8_bom_is_ignored_in_first_header():
     assert {item.field for item in result.column_mappings} >= {"sku", "name", "manufacturer", "part_number", "category"}
 
 
+def test_sku_id_header_maps_to_sku():
+    content = (
+        "sku_id,product_name,manufacturer,mpn,category\n"
+        "SK-101,Mini Car,Maker A,MPN-101,Toys\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.valid_count == 1
+    assert {item.field: item.source_header for item in result.column_mappings}["sku"] == "sku_id"
+
+
+def test_sku_code_header_maps_to_sku():
+    content = (
+        "SKU_Code,Product_Name,Manufacturer,MPN,Product_Category\n"
+        "ELEC-001,Smartphone,Maker A,MPN-001,Electronics\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.valid_count == 1
+    assert {item.field: item.source_header for item in result.column_mappings}["sku"] == "SKU_Code"
+
+
 def test_header_normalization_accepts_spaces_and_punctuation():
     content = (
         " Product SKU , Product Name , Manufacturer Name , Part No. , Category Name \n"
