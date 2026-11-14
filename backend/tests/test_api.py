@@ -41,7 +41,7 @@ def test_import_job_status_endpoint_is_not_exposed():
 
 
 def test_preview_rejects_upload_over_configured_limit_before_auth():
-    oversized = b"x" * (25 * 1024 * 1024 + 1)
+    oversized = b"x" * (26 * 1024 * 1024)
     response = client.post(
         "/api/v1/catalog/import/preview",
         files={"file": ("large.csv", oversized, "text/csv")},
