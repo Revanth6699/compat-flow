@@ -25,7 +25,7 @@ HEADER_ALIASES = {
     },
     "name": {
         "name": 1.0, "product_name": 0.99, "item_name": 0.98,
-        "title": 0.94, "product_title": 0.98, "description": 0.82,
+        "title": 0.94, "product_title": 0.98, "device_name": 0.98, "description": 0.82,
         "short_description": 0.80,
     },
     "manufacturer": {
@@ -34,8 +34,8 @@ HEADER_ALIASES = {
     },
     "part_number": {
         "part_number": 1.0, "manufacturer_part_number": 0.99,
-        "mfr_part_number": 0.98, "manufacturerpartnumber": 0.99,
-        "product_mpn": 0.98, "mpn": 0.98, "part_no": 0.96,
+        "mfr_part_number": 0.98, "manufacturerpartnumber": 0.99, "manufacturer_number": 0.97,
+        "product_mpn": 0.98, "google_shopping_manufacturer_part_number_mpn": 0.96, "mpn": 0.98, "part_no": 0.96,
     },
     "category": {
         "category": 1.0, "product_category": 0.99, "category_name": 0.98,
