@@ -47,6 +47,7 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["organization_id", "supplier_id"], ["suppliers.organization_id", "suppliers.id"], name="fk_supplier_offers_org_supplier"),
         sa.ForeignKeyConstraint(["organization_id", "product_id"], ["products.organization_id", "products.id"], name="fk_supplier_offers_org_product"),
+        sa.UniqueConstraint("organization_id", "id", name="uq_supplier_offers_org_id"),
         sa.UniqueConstraint("organization_id", "supplier_id", "supplier_sku", name="uq_supplier_offers_org_supplier_sku"),
         sa.CheckConstraint("unit_price IS NULL OR unit_price >= 0", name="ck_supplier_offers_price_nonnegative"),
         sa.CheckConstraint("minimum_order_quantity IS NULL OR minimum_order_quantity > 0", name="ck_supplier_offers_moq_positive"),
