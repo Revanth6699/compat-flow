@@ -77,7 +77,7 @@ export default function CatalogImportPage() {
     try {
       const formData = new FormData(); formData.append("file", file);
       const extension = file.name.split(".").pop()?.toLowerCase();
-      if (extension !== "csv" || recordType !== "products") {
+      if (extension !== "csv" || recordType !== "products" || Object.keys(manualMapping).some((field) => !canonicalFields.includes(field))) {
         if (!user) throw new Error("Sign in to validate Excel, JSON, XML, or non-product catalog records.");
         formData.append("record_type", recordType);
         if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
@@ -179,7 +179,7 @@ export default function CatalogImportPage() {
           <h2>Catalog file validation</h2>
           <p className="import-description">CSV, XLSX, XLS, JSON and XML · Maximum 5 MB per upload. The public demo remains CSV-only; multi-format and non-product validation require an authenticated account with the supplier catalog feature.</p>
           <label className="column-hint" htmlFor="record-type">Target catalog record type</label>
-          <select id="record-type" value={recordType} onChange={(event) => { setRecordType(event.target.value); setResult(null); setMultiResult(null); setManualMapping({}); setAiResult(null); }}>
+          <select id="record-type" value={recordType} onChange={(event) => { setRecordType(event.target.value); setResult(null); setMultiResult(null); setManualMapping({}); setAiResult(null); setAiConsent(false); }}>
             <option value="products">Products</option><option value="product_variants">Product variants</option><option value="supplier_offers">Supplier offers</option><option value="inventory_snapshots">Inventory snapshots</option><option value="product_identifiers">Product identifiers</option>
           </select>
           <label className="column-hint" htmlFor="catalog-profile">Catalog profile</label>
