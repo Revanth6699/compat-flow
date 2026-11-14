@@ -162,7 +162,7 @@ def test_product_cannot_attach_supplier_from_another_organization():
 
 def test_new_catalog_record_endpoints_require_authentication():
     client = TestClient(app)
-    for path in ("/api/v1/product-variants", "/api/v1/supplier-offers", "/api/v1/inventory-snapshots"):
+    for path in ("/api/v1/product-variants", "/api/v1/supplier-offers", "/api/v1/inventory-snapshots", "/api/v1/product-identifiers"):
         assert client.get(path).status_code == 401
 
 
@@ -256,6 +256,40 @@ def test_inventory_snapshot_cannot_reference_product_from_another_organization()
             "quantity_on_hand": "10",
             "quantity_reserved": "2",
             "quantity_available": "8",
+        })
+        assert response.status_code == 404
+        compiled = db.statements[-1].compile(dialect=postgresql.dialect())
+        assert organization_id in compiled.params.values()
+        assert "products.organization_id" in str(compiled)
+    finally:
+        clear_overrides()
+
+
+
+def test_product_identifier_read_is_scoped_to_authenticated_organization():
+    organization_id = uuid4()
+    db = FakeDB(permission_granted=True)
+    install_auth_overrides(organization_id, "member", db)
+    try:
+        response = TestClient(app).get("/api/v1/product-identifiers")
+        assert response.status_code == 200
+        compiled = db.statements[-1].compile(dialect=postgresql.dialect())
+        assert organization_id in compiled.params.values()
+        assert "product_identifiers.organization_id" in str(compiled)
+    finally:
+        clear_overrides()
+
+
+def test_product_identifier_cannot_reference_product_from_another_organization():
+    organization_id = uuid4()
+    db = FakeDB(permission_granted=True)
+    install_auth_overrides(organization_id, "member", db)
+    try:
+        response = TestClient(app).post("/api/v1/product-identifiers", json={
+            "product_id": str(uuid4()),
+            "identifier_type": "gtin",
+            "namespace": "global",
+            "value": "00012345678905",
         })
         assert response.status_code == 404
         compiled = db.statements[-1].compile(dialect=postgresql.dialect())
