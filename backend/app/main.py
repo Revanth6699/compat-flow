@@ -6,7 +6,7 @@ from starlette.responses import JSONResponse
 from app.api.routes import router
 from app.api.auth_routes import router as auth_router, invitation_router
 from app.api.connector_import_routes import router as connector_import_router
-from app.api.billing_routes import router as billing_router
+from app.api.billing_routes import router as billing_router\nfrom app.api.review_routes import router as review_router
 from app.core.config import settings
 
 
@@ -140,7 +140,7 @@ app.include_router(router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(invitation_router, prefix="/api/v1")
 app.include_router(connector_import_router, prefix="/api/v1")
-app.include_router(billing_router, prefix="/api/v1")
+app.include_router(billing_router, prefix="/api/v1")\napp.include_router(review_router, prefix="/api/v1")
 
 
 @app.get("/", include_in_schema=False)
