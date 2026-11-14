@@ -125,9 +125,9 @@ def fetch_sql_server_rows(connection_url: str, *, schema: str, table: str,
     )
     if "ODBC Driver 18" not in connection_options:
         raise SourceConnectorError("SQL Server must use Microsoft ODBC Driver 18.")
-    if not re.search(r"Encrypt\\s*=\\s*(yes|true)", connection_options, re.IGNORECASE):
+    if not re.search(r"Encrypt\s*=\s*(yes|true)", connection_options, re.IGNORECASE):
         raise SourceConnectorError("SQL Server connections must enable encryption.")
-    if not re.search(r"TrustServerCertificate\\s*=\\s*(no|false)", connection_options, re.IGNORECASE):
+    if not re.search(r"TrustServerCertificate\s*=\s*(no|false)", connection_options, re.IGNORECASE):
         raise SourceConnectorError("SQL Server certificate verification must remain enabled.")
     identifier = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
     if not identifier.fullmatch(schema) or not identifier.fullmatch(table):
