@@ -50,3 +50,21 @@ def test_member_access_update_requires_authenticated_admin():
         json={"role": "viewer"},
     )
     assert response.status_code == 401
+
+
+
+def test_account_deletion_requires_authenticated_supabase_identity():
+    response = client.request(
+        "DELETE",
+        "/api/v1/auth/account",
+        json={"confirmation": "DELETE MY ACCOUNT"},
+    )
+    assert response.status_code == 401
+
+
+def test_review_submission_requires_authenticated_user():
+    response = client.post(
+        "/api/v1/reviews/mine",
+        json={"display_name": "Example User", "rating": 5, "comment": "This is a sufficiently detailed review."},
+    )
+    assert response.status_code == 401
