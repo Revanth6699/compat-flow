@@ -1135,3 +1135,11 @@ Continue inspecting datasets individually and append each verified file here. Af
 - Removed generic `part_no` from automatic MPN mapping because it can represent an internal/maintenance part identifier rather than a manufacturer's part number.
 - Added regression tests for these conservative decisions. CI run 43560733690 passed the manufacturer_part alias and all previous changes; the newest conservative-alias tests are in a later run and remain pending.
 - This is intentionally conservative: an unmapped field can be manually mapped or later suggested by AI. A wrong automatic identifier mapping can corrupt catalog identity and is more costly than asking for confirmation.
+
+
+## AI benchmark and final CI note
+
+- Added a 72-example manually reviewed mapping benchmark seed at `docs/column-mapping-benchmark-seed.json`. It includes positive aliases, negative mappings, ambiguous identifiers, and source-specific fields. It is not a trained model or a claim of accuracy.
+- Updated `docs/column-mapping-ai-design.md` to reference the benchmark seed and source-separated evaluation rules.
+- CI run 43560733690 passed the manufacturer_part alias and previous changes.
+- A later CI failure was caused by an old punctuation-normalization test still using the ambiguous generic header `Part No.` after that alias was intentionally removed. The test now uses explicit `Manufacturer Part Number`; generic `part_no` has its own negative test. The corrected run 43561207116 is in progress; do not claim it green until completion.
