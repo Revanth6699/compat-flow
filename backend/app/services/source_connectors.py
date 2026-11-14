@@ -13,7 +13,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
-from sqlalchemy import create_engine, text
+from sqlalchemy import MetaData, Table, create_engine, select
 from sqlalchemy.engine import make_url
 
 
@@ -136,13 +136,14 @@ def fetch_sql_server_rows(connection_url: str, *, schema: str, table: str,
         raise SourceConnectorError("Provide between 1 and 200 valid column identifiers.")
     if not 1 <= limit <= 10_000:
         raise SourceConnectorError("SQL Server row limit must be between 1 and 10,000.")
-    projection = ", ".join(f"[{column}]" for column in columns)
-    statement = text(f"SELECT TOP (:limit) {projection} FROM [{schema}].[{table}]")
     try:
         engine = create_engine(connection_url, pool_pre_ping=True, pool_size=1, max_overflow=0)
         try:
             with engine.connect() as connection:
-                rows = connection.execute(statement, {"limit": limit}).mappings().all()
+                source_table = Table(table, MetaData(), schema=schema, autoload_with=connection)
+                selected_columns = [source_table.c[column] for column in columns]
+                statement = select(*selected_columns).limit(limit)
+                rows = connection.execute(statement).mappings().all()
                 return [dict(row) for row in rows]
         finally:
             engine.dispose()
