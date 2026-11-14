@@ -157,3 +157,42 @@ def test_quality_score_uses_documented_formula():
     result = parse_catalog_csv(VALID_HEADER + "SKU-1,Brake Pad,Maker A,BP-100,Brakes,,\n")
     assert result.validation_pass_rate == 100.0
     assert result.data_quality_score == 100.0
+
+
+
+def test_manual_mapping_overrides_automatic_detection():
+    content = "code,title,maker,mpn,type,unused\nSKU-1,Brake Pad,Maker A,BP-100,Brakes,x\n"
+    mapping = {"sku": "code", "name": "title", "manufacturer": "maker", "part_number": "mpn", "category": "type"}
+    result = parse_catalog_csv(content, column_mapping=mapping)
+    assert result.valid_count == 1
+    assert {item.field: item.source_header for item in result.column_mappings} == mapping
+    assert result.unmapped_headers == ["unused"]
+
+
+def test_manual_mapping_rejects_duplicate_source_columns():
+    content = "code,title,maker,mpn,type\nSKU-1,Brake Pad,Maker A,BP-100,Brakes\n"
+    mapping = {"sku": "code", "name": "code", "manufacturer": "maker", "part_number": "mpn", "category": "type"}
+    with pytest.raises(CatalogCSVValidationError, match="source column cannot be mapped"):
+        parse_catalog_csv(content, column_mapping=mapping)
+
+
+def test_profile_requires_profile_specific_fields():
+    content = "sku,name,manufacturer,part_number,category,replacement_sku\nSKU-1,Brake Pad,Maker A,BP-100,Brakes,\n"
+    result = parse_catalog_csv(content, profile_id="electronics")
+    assert result.valid_count == 0
+    assert any(issue.error_code == "PROFILE_REQUIRED_FIELD_MISSING" and issue.field == "replacement_sku" for issue in result.row_errors)
+
+
+def test_profile_rejects_unknown_profile():
+    with pytest.raises(CatalogCSVValidationError, match="Unknown catalog profile"):
+        parse_catalog_csv(VALID_HEADER, profile_id="unknown")
+
+
+def test_metrics_separate_affected_records_from_issue_count():
+    content = VALID_HEADER + "SKU-1,Brake Pad,Maker A,BP-100,Brakes,,\nSKU-1,Oil Filter,Maker A,OF-200,Filters,,\n"
+    result = parse_catalog_csv(content)
+    assert result.records_with_issues == 1
+    assert result.duplicate_sku_count == 1
+    assert result.duplicate_rate == 50.0
+    assert result.issue_density == 0.5
+    assert result.critical_record_rate == 50.0
