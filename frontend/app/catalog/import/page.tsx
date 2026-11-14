@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/auth-client";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+
 type PreviewRow = {
   sku: string; name: string; manufacturer: string; part_number: string;
   category: string; compatibility?: string | null; replacement_sku?: string | null;
@@ -93,7 +95,7 @@ export default function CatalogImportPage() {
         setResult(data);
         setManualMapping(Object.fromEntries(data.column_mappings.map((item) => [item.field, item.source_header])));
       } else {
-        const response = await fetch("/api/catalog/import/preview", { method: "POST", body: formData });
+        const response = await fetch(`${API_BASE.replace(/\/$/, "")}/api/v1/catalog/import/preview`, { method: "POST", body: formData });
         const data = await response.json();
         if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The backend could not validate this CSV.");
         const parsed = data as PreviewResponse;
