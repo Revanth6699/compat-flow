@@ -9,7 +9,7 @@ from uuid import UUID
 
 from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.database import get_db
-from app.models import Product, Supplier
+from app.models import InventorySnapshot, Product, ProductVariant, Supplier, SupplierOffer
 from app.core.config import settings
 from app.schemas import (
     HealthResponse,
@@ -22,6 +22,12 @@ from app.schemas import (
     ProductCreateRequest,
     SupplierCreateRequest,
     SupplierResponse,
+    ProductVariantCreateRequest,
+    ProductVariantResponse,
+    SupplierOfferCreateRequest,
+    SupplierOfferResponse,
+    InventorySnapshotCreateRequest,
+    InventorySnapshotResponse,
 )
 from app.services.catalog_csv import (
     CatalogCSVValidationError,
@@ -280,3 +286,160 @@ def create_product(
         raise
     db.refresh(product)
     return product
+
+
+@router.get("/product-variants", response_model=list[ProductVariantResponse])
+def list_product_variants(
+    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    return list(db.scalars(
+        select(ProductVariant)
+        .where(ProductVariant.organization_id == current.profile.organization_id)
+        .order_by(ProductVariant.created_at.desc())
+        .limit(500)
+    ).all())
+
+
+@router.post("/product-variants", response_model=ProductVariantResponse, status_code=201)
+def create_product_variant(
+    payload: ProductVariantCreateRequest,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    organization_id = current.profile.organization_id
+    product = db.scalar(select(Product.id).where(
+        Product.id == payload.product_id,
+        Product.organization_id == organization_id,
+    ))
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    variant = ProductVariant(
+        organization_id=organization_id,
+        product_id=payload.product_id,
+        variant_sku=payload.variant_sku.strip() if payload.variant_sku else None,
+        attributes=payload.attributes,
+        is_active=payload.is_active,
+    )
+    db.add(variant)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A variant with this SKU already exists in the organization.") from None
+    db.refresh(variant)
+    return variant
+
+
+@router.get("/supplier-offers", response_model=list[SupplierOfferResponse])
+def list_supplier_offers(
+    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    return list(db.scalars(
+        select(SupplierOffer)
+        .where(SupplierOffer.organization_id == current.profile.organization_id)
+        .order_by(SupplierOffer.created_at.desc())
+        .limit(500)
+    ).all())
+
+
+@router.post("/supplier-offers", response_model=SupplierOfferResponse, status_code=201)
+def create_supplier_offer(
+    payload: SupplierOfferCreateRequest,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    organization_id = current.profile.organization_id
+    supplier = db.scalar(select(Supplier.id).where(
+        Supplier.id == payload.supplier_id,
+        Supplier.organization_id == organization_id,
+    ))
+    if supplier is None:
+        raise HTTPException(status_code=404, detail="Supplier not found.")
+    if payload.product_id is not None:
+        product = db.scalar(select(Product.id).where(
+            Product.id == payload.product_id,
+            Product.organization_id == organization_id,
+        ))
+        if product is None:
+            raise HTTPException(status_code=404, detail="Product not found.")
+    offer = SupplierOffer(
+        organization_id=organization_id,
+        supplier_id=payload.supplier_id,
+        product_id=payload.product_id,
+        supplier_sku=payload.supplier_sku.strip() if payload.supplier_sku else None,
+        supplier_product_id=payload.supplier_product_id.strip() if payload.supplier_product_id else None,
+        unit_price=payload.unit_price,
+        currency=payload.currency,
+        unit_of_measure=payload.unit_of_measure,
+        minimum_order_quantity=payload.minimum_order_quantity,
+        lead_time_days=payload.lead_time_days,
+        source_url=payload.source_url,
+        status=payload.status,
+    )
+    db.add(offer)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="This supplier already has an offer with that supplier SKU.") from None
+    db.refresh(offer)
+    return offer
+
+
+@router.get("/inventory-snapshots", response_model=list[InventorySnapshotResponse])
+def list_inventory_snapshots(
+    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    return list(db.scalars(
+        select(InventorySnapshot)
+        .where(InventorySnapshot.organization_id == current.profile.organization_id)
+        .order_by(InventorySnapshot.snapshot_at.desc())
+        .limit(500)
+    ).all())
+
+
+@router.post("/inventory-snapshots", response_model=InventorySnapshotResponse, status_code=201)
+def create_inventory_snapshot(
+    payload: InventorySnapshotCreateRequest,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    organization_id = current.profile.organization_id
+    product = db.scalar(select(Product.id).where(
+        Product.id == payload.product_id,
+        Product.organization_id == organization_id,
+    ))
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    if payload.supplier_offer_id is not None:
+        offer = db.scalar(select(SupplierOffer.id).where(
+            SupplierOffer.id == payload.supplier_offer_id,
+            SupplierOffer.organization_id == organization_id,
+            SupplierOffer.product_id == payload.product_id,
+        ))
+        if offer is None:
+            raise HTTPException(status_code=404, detail="Supplier offer not found for this product.")
+    snapshot = InventorySnapshot(
+        organization_id=organization_id,
+        product_id=payload.product_id,
+        supplier_offer_id=payload.supplier_offer_id,
+        warehouse_code=payload.warehouse_code.strip(),
+        quantity_on_hand=payload.quantity_on_hand,
+        quantity_reserved=payload.quantity_reserved,
+        quantity_available=payload.quantity_available,
+        source_reference=payload.source_reference,
+        **({"snapshot_at": payload.snapshot_at} if payload.snapshot_at is not None else {}),
+    )
+    db.add(snapshot)
+    db.commit()
+    db.refresh(snapshot)
+    return snapshot
