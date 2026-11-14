@@ -99,3 +99,39 @@ def test_supported_text_formats_reject_invalid_product_rows_consistently():
         assert result.total_records == 1, filename
         assert result.invalid_records == 1, filename
         assert any(error["field"] == "name" for error in result.errors), filename
+
+
+def test_spreadsheet_formats_report_missing_required_product_fields():
+    invalid = {
+        "sku": "001",
+        "name": "",
+        "manufacturer": "Acme",
+        "part_number": "A-1",
+        "category": "Parts",
+    }
+
+    xlsx_output = io.BytesIO()
+    xlsx_workbook = openpyxl.Workbook()
+    xlsx_sheet = xlsx_workbook.active
+    xlsx_sheet.append(list(invalid))
+    xlsx_sheet.append(list(invalid.values()))
+    xlsx_workbook.save(xlsx_output)
+
+    xls_output = io.BytesIO()
+    xls_workbook = xlwt.Workbook()
+    xls_sheet = xls_workbook.add_sheet("Products")
+    for column, value in enumerate(invalid):
+        xls_sheet.write(0, column, value)
+    for column, value in enumerate(invalid.values()):
+        xls_sheet.write(1, column, value)
+    xls_workbook.save(xls_output)
+
+    for filename, payload in [
+        ("bad.xlsx", xlsx_output.getvalue()),
+        ("bad.xls", xls_output.getvalue()),
+    ]:
+        parsed = parse_source(payload, filename)
+        result = validate_parsed_records(parsed, "products")
+        assert result.total_records == 1, filename
+        assert result.invalid_records == 1, filename
+        assert any(error["field"] == "name" for error in result.errors), filename
