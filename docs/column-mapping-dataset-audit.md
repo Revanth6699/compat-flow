@@ -1003,3 +1003,12 @@ Continue inspecting datasets individually and append each verified file here. Af
 5. Multi-currency prices and derived metrics must retain currency/formula context. Margins and price-per-unit fields should be recomputed from their source values.
 6. Empty template files provide schema evidence only; they cannot support value-pattern confidence or data-quality claims.
 7. Multilingual content and identifiers must be preserved exactly; normalization should target comparison keys, not rewrite source text.
+
+
+## Implementation update after the first 90 samples
+
+- Added `full_name` as a product-name candidate based on the enriched laptop product knowledge catalog, with a regression test.
+- CI run 43560138904 passed completely for the medicine_name alias and all prior changes.
+- The full_name change is in the latest CI run and remains pending until backend tests and frontend checks complete.
+- No generic alias was added for `product_id`, `record_id`, `manufacturer_code`, `model_name`, `source_product_id`, `seller_name`, or `supplier`.
+- The audit now includes 90 individually fetched CSV files. Several are correlated files from the same source family; they count as individual file inspections but will not be treated as independent evidence when evaluating model generalization.
