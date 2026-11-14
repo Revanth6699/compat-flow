@@ -157,5 +157,7 @@ def fetch_sql_server_rows(connection_url: str, *, schema: str, table: str,
                 return rows
         finally:
             engine.dispose()
+    except SourceConnectorError:
+        raise
     except Exception:
         raise SourceConnectorError("SQL Server read failed; verify the read-only login, ODBC driver, and source schema.") from None
