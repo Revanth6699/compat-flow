@@ -750,6 +750,11 @@ small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs)
   transform: translateY(-2px);
 }
 .pricing-card-featured { border-top: 3px solid #16877F; padding-top: 20px; }
+.billing-plan { align-items: flex-start; gap: 12px; width: 100%; text-align: left; color: #202833; font: inherit; cursor: pointer; }
+.billing-plan:disabled { cursor: not-allowed; opacity: .58; }
+.billing-plan.selected { border-color: #00689C; box-shadow: 0 0 0 2px rgba(0,104,156,.12); }
+.billing-plan .pricing-amount { display: block; color: #202833; font-size: 1.6rem; font-weight: 700; }
+.billing-plan .pricing-amount small { color: #737E8B; font-size: .75rem; font-weight: 400; }
 .pricing-plan-name { color: #202833; font-size: 1.05rem; font-weight: 700; }
 .pricing-card-top > p { min-height: 84px; margin: 8px 0 14px; color: #647181; font-size: .78rem; line-height: 1.6; }
 .pricing-price { display: flex; align-items: baseline; flex-wrap: wrap; gap: 5px; }
