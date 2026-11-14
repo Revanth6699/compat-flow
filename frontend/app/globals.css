@@ -945,3 +945,35 @@ small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs)
  .settings-panel { padding: 20px; }
  .workspace-actions { width: 100%; }
 }
+
+
+/* Consistent, restrained motion across the marketing and workspace UI. */
+a, button, .button, .pricing-card, .home-capability-card, .home-step, .panel {
+  transition:
+    color var(--ease),
+    background-color var(--ease),
+    border-color var(--ease),
+    box-shadow var(--ease),
+    transform var(--ease),
+    opacity var(--ease);
+}
+.pricing-card:hover, .home-capability-card:hover, .home-step:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+button:disabled, .button:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+:focus-visible {
+  outline: 3px solid rgba(11, 143, 133, .42);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
