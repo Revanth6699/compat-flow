@@ -477,6 +477,86 @@
       "canonical_field": "sku",
       "decision": "auto_alias",
       "reason": "Explicit product code identifier; keep Product_ID separate."
+    },
+    {
+      "source_dataset": 58,
+      "header": "item_code",
+      "canonical_field": null,
+      "semantic_role": "item_identifier",
+      "decision": "manual_review",
+      "reason": "Item code is not guaranteed to be a SKU without the source contract."
+    },
+    {
+      "source_dataset": 74,
+      "header": "part_no",
+      "canonical_field": null,
+      "semantic_role": "internal_part_identifier",
+      "decision": "manual_review",
+      "reason": "Generic part number may be a maintenance/internal identifier rather than an MPN."
+    },
+    {
+      "source_dataset": 23,
+      "header": "item_number",
+      "canonical_field": null,
+      "semantic_role": "item_identifier",
+      "decision": "manual_review",
+      "reason": "Item number is not guaranteed to be a SKU."
+    },
+    {
+      "source_dataset": 37,
+      "header": "stock_code",
+      "canonical_field": null,
+      "semantic_role": "stock_identifier",
+      "decision": "manual_review",
+      "reason": "Stock code requires source-specific confirmation before mapping to SKU."
+    },
+    {
+      "source_dataset": 37,
+      "header": "part_id",
+      "canonical_field": null,
+      "semantic_role": "part_identifier",
+      "decision": "manual_review",
+      "reason": "Part ID is not necessarily a sellable SKU."
+    },
+    {
+      "source_dataset": 93,
+      "header": "product_type",
+      "canonical_field": null,
+      "semantic_role": "product_type",
+      "decision": "do_not_auto_map",
+      "reason": "Product type is distinct from category in the same source."
+    },
+    {
+      "source_dataset": 14,
+      "header": "item_type",
+      "canonical_field": null,
+      "semantic_role": "item_type",
+      "decision": "manual_review",
+      "reason": "Item type can be taxonomy or operational classification depending on source."
+    },
+    {
+      "source_dataset": 75,
+      "header": "product",
+      "canonical_field": null,
+      "semantic_role": "product_name_candidate",
+      "decision": "manual_review",
+      "reason": "Product is a contextual name candidate, not a safe global alias."
+    },
+    {
+      "source_dataset": 13,
+      "header": "description",
+      "canonical_field": null,
+      "semantic_role": "description",
+      "decision": "do_not_auto_map",
+      "reason": "Description is not product name."
+    },
+    {
+      "source_dataset": 13,
+      "header": "short_description",
+      "canonical_field": null,
+      "semantic_role": "description",
+      "decision": "do_not_auto_map",
+      "reason": "Short description is not product name."
     }
   ]
 }
