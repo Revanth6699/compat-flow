@@ -10,6 +10,7 @@ from sqlalchemy import (
     Index,
     Integer,
     BigInteger,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -116,6 +117,113 @@ class Product(Base):
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class ProductVariant(Base):
+    """A sellable variation belonging to a product master record."""
+
+    __tablename__ = "product_variants"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "product_id"],
+            ["products.organization_id", "products.id"],
+            name="fk_product_variants_org_product",
+        ),
+        UniqueConstraint("organization_id", "variant_sku", name="uq_product_variants_org_sku"),
+        Index("ix_product_variants_org_product", "organization_id", "product_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    variant_sku: Mapped[str | None] = mapped_column(String(100))
+    attributes: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class SupplierOffer(Base):
+    """A supplier-specific commercial offer; not part of product identity."""
+
+    __tablename__ = "supplier_offers"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "supplier_id"],
+            ["suppliers.organization_id", "suppliers.id"],
+            name="fk_supplier_offers_org_supplier",
+        ),
+        ForeignKeyConstraint(
+            ["organization_id", "product_id"],
+            ["products.organization_id", "products.id"],
+            name="fk_supplier_offers_org_product",
+        ),
+        UniqueConstraint(
+            "organization_id", "supplier_id", "supplier_sku",
+            name="uq_supplier_offers_org_supplier_sku",
+        ),
+        CheckConstraint("unit_price IS NULL OR unit_price >= 0", name="ck_supplier_offers_price_nonnegative"),
+        CheckConstraint("minimum_order_quantity IS NULL OR minimum_order_quantity > 0", name="ck_supplier_offers_moq_positive"),
+        CheckConstraint("lead_time_days IS NULL OR lead_time_days >= 0", name="ck_supplier_offers_lead_time_nonnegative"),
+        Index("ix_supplier_offers_org_product", "organization_id", "product_id"),
+        Index("ix_supplier_offers_org_supplier", "organization_id", "supplier_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    supplier_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    product_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    supplier_sku: Mapped[str | None] = mapped_column(String(120))
+    supplier_product_id: Mapped[str | None] = mapped_column(String(160))
+    unit_price: Mapped[object | None] = mapped_column(Numeric(18, 4))
+    currency: Mapped[str | None] = mapped_column(String(3))
+    unit_of_measure: Mapped[str | None] = mapped_column(String(40))
+    minimum_order_quantity: Mapped[object | None] = mapped_column(Numeric(18, 4))
+    lead_time_days: Mapped[int | None] = mapped_column(Integer)
+    source_url: Mapped[str | None] = mapped_column(String(2048))
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="active", server_default="active")
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class InventorySnapshot(Base):
+    """Point-in-time stock position; never overwrite previous snapshots."""
+
+    __tablename__ = "inventory_snapshots"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "product_id"],
+            ["products.organization_id", "products.id"],
+            name="fk_inventory_snapshots_org_product",
+        ),
+        ForeignKeyConstraint(
+            ["organization_id", "supplier_offer_id"],
+            ["supplier_offers.organization_id", "supplier_offers.id"],
+            name="fk_inventory_snapshots_org_offer",
+        ),
+        CheckConstraint("quantity_on_hand IS NULL OR quantity_on_hand >= 0", name="ck_inventory_on_hand_nonnegative"),
+        CheckConstraint("quantity_reserved IS NULL OR quantity_reserved >= 0", name="ck_inventory_reserved_nonnegative"),
+        CheckConstraint("quantity_available IS NULL OR quantity_available >= 0", name="ck_inventory_available_nonnegative"),
+        Index("ix_inventory_snapshots_org_product_time", "organization_id", "product_id", "snapshot_at"),
+        Index("ix_inventory_snapshots_org_warehouse_time", "organization_id", "warehouse_code", "snapshot_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    product_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    supplier_offer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    warehouse_code: Mapped[str] = mapped_column(String(120), nullable=False)
+    quantity_on_hand: Mapped[object | None] = mapped_column(Numeric(18, 4))
+    quantity_reserved: Mapped[object | None] = mapped_column(Numeric(18, 4))
+    quantity_available: Mapped[object | None] = mapped_column(Numeric(18, 4))
+    snapshot_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    source_reference: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class CompatibilityRecord(Base):
