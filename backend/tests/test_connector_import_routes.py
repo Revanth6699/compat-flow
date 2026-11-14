@@ -4,8 +4,6 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.core.config import settings
 from app.api.connector_import_routes import ConnectorImportRequest, _prepare, _require_allowed_host
-from app.services.ingestion_adapters import parse_json
-from app.services.source_connectors import SourceConnectorError
 
 client = TestClient(app)
 
