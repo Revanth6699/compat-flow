@@ -5,7 +5,6 @@ import pytest
 from app.services.mapping_assistant import suggest_field_mappings
 
 
-@pytest.mark.asyncio
 def test_mapping_assistant_requires_explicit_opt_in(monkeypatch):
     monkeypatch.setenv("MAPPING_AI_API_KEY", "should-not-be-used")
     result = asyncio.run(suggest_field_mappings(
@@ -18,11 +17,10 @@ def test_mapping_assistant_requires_explicit_opt_in(monkeypatch):
     assert result.suggestions == []
 
 
-@pytest.mark.asyncio
-async def test_mapping_assistant_falls_back_when_provider_is_not_configured(monkeypatch):
+def test_mapping_assistant_falls_back_when_provider_is_not_configured(monkeypatch):
     for key in ("MAPPING_AI_BASE_URL", "MAPPING_AI_API_KEY", "MAPPING_AI_MODEL"):
         monkeypatch.delenv(key, raising=False)
-    result = await suggest_field_mappings(
+    result = asyncio.run(suggest_field_mappings(
         record_type="products",
         headers=["item_ref"],
         sample_records=[{"item_ref": "001"}],
@@ -32,9 +30,8 @@ async def test_mapping_assistant_falls_back_when_provider_is_not_configured(monk
     assert result.suggestions == []
 
 
-@pytest.mark.asyncio
-async def test_mapping_assistant_rejects_unknown_record_type():
+def test_mapping_assistant_rejects_unknown_record_type():
     with pytest.raises(ValueError, match="record type"):
-        await suggest_field_mappings(
+        asyncio.run(suggest_field_mappings(
             record_type="unknown", headers=[], sample_records=[], user_opted_in=True
         ))
