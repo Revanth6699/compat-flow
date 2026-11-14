@@ -123,7 +123,7 @@ export default function PricingPage() {
           <p>Starter adds an organization workspace, a 25 MB subscribed-import ceiling and downloadable validation reports. It does not unlock JSON/XML ingestion or external source connectors.</p>
           <p>Growth connector access is subject to operator-side host allowlisting and source security configuration. A plan becomes active only after a verified payment-provider webhook.</p>
           <Link className="pricing-text-link" href="/catalog/import">Try the public demo</Link>
-        </section>
+        </section>}
       </div>
     </main>
   );
