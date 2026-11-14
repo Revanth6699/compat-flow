@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthRequired } from "@/components/auth-required";
 import { useAuth } from "@/components/auth-provider";
-import { ApiRequestError, apiRequest, type AuthUser } from "@/lib/auth-client";
+import { ApiRequestError, apiRequest } from "@/lib/auth-client";
 
 type Profile = {
   id: string; organization_id: string; email: string; role: string; is_active: boolean;
