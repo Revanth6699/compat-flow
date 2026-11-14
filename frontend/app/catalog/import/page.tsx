@@ -65,8 +65,8 @@ export default function CatalogImportPage() {
     setFile(selectedFile); setResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setError("");
     if (!selectedFile) return;
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
-    if (!["csv", "xlsx", "xls", "json", "xml"].includes(extension ?? "")) {
-      setFile(null); setError("Supported file formats: CSV, XLSX, XLS, JSON and XML."); return;
+    if (!(user ? ["csv", "xlsx", "xls", "json", "xml"] : ["csv"]).includes(extension ?? "")) {
+      setFile(null); setError(user ? "Supported formats: CSV, XLSX, XLS, JSON and XML. Your plan determines which formats you can process." : "The public demo accepts CSV files only. Create an account and choose a plan for additional formats."); return;
     }
     if (selectedFile.size > 5 * 1024 * 1024) {
       setFile(null); setError("The file exceeds the 5 MB limit.");
@@ -174,18 +174,16 @@ export default function CatalogImportPage() {
         <div className="import-heading">
           <div className="eyebrow">Public product demo</div>
           <h1>Validate a supplier catalog</h1>
-          <p>Inspect structured catalog files, map fields to the right record type, and review deterministic validation results before persistence.</p>
+          <p>Validate supplier product files, identify data-quality issues and review clear recommendations before importing.</p>
         </div>
 
         <section className="panel import-panel">
           <h2>Catalog file validation</h2>
-          <p className="import-description">CSV, XLSX, XLS, JSON and XML · Maximum 5 MB per upload. The public demo remains CSV-only; multi-format and non-product validation require an authenticated account with the supplier catalog feature.</p>
-          <label className="column-hint" htmlFor="record-type">Target catalog record type</label>
-          <select id="record-type" value={recordType} onChange={(event) => { setRecordType(event.target.value); setResult(null); setMultiResult(null); setManualMapping({}); setAiResult(null); setAiConsent(false); }}>
-            <option value="products">Products</option><option value="product_variants">Product variants</option><option value="supplier_offers">Supplier offers</option><option value="inventory_snapshots">Inventory snapshots</option><option value="product_identifiers">Product identifiers</option>
-          </select>
-          <label className="column-hint" htmlFor="catalog-profile">Catalog profile</label>
-          <select id="catalog-profile" value={profileId} onChange={(event) => { setProfileId(event.target.value); setResult(null); setManualMapping({}); }}><option value="general">General product catalog</option><option value="automotive">Automotive parts</option><option value="electronics">Electronics</option><option value="industrial">Industrial components</option></select>
+          <p className="import-description">Public demo: CSV only · Maximum 5 MB. Signed-in formats and connector access depend on your active subscription.</p>
+          <div className="import-description">
+            Product catalog validation. CompatFlow detects common supplier column names automatically.
+            Public demo access is limited to CSV; additional formats and connected sources depend on your subscription.
+          </div>
           <p className="import-description">Files are validated in memory. This public demo does not save files or modify a catalog.</p>
           <p className="column-hint">CompatFlow detects common supplier header variants and maps them to the product catalog fields.</p>
           <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>
@@ -194,7 +192,7 @@ export default function CatalogImportPage() {
             <strong>{file ? file.name : "Choose a catalog file"}</strong>
             <span>{file ? `${(file.size / 1024).toFixed(1)} KB` : "Select a file from your computer"}</span>
           </label>
-          <input id="catalog-file" className="visually-hidden" type="file" accept=".csv,.xlsx,.xls,.json,.xml,text/csv,application/json,application/xml"
+          <input id="catalog-file" className="visually-hidden" type="file" accept={user ? ".csv,.xlsx,.xls,.json,.xml,text/csv,application/json,application/xml" : ".csv,text/csv"}
             onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)} />
           <div className="import-actions">
             <button className="button" type="button" onClick={handleValidate} disabled={!file || loading}>
@@ -294,7 +292,7 @@ export default function CatalogImportPage() {
 
             <div className="panel result-section">
               <div className="results-heading"><div><h3>Issue overview</h3><p className="import-description">Critical: blocks the record from passing. Warning: requires review but does not block it.</p></div>
-                <button className="button button-secondary" type="button" onClick={downloadReport}>Download report</button>
+                {user ? <button className="button button-secondary" type="button" onClick={downloadReport}>Download report</button> : <span className="import-description">Report downloads are available with a Starter subscription.</span>}
               </div>
               <div className="result-stats">
                 <div className="stat-card"><span>Records with issues</span><strong>{result.records_with_issues}</strong></div>
