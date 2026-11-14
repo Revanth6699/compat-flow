@@ -213,7 +213,7 @@ async def profile_public_dataset(file: UploadFile = File(...)):
             "average": round(sum(numeric) / len(numeric), 4) if numeric else None,
         })
     normalized = {re.sub(r"[^a-z0-9]+", "_", header.casefold()).strip("_") for header in parsed.headers}
-    product_headers = {"sku", "product_sku", "item_sku", "product_code", "name", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category"}
+    product_headers = {"sku", "product_sku", "item_sku", "product_code", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category"}
     return {
         "filename": filename,
         "format": parsed.format,
