@@ -105,3 +105,8 @@ Design only. No model is trained, no AI API is called, and no user data is sent 
 ## Benchmark seed status
 
 A first manually reviewed benchmark seed now exists at docs/column-mapping-benchmark-seed.json with 72 examples covering positive aliases, negative mappings, ambiguous identifiers, source-specific fields, and structural cases. It is a discovery/evaluation seed only, not a training corpus and not a claim of model accuracy. Before model evaluation, labels must be reviewed by source family, the synthetic/adversarial sources must be tagged, and held-out source repositories must be kept separate from examples used to tune prompts or rules.
+
+
+## Benchmark regression coverage
+
+The backend test suite now checks the 72 reviewed examples against the deterministic alias map. Positive examples must resolve to the reviewed canonical field; negative and manual-review examples must not be auto-mapped. This guards against reintroducing risky brand/manufacturer, product_type/category, model/MPN, and product_id/SKU substitutions while the AI suggestion layer is developed.
