@@ -123,7 +123,7 @@ function WorkspaceContent() {
               <article className="panel settings-panel"><span className="eyebrow">CATALOG OPERATIONS</span><h2>Catalog validation</h2><p>Open the current validation experience and review supported catalog inputs.</p><Link className="button button-secondary" href="/catalog/import">Open catalog validation</Link></article>
               <article className="panel settings-panel"><span className="eyebrow">CONNECTED DATA</span><h2>Data sources</h2><p>Configure eligible REST API, SFTP and SQL Server source connections.</p><Link className="button button-secondary" href="/catalog/sources">Manage data sources</Link></article>
               <article className="panel settings-panel"><span className="eyebrow">PEOPLE</span><h2>Team access</h2><p>Invite employees and review pending invitations for this organization.</p><Link className="button button-secondary" href="/team">Manage team</Link></article>
-              <article className="panel settings-panel"><span className="eyebrow">ORGANIZATION</span><h2>Billing</h2><p>Review the organization's subscription and payment status.</p><Link className="button button-secondary" href="/billing">Manage subscription</Link></article>
+              <article className="panel settings-panel"><span className="eyebrow">ORGANIZATION</span><h2>Billing</h2><p>Review this organization's subscription and payment status.</p><Link className="button button-secondary" href="/billing">Manage subscription</Link></article>
             </section>
           </>
         )}
