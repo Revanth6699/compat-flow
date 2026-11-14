@@ -363,9 +363,26 @@ class ImportRowError(Base):
     field: Mapped[str | None] = mapped_column(String(120))
     error_code: Mapped[str] = mapped_column(String(80), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    source_location: Mapped[str | None] = mapped_column(String(512))
     created_at: Mapped[DateTime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class ImportRecordLineage(Base):
+    __tablename__ = "import_record_lineage"
+    __table_args__ = (
+        UniqueConstraint("job_id", "source_location", name="uq_import_lineage_job_location"),
+        Index("ix_import_lineage_org_job", "organization_id", "job_id"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    job_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("import_jobs.id", ondelete="CASCADE"), nullable=False)
+    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
+    record_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    source_location: Mapped[str] = mapped_column(String(512), nullable=False)
+    source_key: Mapped[str | None] = mapped_column(String(255))
+    target_record_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class UserInvitation(Base):
