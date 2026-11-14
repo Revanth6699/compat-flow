@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
+from app.core.auth import AuthenticatedUser, require_demo_or_paid_access, require_permission, require_plan_feature
 from app.core.database import get_db
 from app.models import DemoAccessRequest, InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer
 from app.core.config import settings
