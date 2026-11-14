@@ -893,3 +893,12 @@ Continue inspecting datasets individually and append each verified file here. Af
 5. Pharmacy catalog facts and modeled inventory fields need separate provenance. Scraped price/availability, manufacturer, pack size and composition should not be mixed with synthetic or derived stockout metrics.
 6. Product identity validation and inventory reconciliation are different product capabilities. Inventory profile rules need composite keys and deterministic reconciliation metrics.
 7. The same-source PIM and supplier files provide a valuable paired matching benchmark, but their synthetic identifiers and attribute labels must be tagged; do not count correlated files as independent evidence for model generalization.
+
+
+## Implementation update after the first 80 samples
+
+- Added `medicine_name` as an explicit pharmacy-domain product-name alias, with a regression test.
+- CI run 43559764619 passed for SKU ID/code alias tests. CI run 43559810602 passed the top_category and BOM changes.
+- The medicine_name change is being checked in CI run 43560138904; backend and frontend jobs are running. No success is claimed until completion.
+- No new generic aliases were added for `record_id`, `medicine_id`, `parent_id`, `warehouse_id`, `supplier_id`, `amazon_sku`, `rakuten_item_code`, or barcode fields.
+- The audit now distinguishes product master, supplier feed, PIM parent/variant catalog, warehouse inventory, inventory snapshot, pharmacy catalog, and replenishment data. These need separate validation grains and profiles.
