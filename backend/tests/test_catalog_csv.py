@@ -39,6 +39,17 @@ def test_alias_headers_are_mapped_to_canonical_fields():
     assert next(m.confidence for m in result.column_mappings if m.field == "manufacturer") == 0.88
 
 
+
+def test_product_mpn_header_maps_to_part_number():
+    content = (
+        "product_sku,product_name,manufacturer,product_mpn,product_category\\n"
+        "SKU-1,Brake Pad,Maker A,BP-100,Brakes\\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.valid_count == 1
+    assert {item.field: item.source_header for item in result.column_mappings}["part_number"] == "product_mpn"
+
+
 def test_header_normalization_accepts_spaces_and_punctuation():
     content = (
         " Product SKU , Product Name , Manufacturer Name , Part No. , Category Name \n"
