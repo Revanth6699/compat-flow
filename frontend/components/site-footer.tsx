@@ -1,4 +1,7 @@
-"use client";\n\nimport Link from "next/link";\nimport { useAuth } from "@/components/auth-provider";
+"use client";
+
+import Link from "next/link";
+import { useAuth } from "@/components/auth-provider";
 export function SiteFooter() {
  return <footer className="site-footer"><div className="container footer">
   <div className="footer-brand">
