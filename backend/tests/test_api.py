@@ -156,3 +156,23 @@ def test_public_product_preview_rejects_seller_dataset_instead_of_scoring_every_
     assert response.status_code == 422
     assert "does not appear to contain product catalog columns" in response.json()["detail"]
     assert "seller" in response.json()["detail"].lower()
+
+
+
+def test_public_dataset_profile_accepts_seller_dataset_and_returns_real_statistics():
+    response = client.post(
+        "/api/v1/catalog/import/profile",
+        files={"file": ("olist_sellers_dataset.csv", b"seller_id,seller_zip_code_prefix,seller_city,seller_state\\ns1,12345,city_a,SP\\ns2,23456,city_b,RJ\\ns2,23456,city_b,RJ", "text/csv")},
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["is_product_catalog"] is False
+    assert result["total_records"] == 3
+    assert result["total_columns"] == 4
+    assert result["duplicate_rows"] == 1
+    assert result["missing_cells"] == 0
+    assert result["completeness_pct"] == 100
+    assert result["persisted"] is False
+    assert {column["name"] for column in result["columns"]} == {
+        "seller_id", "seller_zip_code_prefix", "seller_city", "seller_state"
+    }
