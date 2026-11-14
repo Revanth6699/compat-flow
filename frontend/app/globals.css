@@ -90,8 +90,8 @@ p { margin-top: 0; }
   background: #fff; border-bottom: 1px solid var(--line);
 }
 .header-inner {
-  min-height: 76px; display: flex; align-items: center;
-  justify-content: space-between; gap: 28px;
+  min-height: 76px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center; gap: 24px;
 }
 .brand {
   display: inline-flex; align-items: baseline; gap: 0;
