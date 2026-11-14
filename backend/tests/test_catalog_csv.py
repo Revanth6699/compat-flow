@@ -250,7 +250,7 @@ def test_generic_part_no_is_not_assumed_to_be_manufacturer_part_number():
 
 def test_header_normalization_accepts_spaces_and_punctuation():
     content = (
-        " Product SKU , Product Name , Manufacturer Name , Part No. , Category Name \n"
+        " Product SKU , Product Name , Manufacturer Name , Manufacturer Part Number , Category Name \n"
         "SKU-1,Brake Pad,Maker A,BP-100,Brakes\n"
     )
     result = parse_catalog_csv(content)
