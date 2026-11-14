@@ -284,7 +284,7 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         client = TestClient(app)
 
         created_a = client.post("/api/v1/invitations", json={
-            "email": f"new-member-a-{uuid4().hex[:8]}@example.test",
+            "email": f"new-member-a-{uuid4().hex[:8]}@example.com",
             "role": "member",
         })
         assert created_a.status_code == 201, created_a.text
@@ -295,7 +295,7 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
             profile=owner_b,
         )
         created_b = client.post("/api/v1/invitations", json={
-            "email": f"new-member-b-{uuid4().hex[:8]}@example.test",
+            "email": f"new-member-b-{uuid4().hex[:8]}@example.com",
             "role": "viewer",
         })
         assert created_b.status_code == 201, created_b.text
