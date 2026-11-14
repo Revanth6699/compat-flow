@@ -285,12 +285,20 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         )
         db.add(seat_plan)
         db.flush()
-        db.add(Subscription(
-            organization_id=organization_a.id,
-            user_id=owner_a.id,
-            plan_code=seat_plan.code,
-            status="active",
-        ))
+        db.add_all([
+            Subscription(
+                organization_id=organization_a.id,
+                user_id=owner_a.id,
+                plan_code=seat_plan.code,
+                status="active",
+            ),
+            Subscription(
+                organization_id=organization_b.id,
+                user_id=owner_b.id,
+                plan_code=seat_plan.code,
+                status="active",
+            ),
+        ])
         db.commit()
 
         app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
