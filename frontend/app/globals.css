@@ -987,3 +987,27 @@ button:disabled, .button:disabled {
 .metric-bar-small { display: inline-block; width: 90px; height: 7px; margin-right: 8px; vertical-align: middle; }
 .result-status.success { color: var(--green); }
 .result-status.warning { color: #B7791F; }
+
+/* Account deletion and customer reviews */
+.danger-zone { border-color: #FECACA; }
+.danger-zone h2 { color: var(--red); }
+.button-danger { background: var(--red); border-color: var(--red); color: #fff; }
+.button-danger:hover { background: #B91C1C; border-color: #B91C1C; }
+.button-danger:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+.reviews-page, .review-form-page { max-width: 1080px; }
+.reviews-heading { max-width: 760px; padding-bottom: 30px; }
+.reviews-heading h1 { margin: 10px 0; color: var(--navy); font-size: clamp(36px, 5vw, 52px); line-height: 1.12; }
+.reviews-heading p { color: var(--muted); margin-bottom: 20px; }
+.reviews-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin: 0 0 24px; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.reviews-summary strong { color: var(--navy); font-size: 1.8rem; }
+.reviews-summary span:last-child { color: var(--muted); font-size: .85rem; }
+.review-stars { color: #D97706; letter-spacing: .12em; font-size: 1.05rem; }
+.reviews-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+.review-card { padding: 22px; }
+.review-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.review-card-top strong { color: var(--navy); }
+.review-card-top time { color: var(--subtle); font-size: .75rem; }
+.review-card p { margin: 12px 0 0; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-empty { max-width: 650px; }
+.review-form-page .settings-panel { max-width: 760px; }
+@media (max-width: 640px) { .reviews-grid { grid-template-columns: 1fr; } .review-card-top { align-items: flex-start; flex-direction: column; gap: 4px; } }
