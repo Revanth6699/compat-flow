@@ -287,7 +287,7 @@ async def suggest_multiformat_mappings(
             }
             for item in result.suggestions
         ],
-        "source_data_sent": ai_opt_in and result.status not in {"provider_unconfigured", "provider_error"},
+        "source_data_sent": ai_opt_in and result.status != "provider_unconfigured",
     }
 
 
