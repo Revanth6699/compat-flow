@@ -1,6 +1,7 @@
 import csv
+import json
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -24,6 +25,7 @@ from app.schemas import (
 )
 from app.services.catalog_csv import (
     CatalogCSVValidationError,
+    CATALOG_PROFILES,
     parse_catalog_csv,
 )
 
@@ -35,7 +37,7 @@ def health():
     return HealthResponse(status="ok", service="compatflow-api")
 
 
-async def _validate_catalog_csv(file: UploadFile) -> ImportPreviewResponse:
+async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", column_mapping=None) -> ImportPreviewResponse:
     filename = (file.filename or "").strip()
     if not filename.lower().endswith(".csv"):
         await file.close()
@@ -59,7 +61,7 @@ async def _validate_catalog_csv(file: UploadFile) -> ImportPreviewResponse:
         raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded.") from None
 
     try:
-        result = parse_catalog_csv(content)
+        result = parse_catalog_csv(content, profile_id=profile_id, column_mapping=column_mapping)
     except CatalogCSVValidationError as exc:
         message = str(exc)
         status_code = 413 if "row limit" in message else 422
@@ -69,6 +71,12 @@ async def _validate_catalog_csv(file: UploadFile) -> ImportPreviewResponse:
 
     return ImportPreviewResponse(
         filename=filename,
+        profile_id=result.profile_id,
+        records_with_issues=result.records_with_issues,
+        duplicate_sku_count=result.duplicate_sku_count,
+        duplicate_rate=result.duplicate_rate,
+        issue_density=result.issue_density,
+        critical_record_rate=result.critical_record_rate,
         total_rows=result.total_rows,
         valid_rows=result.valid_count,
         invalid_rows=result.invalid_count,
@@ -119,16 +127,42 @@ async def _validate_catalog_csv(file: UploadFile) -> ImportPreviewResponse:
 @router.post("/catalog/import/validate", response_model=ImportPreviewResponse)
 async def validate_paid_catalog_import(
     file: UploadFile = File(...),
+    profile_id: str = Form("general"),
+    column_mapping_json: str | None = Form(None),
     _plan: AuthenticatedUser = Depends(require_plan_feature("csv_validation")),
 ):
     """Authenticated, subscription-gated validation. Files are not persisted."""
-    return await _validate_catalog_csv(file)
+    if profile_id not in CATALOG_PROFILES:
+        await file.close()
+        raise HTTPException(status_code=422, detail="Unknown catalog profile.")
+    try:
+        mapping = json.loads(column_mapping_json) if column_mapping_json else None
+        if mapping is not None and (not isinstance(mapping, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in mapping.items())):
+            raise ValueError
+    except (ValueError, TypeError):
+        await file.close()
+        raise HTTPException(status_code=422, detail="Manual mapping must be a JSON object of canonical fields to source headers.") from None
+    return await _validate_catalog_csv(file, profile_id, mapping)
 
 
 @router.post("/catalog/import/preview", response_model=ImportPreviewResponse)
-async def preview_catalog_import(file: UploadFile = File(...)):
+async def preview_catalog_import(
+    file: UploadFile = File(...),
+    profile_id: str = Form("general"),
+    column_mapping_json: str | None = Form(None),
+):
     """Public stateless demo validation. Files are not persisted."""
-    return await _validate_catalog_csv(file)
+    if profile_id not in CATALOG_PROFILES:
+        await file.close()
+        raise HTTPException(status_code=422, detail="Unknown catalog profile.")
+    try:
+        mapping = json.loads(column_mapping_json) if column_mapping_json else None
+        if mapping is not None and (not isinstance(mapping, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in mapping.items())):
+            raise ValueError
+    except (ValueError, TypeError):
+        await file.close()
+        raise HTTPException(status_code=422, detail="Manual mapping must be a JSON object of canonical fields to source headers.") from None
+    return await _validate_catalog_csv(file, profile_id, mapping)
 
 
 @router.post("/catalog/import")
