@@ -80,7 +80,11 @@ function BillingContent() {
     }
   }, []);
 
-  useEffect(() => { void Promise.resolve().then(() => loadSubscription()); }, [loadSubscription]);
+  useEffect(() => {
+    const requestedPlan = new URLSearchParams(window.location.search).get("plan");
+    if (requestedPlan && plans.some(plan => plan.code === requestedPlan)) setSelectedPlan(requestedPlan);
+    void Promise.resolve().then(() => loadSubscription());
+  }, [loadSubscription]);
 
   async function startCheckout() {
     setError("");
