@@ -50,6 +50,12 @@ class ImportColumnMappingResponse(BaseModel):
 
 class ImportPreviewResponse(BaseModel):
     filename: str
+    profile_id: str = "general"
+    records_with_issues: int = 0
+    duplicate_sku_count: int = 0
+    duplicate_rate: float = 0.0
+    issue_density: float = 0.0
+    critical_record_rate: float = 0.0
     total_rows: int
     valid_rows: int
     invalid_rows: int
