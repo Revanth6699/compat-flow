@@ -80,3 +80,9 @@ def test_xml_single_record_root_is_not_split_into_field_records():
 def test_xml_multiple_repeated_groups_require_explicit_record_tag():
     with pytest.raises(IngestionParseError, match="multiple repeated record groups"):
         parse_xml(b'<feed><products><product><sku>A</sku></product><product><sku>B</sku></product></products><variants><variant><code>A</code></variant><variant><code>B</code></variant></variants></feed>')
+
+
+def test_xml_single_record_inside_collection_wrapper():
+    parsed = parse_xml(b'<Products><Product><SKU>001</SKU><Name>Widget</Name></Product></Products>')
+    assert len(parsed.records) == 1
+    assert parsed.records[0].values == {"SKU": "001", "Name": "Widget"}
