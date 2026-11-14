@@ -206,6 +206,16 @@ def test_full_name_header_maps_to_name():
     assert {item.field: item.source_header for item in result.column_mappings}["name"] == "full_name"
 
 
+def test_manufacturer_part_number_hash_header_maps_to_part_number():
+    content = (
+        "sku,title,manufacturer,Manufacturer Part #,category\n"
+        "PDTFLM,Detectable Tape,Pro-Pak Industries,PDTFLM,Tools\n"
+    )
+    result = parse_catalog_csv(content)
+    assert result.valid_count == 1
+    assert {item.field: item.source_header for item in result.column_mappings}["part_number"] == "Manufacturer Part #"
+
+
 def test_header_normalization_accepts_spaces_and_punctuation():
     content = (
         " Product SKU , Product Name , Manufacturer Name , Part No. , Category Name \n"
