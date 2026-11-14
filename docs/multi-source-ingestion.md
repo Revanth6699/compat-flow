@@ -35,14 +35,14 @@ Implemented on the feature branch:
 - Format-neutral parsers for CSV, XLSX, XLS, JSON, and XML with source-location metadata.
 - Authenticated, subscription-gated `POST /api/v1/catalog/import/parse-preview` and `POST /api/v1/catalog/import/validate-records` endpoints for structural preview and deterministic schema/file-duplicate validation across all five record types; neither persists records.
 - An opt-in `POST /api/v1/catalog/import/suggest-mappings` endpoint that sends only bounded header/sample evidence to a configured HTTPS OpenAI-compatible provider after explicit opt-in; suggestions require human confirmation.
-- Secure connector primitives for HTTPS API fetch, host-key-verified SFTP download, and bounded SQL Server read projections.
+- Secure connector primitives plus authenticated one-shot REST API, SFTP, and SQL Server preview/commit endpoints. Connector hosts are server-allowlisted; SFTP uses configured known-hosts; SQL Server uses bounded SELECT projections. Credentials are request-scoped and are not stored by CompatFlow.
 - An opt-in AI mapping provider interface with bounded evidence, HTTPS provider endpoint requirement, candidate-field allowlisting, source-evidence checks, and no-provider fallback.
 
 Not yet an end-to-end production import workflow:
 - The existing CSV-specific business validator remains separate; the new shared record validator currently performs schema/type validation and in-file duplicate checks, not all domain-specific business or database referential checks.
-- The preview endpoint does not persist data.
-- No connector configuration UI, encrypted credential vault, API pagination scheduler, SFTP polling/deduplication scheduler, or SQL Server incremental watermark scheduler exists.
-- Durable job orchestration, retry/recovery, full row/item lineage storage, and transactional batch persistence remain to be implemented.
+- The file preview endpoint does not persist data. Explicit commit endpoints persist reviewed file and connector imports and record row-level errors and source-to-record lineage.
+- No connector configuration UI, encrypted credential vault, API pagination scheduler, SFTP polling/deduplication scheduler, or SQL Server incremental watermark scheduler exists. REST API requests currently fetch one page per run.
+- Durable background job orchestration, scheduled polling/sync, connector credential vault, pagination/watermark orchestration, and retry/recovery remain to be implemented. Connector execution is synchronous and bounded; it is not a scheduled or durable connector service.
 - The frontend import page now exposes CSV/XLSX/XLS/JSON/XML uploads, record-type selection, field-mapping review, and explicit AI sample-consent controls. API, SFTP, and SQL Server connector configuration screens are not implemented.
 - AI suggestions are exposed through a backend endpoint and an explicit-consent frontend flow. No AI provider credentials are configured and no model has been trained.
 
