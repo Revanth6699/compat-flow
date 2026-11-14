@@ -224,17 +224,28 @@ def parse_xml(data: bytes, *, record_tag: str | None = None,
         root = fromstring(data)
     except Exception:
         raise IngestionParseError("XML is malformed or contains unsafe constructs.") from None
+    children = list(root)
     candidates: dict[str, list[Any]] = {}
-    for child in list(root):
+    for child in children:
         candidates.setdefault(_local_name(child.tag), []).append(child)
     selected_tag = record_tag
-    if selected_tag is None:
-        repeated = [name for name, elements in candidates.items() if len(elements) > 1]
-        selected_tag = repeated[0] if len(repeated) == 1 else None
-    elements = candidates.get(selected_tag, []) if selected_tag else []
-    if not elements and selected_tag is None and list(root):
-        elements = list(root)
-        selected_tag = _local_name(elements[0].tag)
+    if selected_tag == _local_name(root.tag):
+        elements = [root]
+    elif selected_tag is not None:
+        elements = candidates.get(selected_tag, [])
+    else:
+        repeated = [name for name, items in candidates.items() if len(items) > 1]
+        if len(repeated) > 1:
+            raise IngestionParseError("XML contains multiple repeated record groups; supply record_tag.")
+        if len(repeated) == 1:
+            selected_tag = repeated[0]
+            elements = candidates[selected_tag]
+        elif len(children) == 1 and list(children[0]):
+            selected_tag = _local_name(children[0].tag)
+            elements = children
+        else:
+            selected_tag = _local_name(root.tag)
+            elements = [root]
     if not elements:
         raise IngestionParseError("Could not identify XML record elements; supply record_tag.")
     if len(elements) > max_records:
