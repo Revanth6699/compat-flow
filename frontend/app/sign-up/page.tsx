@@ -20,8 +20,8 @@ function SignUpForm() {
     if(!isInvitationFlow && jobTitle.trim().length<2){setError("Enter your job title.");return;}
     if(!isInvitationFlow && !industry){setError("Select your industry.");return;}
     if(!isInvitationFlow && !teamSize){setError("Select your team size.");return;}
-    if(phone && !/^\\+?[0-9() .-]{7,20}$/.test(phone)){setError("Enter a valid phone number, including country code if applicable.");return;}
-    if(companyWebsite && !/^https?:\\/\\//i.test(companyWebsite)){setError("Enter a company website beginning with https:// or http://.");return;}
+    if(phone && !/^\+?[0-9() .-]{7,20}$/.test(phone)){setError("Enter a valid phone number, including country code if applicable.");return;}
+    if(companyWebsite && !/^https?:\/\//i.test(companyWebsite)){setError("Enter a company website beginning with https:// or http://.");return;}
     setBusy(true);
     try {
       const result=await signUp(email,password,fullName,isInvitationFlow ? "" : organizationName,next,{job_title:jobTitle.trim(),phone:phone.trim(),company_website:companyWebsite.trim(),industry,team_size:teamSize});
@@ -46,7 +46,7 @@ function SignUpForm() {
       <label htmlFor="signup-name">Full name</label><input id="signup-name" type="text" autoComplete="name" minLength={2} maxLength={100} required value={fullName} onChange={e=>setFullName(e.target.value)} />
       {!isInvitationFlow && <><label htmlFor="signup-organization">Organization name</label><input id="signup-organization" type="text" minLength={2} maxLength={160} required value={organizationName} onChange={e=>setOrganizationName(e.target.value)} />
       <label htmlFor="signup-job-title">Your job title</label><input id="signup-job-title" type="text" minLength={2} maxLength={100} required value={jobTitle} onChange={e=>setJobTitle(e.target.value)} placeholder="e.g. Ecommerce Operations Manager" />
-      <label htmlFor="signup-phone">Phone number</label><input id="signup-phone" type="tel" autoComplete="tel" maxLength={20} pattern="\\+?[0-9() .-]{7,20}" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+91 98765 43210" />
+      <label htmlFor="signup-phone">Phone number</label><input id="signup-phone" type="tel" autoComplete="tel" maxLength={20} pattern="^\+?[0-9() .-]{7,20}$" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+91 98765 43210" />
       <label htmlFor="signup-website">Company website</label><input id="signup-website" type="url" maxLength={255} value={companyWebsite} onChange={e=>setCompanyWebsite(e.target.value)} placeholder="https://example.com" />
       <label htmlFor="signup-industry">Industry</label><select id="signup-industry" required value={industry} onChange={e=>setIndustry(e.target.value)}><option value="">Select industry</option><option value="ecommerce">Ecommerce / D2C</option><option value="retail">Retail</option><option value="automotive">Automotive / Parts</option><option value="manufacturing">Manufacturing</option><option value="distribution">Wholesale / Distribution</option><option value="technology">Technology / Software</option><option value="other">Other</option></select>
       <label htmlFor="signup-team-size">Team size</label><select id="signup-team-size" required value={teamSize} onChange={e=>setTeamSize(e.target.value)}><option value="">Select team size</option><option value="1">Just me</option><option value="2-5">2–5</option><option value="6-20">6–20</option><option value="21-50">21–50</option><option value="51-200">51–200</option><option value="201+">201+</option></select>
