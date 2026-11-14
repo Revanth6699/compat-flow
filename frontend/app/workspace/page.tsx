@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AuthRequired } from "@/components/auth-required";
 import { useAuth } from "@/components/auth-provider";
 import { ApiRequestError, apiRequest, type AuthUser } from "@/lib/auth-client";
@@ -13,6 +14,7 @@ type Profile = {
 
 function WorkspaceContent() {
   const { user, signOut } = useAuth();
+  const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [organizationName, setOrganizationName] = useState(user?.user_metadata?.organization_name || "");
   const [error, setError] = useState("");
@@ -26,6 +28,10 @@ function WorkspaceContent() {
     try {
       const data = await apiRequest<Profile>("/api/v1/auth/me");
       setProfile(data);
+      const requestedPlan = new URLSearchParams(window.location.search).get("plan");
+      if (requestedPlan && ["starter", "growth", "business"].includes(requestedPlan)) {
+        router.replace(`/billing?plan=${requestedPlan}`);
+      }
     } catch (cause) {
       if (cause instanceof ApiRequestError && cause.status === 404 &&
           cause.message === "No CompatFlow organization is linked to this account yet.") {
@@ -37,7 +43,7 @@ function WorkspaceContent() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => { void loadProfile(); }, [loadProfile]);
 
@@ -54,6 +60,11 @@ function WorkspaceContent() {
         method: "POST",
         body: JSON.stringify({ name: organizationName.trim() }),
       });
+      const requestedPlan = new URLSearchParams(window.location.search).get("plan");
+      if (requestedPlan && ["starter", "growth", "business"].includes(requestedPlan)) {
+        router.replace(`/billing?plan=${requestedPlan}`);
+        return;
+      }
       await loadProfile();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not create your organization.");
