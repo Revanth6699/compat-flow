@@ -47,7 +47,7 @@ def _unix_datetime(value):
 
 def _subscription_status(event_type: str) -> str | None:
     return {
-        "subscription.authenticated": "trialing",
+        "subscription.authenticated": "pending",
         "subscription.activated": "active",
         "subscription.charged": "active",
         "subscription.pending": "pending",
@@ -172,9 +172,7 @@ def verify_subscription_checkout(
     ):
         raise HTTPException(status_code=400, detail="Razorpay checkout signature verification failed.")
 
-    if subscription.status in {"pending", "incomplete"}:
-        subscription.status = "trialing"
-        db.commit()
+    # Checkout verification alone does not grant access; wait for subscription.activated.
     return {
         "verified": True,
         "subscription_id": str(subscription.id),
@@ -213,9 +211,7 @@ def cancel_subscription(
         raise HTTPException(status_code=502, detail="Razorpay could not process the cancellation request.") from None
 
     subscription.cancel_at_period_end = payload.cancel_at_cycle_end
-    if not payload.cancel_at_cycle_end:
-        # Razorpay's webhook remains authoritative for the final canceled state.
-        subscription.status = "pending"
+    # Keep the current entitlement state until Razorpay confirms cancellation.
     db.commit()
     return {
         "subscription_id": str(subscription.id),
@@ -294,7 +290,7 @@ async def razorpay_webhook(
         provider_event_id=x_razorpay_event_id,
         event_type=event_type,
         processing_status="processing",
-        payload=event_payload,
+        payload={"event": event_type},
     )
     db.add(webhook_event)
 
