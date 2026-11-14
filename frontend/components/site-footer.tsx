@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 export function SiteFooter() {
+ const { user } = useAuth();
  return <footer className="site-footer"><div className="container footer">
   <div className="footer-brand">
    <Link className="footer-brand-name" href="/">compatflow</Link>
