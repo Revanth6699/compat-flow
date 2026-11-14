@@ -15,9 +15,19 @@ Owns stable product identity and core descriptive attributes:
 - manufacturer part number
 - category
 
-Supplier-specific identifiers, prices, warehouse quantities, and variant attributes do not belong on this row.
+Supplier-specific identifiers, prices, warehouse quantities, and variant attributes do not belong on this row. The canonical SKU and MPN stay on the master; additional identifiers use the typed identifier registry.
 
-### 2. Product variants — `product_variants`
+### 2. Product identifiers — `product_identifiers`
+
+One row per additional identifier attached to a product:
+- identifier type: UPC, EAN, GTIN, ASIN, marketplace ID, manufacturer code, source product ID, or other
+- explicit namespace, such as `global` or a marketplace
+- identifier value stored as text so leading zeros are preserved
+- source reference and primary flag
+
+SKU, MPN, supplier SKU, and marketplace identifiers remain separate namespaces. Identifier values are never numerically coerced.
+
+### 3. Product variants — `product_variants`
 
 One row per sellable variation of a product:
 - parent product and tenant
@@ -27,7 +37,7 @@ One row per sellable variation of a product:
 
 The same product can have multiple variants. A variant is not a duplicate product merely because the parent name is the same.
 
-### 3. Supplier offers — `supplier_offers`
+### 4. Supplier offers — `supplier_offers`
 
 One row per supplier's commercial listing:
 - supplier and optional matched product
@@ -38,7 +48,7 @@ One row per supplier's commercial listing:
 
 An offer can exist before it has been confidently matched to a product. A supplier's SKU is never silently promoted to the canonical SKU.
 
-### 4. Inventory snapshots — `inventory_snapshots`
+### 5. Inventory snapshots — `inventory_snapshots`
 
 Append-only point-in-time stock positions:
 - product, optional supplier offer, warehouse code
@@ -55,6 +65,7 @@ All new tables carry `organization_id`. Composite foreign keys bind variants, of
 
 All endpoints require authentication, the existing catalog read/write permission, and the `supplier_catalogs` plan feature.
 
+- `GET/POST /api/v1/product-identifiers`
 - `GET/POST /api/v1/product-variants`
 - `GET/POST /api/v1/supplier-offers`
 - `GET/POST /api/v1/inventory-snapshots`
