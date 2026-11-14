@@ -44,3 +44,14 @@ The workflow does not create a database backup. The operator must create and ver
 ## Public demo boundary
 
 The public CSV preview remains available without authentication. It validates uploads in memory and does not persist files or catalog records. Persistent imports remain disabled. Protected supplier and catalog endpoints derive organization scope from the authenticated backend profile and enforce database-backed role permissions.
+
+
+## Account and organization deletion
+
+The backend account deletion endpoint requires a server-only `SUPABASE_SERVICE_ROLE_KEY`. Configure it in the backend secret manager; never expose it as a `NEXT_PUBLIC_*` variable or commit its value.
+
+- A member/admin confirms `DELETE MY ACCOUNT`: their Supabase identity, CompatFlow membership and personal review are removed. Shared organization records and the organization subscription remain.
+- An owner confirms `DELETE ORGANIZATION`: CompatFlow first requests immediate cancellation of provider subscriptions, then removes every linked Supabase identity and cascades the organization, members, catalog records, import history, review records, local subscription/payment rows and related webhook history.
+- If the payment provider cannot confirm cancellation, deletion is stopped before local organization data is removed.
+- Supabase Auth and PostgreSQL cannot participate in one distributed transaction. If Supabase deletes some linked identities and then returns an error, retry deletion; already-absent identities are treated as deleted.
+- Verify a recoverable backup and understand that this operation is irreversible before enabling the feature in a production environment.
