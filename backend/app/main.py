@@ -110,7 +110,7 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_origin_regex=staging_preview_origin_regex,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
 
