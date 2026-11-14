@@ -68,3 +68,18 @@ def test_review_submission_requires_authenticated_user():
         json={"display_name": "Example User", "rating": 5, "comment": "This is a sufficiently detailed review."},
     )
     assert response.status_code == 401
+
+
+def test_demo_access_status_requires_authenticated_account():
+    response = client.get("/api/v1/demo-requests/mine")
+    assert response.status_code == 401
+
+
+def test_platform_admin_overview_requires_authenticated_account():
+    response = client.get("/api/v1/platform-admin/overview")
+    assert response.status_code == 401
+
+
+def test_platform_admin_demo_request_queue_requires_authenticated_account():
+    response = client.get("/api/v1/platform-admin/demo-requests")
+    assert response.status_code == 401
