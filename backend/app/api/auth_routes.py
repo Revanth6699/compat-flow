@@ -232,6 +232,15 @@ def _ensure_invitation_seat_available(
         )
 
 
+@invitation_router.get("/seats")
+def get_member_seat_usage(
+    current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    """Report seat usage without disabling existing members after a downgrade."""
+    return _member_seat_usage(db, current.profile.organization_id)
+
+
 @invitation_router.post("", response_model=InvitationCreatedResponse, status_code=201)
 def create_invitation(
     payload: InvitationCreateRequest,
