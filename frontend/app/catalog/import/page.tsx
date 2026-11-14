@@ -65,8 +65,8 @@ export default function CatalogImportPage() {
     setFile(selectedFile); setResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setError("");
     if (!selectedFile) return;
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
-    if (!(user ? ["csv", "xlsx", "xls", "json", "xml"] : ["csv"]).includes(extension ?? "")) {
-      setFile(null); setError(user ? "Supported formats: CSV, XLSX, XLS, JSON and XML. Your plan determines which formats you can process." : "The public demo accepts CSV files only. Create an account and choose a plan for additional formats."); return;
+    if (!(user ? ["csv", "xlsx", "xls", "json", "xml"] : ["csv", "xlsx", "xls"]).includes(extension ?? "")) {
+      setFile(null); setError(user ? "Supported formats: CSV, XLSX, XLS, JSON and XML. Your plan determines which formats you can process." : "The public demo accepts CSV, XLSX and XLS files only."); return;
     }
     if (selectedFile.size > (user ? 25 : 5) * 1024 * 1024) {
       setFile(null); setError(`The file exceeds the ${user ? "25 MB" : "5 MB"} limit for this access level.`);
@@ -80,7 +80,14 @@ export default function CatalogImportPage() {
       const formData = new FormData(); formData.append("file", file);
       const extension = file.name.split(".").pop()?.toLowerCase();
       if (extension !== "csv" || recordType !== "products" || Object.keys(manualMapping).some((field) => !canonicalFields.includes(field))) {
-        if (!user) throw new Error("Sign in to validate Excel, JSON, XML, or non-product catalog records.");
+        if (!user && ["xlsx", "xls"].includes(extension ?? "") && recordType === "products") {
+          const response = await fetch(`${API_BASE.replace(/\/$/, "")}/api/v1/catalog/import/preview-records`, { method: "POST", body: formData });
+          const data = await response.json();
+          if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The backend could not validate this spreadsheet.");
+          setMultiResult(data as MultiResult);
+          return;
+        }
+        if (!user) throw new Error("Sign in and choose a plan to validate JSON, XML or other catalog inputs.");
         formData.append("record_type", recordType);
         if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
         const data = await apiRequest<MultiResult>("/api/v1/catalog/import/validate-records", { method: "POST", body: formData });
@@ -191,7 +198,7 @@ export default function CatalogImportPage() {
             <strong>{file ? file.name : "Choose a catalog file"}</strong>
             <span>{file ? `${(file.size / 1024).toFixed(1)} KB` : "Select a file from your computer"}</span>
           </label>
-          <input id="catalog-file" className="visually-hidden" type="file" accept={user ? ".csv,.xlsx,.xls,.json,.xml,text/csv,application/json,application/xml" : ".csv,text/csv"}
+          <input id="catalog-file" className="visually-hidden" type="file" accept={user ? ".csv,.xlsx,.xls,.json,.xml,text/csv,application/json,application/xml" : ".csv,.xlsx,.xls,text/csv"}
             onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)} />
           <div className="import-actions">
             <button className="button" type="button" onClick={handleValidate} disabled={!file || loading}>
