@@ -641,3 +641,79 @@ def test_postgres_enforces_tenant_isolation_for_all_catalog_record_types():
             db.commit()
         finally:
             db.close()
+
+
+def test_postgres_role_permission_matrix_for_catalog_read_and_write():
+    """Verify seeded role grants against real PostgreSQL and the product API."""
+    from app.core.database import SessionLocal
+    from app.models import Organization, Product, Subscription, SubscriptionPlan, User
+
+    db = SessionLocal()
+    organization = Organization(name=f"Role matrix {uuid4().hex[:8]}")
+    plan_code = f"role_test_{uuid4().hex[:12]}"
+    plan = SubscriptionPlan(
+        code=plan_code,
+        name=f"Role matrix plan {uuid4().hex[:8]}",
+        currency="USD",
+        is_active=True,
+        entitlements={"supplier_catalogs": True},
+    )
+    users = []
+    try:
+        db.add_all([organization, plan])
+        db.flush()
+        for role in ("owner", "admin", "member", "viewer"):
+            user = User(
+                organization_id=organization.id,
+                auth_user_id=uuid4(),
+                email=f"role-{role}-{uuid4().hex[:8]}@example.test",
+                role=role,
+                is_active=True,
+                account_type="subscriber",
+            )
+            users.append(user)
+        db.add_all(users)
+        db.flush()
+        db.add(Subscription(
+            organization_id=organization.id,
+            user_id=users[0].id,
+            plan_code=plan_code,
+            status="active",
+            billing_interval="month",
+        ))
+        db.commit()
+
+        client = TestClient(app)
+        for user in users:
+            app.dependency_overrides[get_current_user] = lambda user=user: AuthenticatedUser(
+                identity=SupabaseIdentity(user.auth_user_id, user.email, "role-matrix-token"),
+                profile=user,
+            )
+            read_response = client.get("/api/v1/products")
+            assert read_response.status_code == 200, (user.role, read_response.text)
+
+            write_response = client.post("/api/v1/products", json={
+                "sku": f"ROLE-{user.role.upper()}-{uuid4().hex[:8]}",
+                "name": f"Created by {user.role}",
+                "manufacturer": "CompatFlow test",
+                "part_number": f"{user.role}-{uuid4().hex[:6]}",
+                "category": "Security test",
+            })
+            expected_status = 403 if user.role == "viewer" else 201
+            assert write_response.status_code == expected_status, (
+                user.role, write_response.status_code, write_response.text
+            )
+
+        persisted_products = db.query(Product).filter(
+            Product.organization_id == organization.id
+        ).all()
+        assert len(persisted_products) == 3
+    finally:
+        clear_overrides()
+        try:
+            db.rollback()
+            db.delete(organization)
+            db.delete(plan)
+            db.commit()
+        finally:
+            db.close()
