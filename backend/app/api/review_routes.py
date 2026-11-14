@@ -37,7 +37,18 @@ class ReviewResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-@router.get("/mine", response_model=ReviewResponse)\ndef get_my_review(\n    current: AuthenticatedUser = Depends(get_current_user),\n    db: Session = Depends(get_db),\n):\n    review = db.scalar(select(Review).where(Review.user_id == current.profile.id))\n    if review is None:\n        raise HTTPException(status_code=404, detail="You have not submitted a review yet.")\n    return review\n\n\n@router.get("", response_model=list[ReviewResponse])
+@router.get("/mine", response_model=ReviewResponse)
+def get_my_review(
+    current: AuthenticatedUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    review = db.scalar(select(Review).where(Review.user_id == current.profile.id))
+    if review is None:
+        raise HTTPException(status_code=404, detail="You have not submitted a review yet.")
+    return review
+
+
+@router.get("", response_model=list[ReviewResponse])
 def list_published_reviews(db: Session = Depends(get_db)):
     return list(
         db.scalars(
