@@ -1,4 +1,7 @@
+from io import BytesIO
+
 from fastapi.testclient import TestClient
+from openpyxl import Workbook
 
 from app.main import app
 
@@ -110,3 +113,31 @@ def test_preview_rejects_upload_over_five_megabytes():
         files={"file": ("large.csv", oversized, "text/csv")},
     )
     assert response.status_code == 413
+
+
+def test_public_spreadsheet_preview_accepts_xlsx_without_authentication():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["sku", "name", "manufacturer", "part_number", "category"])
+    sheet.append(["SKU-EXCEL-1", "Brake Pad", "Maker A", "BP-100", "Brakes"])
+    stream = BytesIO()
+    workbook.save(stream)
+    response = client.post(
+        "/api/v1/catalog/import/preview-records",
+        files={"file": ("supplier.xlsx", stream.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["format"] == "xlsx"
+    assert data["record_type"] == "products"
+    assert data["total_records"] == 1
+    assert data["valid_records"] == 1
+    assert data["persisted"] is False
+
+
+def test_public_spreadsheet_preview_rejects_json():
+    response = client.post(
+        "/api/v1/catalog/import/preview-records",
+        files={"file": ("supplier.json", b'{"items":[]}', "application/json")},
+    )
+    assert response.status_code == 415
