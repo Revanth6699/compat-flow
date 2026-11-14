@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Script from "next/script";
 import { AuthRequired } from "@/components/auth-required";
-import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/auth-client";
 
 declare global {
@@ -56,7 +55,7 @@ const plans = [
 ];
 
 function BillingContent() {
-  const { user } = useAuth();
+  const [role, setRole] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [selectedPlan, setSelectedPlan] = useState("starter");
   const [loading, setLoading] = useState(true);
@@ -68,8 +67,12 @@ function BillingContent() {
   const loadSubscription = useCallback(async () => {
     setError("");
     try {
-      const result = await apiRequest<SubscriptionResponse>("/api/v1/billing/subscription");
+      const [result, profile] = await Promise.all([
+        apiRequest<SubscriptionResponse>("/api/v1/billing/subscription"),
+        apiRequest<{ role: string }>("/api/v1/auth/me"),
+      ]);
       setSubscription(result.subscription);
+      setRole(profile.role);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load subscription details.");
     } finally {
@@ -148,7 +151,7 @@ function BillingContent() {
     }
   }
 
-  const isOwner = (user as { role?: string } | null)?.role === "owner";
+  const isOwner = role === "owner";
 
   return (
     <>
