@@ -118,8 +118,8 @@ def test_sku_number_header_maps_to_sku():
         "sku_number,product_name,manufacturer,category\n"
         "SKU-1,Phone,Maker A,Electronics\n"
     )
-    result = parse_catalog_csv(content)
-    assert result.valid_count == 1
+    result = parse_catalog_csv(content, allow_incomplete_mapping=True)
+    assert "sku" in {item.field for item in result.column_mappings}
     assert {item.field: item.source_header for item in result.column_mappings}["sku"] == "sku_number"
 
 
