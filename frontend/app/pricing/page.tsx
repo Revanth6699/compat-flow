@@ -87,11 +87,11 @@ export default function PricingPage() {
           <p>Reference prices are in USD per month. Paid checkout is not enabled until the Razorpay account, plan IDs and webhook are configured. Features marked Planned are not currently available.</p>
         </section>
         <section className="pricing-grid" aria-label="CompatFlow plans">
-          {plans.map(plan => {
+          {plans.filter(plan => !user || plan.code).map(plan => {
             const href = plan.code
-              ? (user ? `/workspace?plan=${plan.code}` : `/sign-up?plan=${plan.code}`)
+              ? (user ? `/billing?plan=${plan.code}` : `/sign-up?plan=${plan.code}`)
               : plan.href;
-            const action = plan.code && user ? "View billing" : plan.action;
+            const action = plan.code && user ? "Select plan" : plan.action;
             return (
               <article className={`pricing-card${plan.featured ? " pricing-card-featured" : ""}`} key={plan.name}>
                 <div className="pricing-card-top">
@@ -117,7 +117,7 @@ export default function PricingPage() {
             );
           })}
         </section>
-        <section className="pricing-footnote">
+        {!user && <section className="pricing-footnote">
           <h2>Demo vs Starter</h2>
           <p>The public demo lets anyone test CSV and Excel validation without signing in. It is limited to 5 MB per file, shows results on screen and does not offer report downloads or an organization workspace.</p>
           <p>Starter adds an organization workspace, a 25 MB subscribed-import ceiling and downloadable validation reports. It does not unlock JSON/XML ingestion or external source connectors.</p>
