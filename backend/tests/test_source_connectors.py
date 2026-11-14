@@ -7,7 +7,11 @@ from app.services.source_connectors import (
 )
 
 
-def test_api_connector_requires_https_and_allowlisted_host():
+def test_api_connector_requires_https_and_allowlisted_host(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.source_connectors.socket.getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 443))],
+    )
     _validate_https_url("https://supplier.example/api", {"supplier.example"})
     with pytest.raises(SourceConnectorError, match="HTTPS"):
         _validate_https_url("http://supplier.example/api", {"supplier.example"})
