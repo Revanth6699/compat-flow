@@ -49,21 +49,18 @@ type PreviewResponse = {
 
 export default function CatalogImportPage() {
   const { user, loading: authLoading } = useAuth();
-  const [demoApproved, setDemoApproved] = useState(false);
-  const [accessType, setAccessType] = useState<"checking" | "demo" | "subscription" | "none">("checking");
+  const [accessResult, setAccessResult] = useState<{ email: string; type: "demo" | "subscription" | "none" } | null>(null);
+  const email = user?.email?.toLowerCase() || "";
+  const accessType = !email ? "none" : accessResult?.email === email ? accessResult.type : "checking";
+  const demoApproved = accessType === "demo";
   useEffect(() => {
-    if (!user) { setDemoApproved(false); setAccessType("none"); return; }
+    if (!email) return;
     let active = true;
-    setAccessType("checking");
     apiRequest<{ allowed: boolean; access_type: "demo" | "subscription" | "none" }>("/api/v1/demo-access")
-      .then((data) => {
-        if (!active) return;
-        setAccessType(data.allowed ? data.access_type : "none");
-        setDemoApproved(data.access_type === "demo" && data.allowed);
-      })
-      .catch(() => { if (active) { setDemoApproved(false); setAccessType("none"); } });
+      .then((data) => { if (active) setAccessResult({ email, type: data.allowed ? data.access_type : "none" }); })
+      .catch(() => { if (active) setAccessResult({ email, type: "none" }); });
     return () => { active = false; };
-  }, [user]);
+  }, [email]);
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<PreviewResponse | null>(null);
   const [datasetResult, setDatasetResult] = useState<DatasetProfile | null>(null);
