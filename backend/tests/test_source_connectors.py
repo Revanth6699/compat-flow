@@ -73,7 +73,7 @@ async def test_api_connector_fetches_and_extracts_records_path(monkeypatch):
     assert records == [{"sku": "001"}]
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_api_connector_rejects_non_object_records(monkeypatch):
     class Response:
         headers = {}
