@@ -31,6 +31,19 @@ const steps = [
 ];
 
 export default function HomePage() {
+  const { user, loading } = useAuth();
+  if (loading) return <main id="main" className="page"><div className="container">Loading your CompatFlow experience…</div></main>;
+  if (user) return (
+    <main id="main" className="page customer-home"><div className="container">
+      <header className="workspace-heading"><div><span className="eyebrow">CUSTOMER WORKSPACE</span><h1>Welcome back</h1><p>Your organization workspace is ready. Continue with your catalog operations below.</p></div><Link className="button" href="/workspace">Open workspace</Link></header>
+      <section className="pricing-grid customer-home-grid">
+        <article className="panel settings-panel"><span className="eyebrow">DATA QUALITY</span><h2>Validate a dataset</h2><p>Profile your dataset and review validation results using the formats available to your account.</p><Link className="button button-secondary" href="/catalog/import">Open validation</Link></article>
+        <article className="panel settings-panel"><span className="eyebrow">ORGANIZATION</span><h2>Manage your workspace</h2><p>Review organization access, account status and available features.</p><Link className="button button-secondary" href="/workspace">Workspace overview</Link></article>
+        <article className="panel settings-panel"><span className="eyebrow">SUBSCRIPTION</span><h2>Plans and billing</h2><p>Compare available plans and manage your organization subscription.</p><Link className="button button-secondary" href="/pricing">Choose a plan</Link></article>
+        <article className="panel settings-panel"><span className="eyebrow">CUSTOMER VOICE</span><h2>Share your feedback</h2><p>Tell us what works and what needs improvement.</p><Link className="button button-secondary" href="/reviews/write">Write a review</Link></article>
+      </section>
+    </div></main>
+  );
   return (
     <main id="main" className="home-page">
       <section className="home-hero">
