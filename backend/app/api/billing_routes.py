@@ -260,9 +260,12 @@ async def razorpay_webhook(
     if not x_razorpay_event_id or len(x_razorpay_event_id) > 180:
         raise HTTPException(status_code=400, detail="A valid x-razorpay-event-id header is required.")
 
-    raw_body = await request.body()
-    if len(raw_body) > 1024 * 1024:
-        raise HTTPException(status_code=413, detail="Razorpay webhook payload exceeds 1 MB.")
+    raw_chunks = bytearray()
+    async for chunk in request.stream():
+        raw_chunks.extend(chunk)
+        if len(raw_chunks) > 1024 * 1024:
+            raise HTTPException(status_code=413, detail="Razorpay webhook payload exceeds 1 MB.")
+    raw_body = bytes(raw_chunks)
     if not verify_webhook_signature(raw_body, x_razorpay_signature or ""):
         raise HTTPException(status_code=400, detail="Razorpay webhook signature verification failed.")
 
@@ -308,12 +311,17 @@ async def razorpay_webhook(
 
     new_status = _subscription_status(event_type)
     if subscription is not None and new_status is not None:
-        subscription.status = new_status
-        subscription.current_period_start = _unix_datetime(subscription_entity.get("current_start"))
-        subscription.current_period_end = _unix_datetime(subscription_entity.get("current_end"))
-        subscription.cancel_at_period_end = bool(subscription_entity.get("cancel_at_cycle_end", subscription.cancel_at_period_end))
-        if new_status == "canceled":
-            subscription.canceled_at = datetime.now(timezone.utc)
+        terminal_status = subscription.status in {"canceled", "expired"}
+        stale_pending_event = new_status == "pending" and subscription.status in {"active", "past_due"}
+        if not terminal_status and not stale_pending_event:
+            subscription.status = new_status
+            subscription.current_period_start = _unix_datetime(subscription_entity.get("current_start"))
+            subscription.current_period_end = _unix_datetime(subscription_entity.get("current_end"))
+            subscription.cancel_at_period_end = bool(
+                subscription_entity.get("cancel_at_cycle_end", subscription.cancel_at_period_end)
+            )
+            if new_status == "canceled":
+                subscription.canceled_at = datetime.now(timezone.utc)
 
     payment_entity = ((payload.get("payment") or {}).get("entity") or {})
     provider_payment_id = payment_entity.get("id")
