@@ -71,9 +71,12 @@ def get_supabase_identity(
             issuer=f"{settings.supabase_url.rstrip('/')}/auth/v1",
             options={"require": ["exp", "sub", "iss", "aud", "email"]},
         )
+        email_claim = claims.get("email")
+        if not isinstance(email_claim, str) or not email_claim.strip():
+            raise _unauthorized()
         return SupabaseIdentity(
             auth_user_id=UUID(claims["sub"]),
-            email=str(claims["email"]).strip().lower(),
+            email=email_claim.strip().lower(),
             access_token=token,
         )
     except (PyJWTError, ValueError, KeyError, RuntimeError):
