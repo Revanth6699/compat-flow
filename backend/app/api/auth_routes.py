@@ -370,6 +370,77 @@ def accept_invitation(
     )
 
 
+class MemberResponse(BaseModel):
+    id: UUID
+    email: EmailStr
+    role: str
+    is_active: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MemberUpdateRequest(BaseModel):
+    role: str | None = Field(default=None, pattern="^(admin|member|viewer)$")
+    is_active: bool | None = None
+
+
+@invitation_router.get("/members", response_model=list[MemberResponse])
+def list_organization_members(
+    current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    return list(
+        db.scalars(
+            select(User)
+            .where(User.organization_id == current.profile.organization_id)
+            .order_by(User.created_at.asc())
+        ).all()
+    )
+
+
+@invitation_router.patch("/members/{member_id}", response_model=MemberResponse)
+def update_organization_member(
+    member_id: UUID,
+    payload: MemberUpdateRequest,
+    current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    if payload.role is None and payload.is_active is None:
+        raise HTTPException(status_code=422, detail="Provide a role or active-state change.")
+
+    member = db.scalar(
+        select(User)
+        .where(
+            User.id == member_id,
+            User.organization_id == current.profile.organization_id,
+        )
+        .with_for_update()
+    )
+    if member is None:
+        raise HTTPException(status_code=404, detail="Organization member not found.")
+    if member.role == "owner":
+        raise HTTPException(status_code=403, detail="The organization owner cannot be modified through member management.")
+    if member.id == current.profile.id:
+        raise HTTPException(status_code=403, detail="You cannot change your own organization access.")
+    if current.profile.role != "owner" and member.role == "admin":
+        raise HTTPException(status_code=403, detail="Only the organization owner can modify an administrator.")
+    if payload.role is not None:
+        if payload.role == "admin" and current.profile.role != "owner":
+            raise HTTPException(status_code=403, detail="Only the organization owner can assign administrator access.")
+        member.role = payload.role
+    if payload.is_active is not None:
+        if payload.is_active and not member.is_active:
+            _ensure_invitation_seat_available(
+                db, current.profile.organization_id, include_pending_invitations=False
+            )
+        member.is_active = payload.is_active
+
+    db.commit()
+    db.refresh(member)
+    return member
+
+
 @invitation_router.get("", response_model=list[InvitationResponse])
 def list_invitations(
     current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
