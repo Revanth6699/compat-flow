@@ -98,7 +98,7 @@ app.add_middleware(
 )
 
 staging_preview_origin_regex = (
-    r"https://compat-flow-web(?:-[a-z0-9-]+)?-revanth-fbe6\.vercel\.app"
+    r"https://compat-flow-[a-z0-9-]+-revanth-fbe6\.vercel\.app"
     if settings.app_env.lower() == "staging"
     else None
 )
