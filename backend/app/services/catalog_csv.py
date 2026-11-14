@@ -34,7 +34,7 @@ HEADER_ALIASES = {
     },
     "part_number": {
         "part_number": 1.0, "manufacturer_part_number": 0.99,
-        "mfr_part_number": 0.98, "mpn": 0.98, "part_no": 0.96,
+        "mfr_part_number": 0.98, "product_mpn": 0.98, "mpn": 0.98, "part_no": 0.96,
         "model_number": 0.90, "model_no": 0.88,
     },
     "category": {
