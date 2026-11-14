@@ -106,3 +106,24 @@ Purpose: inspect real-world CSV headers individually and use observed evidence t
 ## Next work
 
 Continue inspecting datasets individually and append each verified file here. After the sample is broad enough, decide whether to add source profiles, context-aware mapping, optional-field support, delimiter detection, and an explicit duplicate-header workflow. Then update implementation and regression tests together.
+
+
+### 9. Product CSV import minimal sample
+
+- Source: https://github.com/robinprism/product-csv-import/blob/main/samples/valid.csv
+- Type: minimal product import fixture
+- Delimiter: comma
+- Header: `sku,name,price`
+- Sample rows: `MUG-01,Coffee mug,299`; `PEN-02,Blue pen,20`
+- Mapping observations: `sku` and `name` are explicit and unambiguous. `price` is a commercial attribute, not a substitute for category, manufacturer, or part number.
+- Current mapper gap: the fixture has only two of the current general profile's required fields. It should produce a clear missing-fields result rather than infer manufacturer/category/part number.
+
+### 10. Refurbished device combination-count feed
+
+- Source: https://github.com/gaurangkumar-patel/supplier-product-parser/blob/master/examples/combination_count.csv
+- Type: refurbished electronics/device variant feed
+- Delimiter: comma
+- Header: `make,model,colour,capacity,network,grade,condition,count`
+- Sample row: `Apple,Iphone 6s plus 16gb,Working,Grade C - Acceptable Condition,16GB,ROSE GOLD,Unlocked,17`
+- Mapping observations: `make` identifies the device make/brand; `model` identifies model; `colour`, `capacity`, `network`, `grade`, and `condition` describe variant/condition attributes; `count` is quantity. The sample's values suggest the source data may have semantic column/value misalignment (e.g. `colour` contains "Working", while `condition` contains "Unlocked"), so don't infer mappings from names alone without validating row values.
+- Current mapper gap: no canonical fields for brand/make, model, variant attributes, grade, condition, or quantity. Do not map `make` to manufacturer at full confidence or `model` to manufacturer part number without a source-specific rule.
