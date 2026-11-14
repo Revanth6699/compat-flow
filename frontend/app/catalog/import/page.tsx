@@ -197,14 +197,14 @@ export default function CatalogImportPage() {
 
         <section className="panel import-panel">
           <h2>Catalog file validation</h2>
-          <p className="import-description">Public demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file. Subscribed imports: up to 25 MB, subject to plan entitlements.</p>
+          <p className="import-description">{user ? "Subscribed validation: up to 25 MB per file, subject to plan entitlements and configured backend limits." : "Public demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file."}</p>
           <div className="import-description">
             Product catalog validation. CompatFlow detects common supplier column names automatically.
             The public demo accepts CSV, XLS and XLSX product files. JSON, XML and connected data sources require an eligible subscription.
           </div>
-          <p className="import-description">Files are validated in memory. This public demo does not save files or modify a catalog.</p>
-          <p className="column-hint">Non-product datasets are profiled using their actual columns; CompatFlow will not label them as invalid product catalogs or invent a product quality score.</p>
-          <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>
+          <p className="import-description">{user ? "Files are validated in memory. This preview does not save files or commit records to your organization catalog." : "Files are validated in memory. This public demo does not save files or modify a catalog."}</p>
+          {!user && <p className="column-hint">Non-product datasets are profiled using their actual columns; CompatFlow will not label them as invalid product catalogs or invent a product quality score.</p>}
+          {!user && <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>}
           <label className="file-picker" htmlFor="catalog-file">
             <span className="file-picker-icon" aria-hidden="true">↥</span>
             <strong>{file ? file.name : "Choose a catalog file"}</strong>
