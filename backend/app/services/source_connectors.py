@@ -8,11 +8,13 @@ from __future__ import annotations
 import ipaddress
 import re
 import socket
+from urllib.parse import unquote_plus
 from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 
 
 class SourceConnectorError(RuntimeError):
@@ -112,6 +114,21 @@ def fetch_sql_server_rows(connection_url: str, *, schema: str, table: str,
     """Read a bounded projection from SQL Server; arbitrary SQL is intentionally unsupported."""
     if not connection_url.startswith("mssql+pyodbc://"):
         raise SourceConnectorError("SQL Server requires a mssql+pyodbc connection URL and configured ODBC driver.")
+    try:
+        parsed_url = make_url(connection_url)
+    except Exception:
+        raise SourceConnectorError("SQL Server connection URL is invalid.") from None
+    query = parsed_url.query
+    odbc_connect = unquote_plus(str(query.get("odbc_connect", "")))
+    connection_options = ";".join(
+        [f"{key}={value}" for key, value in query.items()] + [odbc_connect]
+    )
+    if "ODBC Driver 18" not in connection_options:
+        raise SourceConnectorError("SQL Server must use Microsoft ODBC Driver 18.")
+    if not re.search(r"Encrypt\\s*=\\s*(yes|true)", connection_options, re.IGNORECASE):
+        raise SourceConnectorError("SQL Server connections must enable encryption.")
+    if not re.search(r"TrustServerCertificate\\s*=\\s*(no|false)", connection_options, re.IGNORECASE):
+        raise SourceConnectorError("SQL Server certificate verification must remain enabled.")
     identifier = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
     if not identifier.fullmatch(schema) or not identifier.fullmatch(table):
         raise SourceConnectorError("Invalid SQL Server schema or table identifier.")
