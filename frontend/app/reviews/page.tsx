@@ -24,7 +24,9 @@ export default function ReviewsPage() {
       .catch(cause => { if (active) setError(cause instanceof Error ? cause.message : "Could not load reviews."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, []);
+  }, [user]);
+
+  if (user) return <main id="main" className="page"><div className="container panel"><h1>Customer reviews</h1><p>The public reviews page is available to visitors only.</p><Link className="button button-secondary" href="/workspace">Return to workspace</Link></div></main>;
 
   const average = reviews.length ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length : 0;
   return <main id="main" className="page"><div className="container reviews-page">
