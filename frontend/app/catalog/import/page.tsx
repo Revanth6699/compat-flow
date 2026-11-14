@@ -189,9 +189,9 @@ export default function CatalogImportPage() {
     <main id="main" className="page">
       <div className="container">
         <div className="import-heading">
-          <div className="eyebrow">Public product demo</div>
-          <h1>Validate a supplier catalog</h1>
-          <p>Validate supplier product files, identify data-quality issues and review clear recommendations before importing.</p>
+          <div className="eyebrow">{user ? "CUSTOMER CATALOG WORKSPACE" : "PUBLIC DATASET DEMO"}</div>
+          <h1>{user ? "Validate your catalog data" : "Explore your dataset quality"}</h1>
+          <p>{user ? "Validate product data using the file formats and limits available to your organization. Review field completeness, duplicates and actionable issues." : "Upload a dataset to inspect its structure, completeness, duplicates and field statistics. Product catalogs also receive CompatFlow catalog validation."}</p>
           {user && <p className="import-description"><a href="/catalog/sources">Connect a REST API, SFTP server or SQL Server source →</a></p>}
         </div>
 
@@ -199,8 +199,7 @@ export default function CatalogImportPage() {
           <h2>Catalog file validation</h2>
           <p className="import-description">{user ? "Subscribed validation: up to 25 MB per file, subject to plan entitlements and configured backend limits." : "Public demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file."}</p>
           <div className="import-description">
-            Product catalog validation. CompatFlow detects common supplier column names automatically.
-            The public demo accepts CSV, XLS and XLSX product files. JSON, XML and connected data sources require an eligible subscription.
+            {user ? "CompatFlow detects common supplier product fields and applies the validation features available on your plan. JSON, XML and connected data sources require the corresponding plan entitlement." : "Public demo accepts CSV, XLS and XLSX. Product catalogs receive catalog validation; other datasets receive structural profiling."}
           </div>
           <p className="import-description">{user ? "Files are validated in memory. This preview does not save files or commit records to your organization catalog." : "Files are validated in memory. This public demo does not save files or modify a catalog."}</p>
           {!user && <p className="column-hint">Non-product datasets are profiled using their actual columns; CompatFlow will not label them as invalid product catalogs or invent a product quality score.</p>}
