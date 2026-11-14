@@ -62,7 +62,12 @@ class ConnectorRouteDB:
         self.plan = SimpleNamespace(code="growth", is_active=True, entitlements={"supplier_catalogs": True})
 
     def scalar(self, statement):
-        return object() if self.permission_granted else None
+        if not self.permission_granted:
+            return None
+        entity = statement.column_descriptions[0].get("entity")
+        if getattr(entity, "__name__", None) == "Subscription":
+            return self.subscription
+        return object()
 
     def get(self, model, key):
         return self.plan
