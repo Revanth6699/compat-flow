@@ -188,10 +188,10 @@ export default function CatalogImportPage() {
           <p className="import-description">Public demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file. Subscribed imports: up to 25 MB, subject to plan entitlements.</p>
           <div className="import-description">
             Product catalog validation. CompatFlow detects common supplier column names automatically.
-            Public demo access is limited to CSV; additional formats and connected sources depend on your subscription.
+            The public demo accepts CSV, XLS and XLSX product files. JSON, XML and connected data sources require an eligible subscription.
           </div>
           <p className="import-description">Files are validated in memory. This public demo does not save files or modify a catalog.</p>
-          <p className="column-hint">CompatFlow detects common supplier header variants and maps them to the product catalog fields.</p>
+          <p className="column-hint">This demo validates product catalogs, not seller or customer master-data files. Download the sample product catalog to see the expected columns. Unrecognized datasets are rejected before a misleading quality score is generated.</p>
           <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>
           <label className="file-picker" htmlFor="catalog-file">
             <span className="file-picker-icon" aria-hidden="true">↥</span>
