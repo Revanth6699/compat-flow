@@ -127,3 +127,12 @@ Continue inspecting datasets individually and append each verified file here. Af
 - Sample row: `Apple,Iphone 6s plus 16gb,Working,Grade C - Acceptable Condition,16GB,ROSE GOLD,Unlocked,17`
 - Mapping observations: `make` identifies the device make/brand; `model` identifies model; `colour`, `capacity`, `network`, `grade`, and `condition` describe variant/condition attributes; `count` is quantity. The sample's values suggest the source data may have semantic column/value misalignment (e.g. `colour` contains "Working", while `condition` contains "Unlocked"), so don't infer mappings from names alone without validating row values.
 - Current mapper gap: no canonical fields for brand/make, model, variant attributes, grade, condition, or quantity. Do not map `make` to manufacturer at full confidence or `model` to manufacturer part number without a source-specific rule.
+
+
+## Implementation update after the first 10 samples
+
+- Implemented common delimiter detection for comma, semicolon, tab, and pipe-separated files in `backend/app/services/catalog_csv.py`.
+- Added regression coverage for semicolon supplier feeds, tab-delimited feeds, and pipe-delimited feeds in `backend/tests/test_catalog_csv.py`.
+- The change deliberately does not add speculative aliases for generic IDs, brand/vendor-to-manufacturer, make/model-to-MPN, or retail product IDs.
+- This is an initial parser improvement, not proof that every supplier CSV dialect is supported. Quoting, encoding, malformed headers, and unusual delimiters still require dedicated test coverage.
+- CI/test execution status: pending verification after the latest commits.
