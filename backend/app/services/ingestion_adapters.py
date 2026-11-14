@@ -234,12 +234,18 @@ def parse_xml(data: bytes, *, record_tag: str | None = None,
     elif selected_tag is not None:
         elements = candidates.get(selected_tag, [])
     else:
-        repeated = [name for name, items in candidates.items() if len(items) > 1]
-        if len(repeated) > 1:
+        repeated_groups = []
+        for parent in root.iter():
+            sibling_groups: dict[str, list[Any]] = {}
+            for child in list(parent):
+                sibling_groups.setdefault(_local_name(child.tag), []).append(child)
+            for name, items in sibling_groups.items():
+                if len(items) > 1 and any(list(item) or item.attrib for item in items):
+                    repeated_groups.append((name, items))
+        if len(repeated_groups) > 1:
             raise IngestionParseError("XML contains multiple repeated record groups; supply record_tag.")
-        if len(repeated) == 1:
-            selected_tag = repeated[0]
-            elements = candidates[selected_tag]
+        if len(repeated_groups) == 1:
+            selected_tag, elements = repeated_groups[0]
         elif len(children) == 1 and list(children[0]):
             selected_tag = _local_name(children[0].tag)
             elements = children
