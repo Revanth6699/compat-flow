@@ -61,7 +61,7 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
         raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded.") from None
 
     try:
-        result = parse_catalog_csv(content, profile_id=profile_id, column_mapping=column_mapping)
+        result = parse_catalog_csv(content, profile_id=profile_id, column_mapping=column_mapping, allow_incomplete_mapping=column_mapping is None)
     except CatalogCSVValidationError as exc:
         message = str(exc)
         status_code = 413 if "row limit" in message else 422
