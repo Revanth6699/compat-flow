@@ -157,3 +157,109 @@ def test_product_cannot_attach_supplier_from_another_organization():
         assert "suppliers.organization_id" in str(supplier_query)
     finally:
         clear_overrides()
+
+
+
+def test_new_catalog_record_endpoints_require_authentication():
+    client = TestClient(app)
+    for path in ("/api/v1/product-variants", "/api/v1/supplier-offers", "/api/v1/inventory-snapshots"):
+        assert client.get(path).status_code == 401
+
+
+def test_product_variant_read_is_scoped_to_authenticated_organization():
+    organization_id = uuid4()
+    db = FakeDB(permission_granted=True)
+    install_auth_overrides(organization_id, "member", db)
+    try:
+        response = TestClient(app).get("/api/v1/product-variants")
+        assert response.status_code == 200
+        compiled = db.statements[-1].compile(dialect=postgresql.dialect())
+        assert organization_id in compiled.params.values()
+        assert "product_variants.organization_id" in str(compiled)
+    finally:
+        clear_overrides()
+
+
+def test_supplier_offer_read_is_scoped_to_authenticated_organization():
+    organization_id = uuid4()
+    db = FakeDB(permission_granted=True)
+    install_auth_overrides(organization_id, "member", db)
+    try:
+        response = TestClient(app).get("/api/v1/supplier-offers")
+        assert response.status_code == 200
+        compiled = db.statements[-1].compile(dialect=postgresql.dialect())
+        assert organization_id in compiled.params.values()
+        assert "supplier_offers.organization_id" in str(compiled)
+    finally:
+        clear_overrides()
+
+
+def test_inventory_snapshot_read_is_scoped_to_authenticated_organization():
+    organization_id = uuid4()
+    db = FakeDB(permission_granted=True)
+    install_auth_overrides(organization_id, "member", db)
+    try:
+        response = TestClient(app).get("/api/v1/inventory-snapshots")
+        assert response.status_code == 200
+        compiled = db.statements[-1].compile(dialect=postgresql.dialect())
+        assert organization_id in compiled.params.values()
+        assert "inventory_snapshots.organization_id" in str(compiled)
+    finally:
+        clear_overrides()
+
+
+def test_variant_cannot_reference_product_from_another_organization():
+    organization_id = uuid4()
+    db = FakeDB(permission_granted=True)
+    install_auth_overrides(organization_id, "member", db)
+    try:
+        response = TestClient(app).post("/api/v1/product-variants", json={
+            "product_id": str(uuid4()),
+            "variant_sku": "VAR-1",
+            "attributes": {"color": "blue", "size": "M"},
+        })
+        assert response.status_code == 404
+        compiled = db.statements[-1].compile(dialect=postgresql.dialect())
+        assert organization_id in compiled.params.values()
+        assert "products.organization_id" in str(compiled)
+    finally:
+        clear_overrides()
+
+
+def test_supplier_offer_cannot_reference_supplier_from_another_organization():
+    organization_id = uuid4()
+    db = FakeDB(permission_granted=True)
+    install_auth_overrides(organization_id, "member", db)
+    try:
+        response = TestClient(app).post("/api/v1/supplier-offers", json={
+            "supplier_id": str(uuid4()),
+            "supplier_sku": "SUP-1",
+            "unit_price": "12.50",
+            "currency": "USD",
+        })
+        assert response.status_code == 404
+        compiled = db.statements[-1].compile(dialect=postgresql.dialect())
+        assert organization_id in compiled.params.values()
+        assert "suppliers.organization_id" in str(compiled)
+    finally:
+        clear_overrides()
+
+
+def test_inventory_snapshot_cannot_reference_product_from_another_organization():
+    organization_id = uuid4()
+    db = FakeDB(permission_granted=True)
+    install_auth_overrides(organization_id, "member", db)
+    try:
+        response = TestClient(app).post("/api/v1/inventory-snapshots", json={
+            "product_id": str(uuid4()),
+            "warehouse_code": "WH-01",
+            "quantity_on_hand": "10",
+            "quantity_reserved": "2",
+            "quantity_available": "8",
+        })
+        assert response.status_code == 404
+        compiled = db.statements[-1].compile(dialect=postgresql.dialect())
+        assert organization_id in compiled.params.values()
+        assert "products.organization_id" in str(compiled)
+    finally:
+        clear_overrides()
