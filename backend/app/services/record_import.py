@@ -90,7 +90,8 @@ def _resolve_mapping(
         confidence = 1.0
     else:
         mapping: dict[str, str] = {}
-        used: set[str] = set()
+        ambiguous_fields: set[str] = set()
+        unmapped_ambiguous: list[str] = []
         for header in headers:
             normalized = _normalize(header)
             candidate = normalized if normalized in allowed else None
@@ -99,14 +100,13 @@ def _resolve_mapping(
                     (field for field in allowed if normalized in ALIASES.get(field, set())),
                     None,
                 )
-            if candidate is None:
+            if candidate is None or candidate in ambiguous_fields:
                 continue
-            if candidate in mapping or header in used:
-                raise RecordMappingError(
-                    f"Ambiguous source columns map to '{candidate}'. Supply a manual mapping."
-                )
+            if candidate in mapping:
+                unmapped_ambiguous.extend([mapping.pop(candidate), header])
+                ambiguous_fields.add(candidate)
+                continue
             mapping[candidate] = header
-            used.add(header)
         confidence = 0.95
 
     mapped_sources = set(mapping.values())
@@ -115,6 +115,8 @@ def _resolve_mapping(
         for field, source in mapping.items()
     ]
     unmapped = [header for header in headers if header not in mapped_sources]
+    if manual_mapping is None:
+        unmapped.extend(header for header in unmapped_ambiguous if header not in unmapped)
     if record_type == "product_variants":
         unmapped = [header for header in unmapped if not header.startswith("attributes.")]
     return mapping, unmapped, details
