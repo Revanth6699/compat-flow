@@ -119,16 +119,29 @@ async def suggest_field_mappings(
         confidence = item.get("confidence")
         rationale = item.get("rationale")
         evidence_items = item.get("evidence")
-        if (source_header not in header_set or candidate not in RECORD_FIELDS[record_type]
+        if (not isinstance(source_header, str) or source_header not in header_set
+                or not isinstance(candidate, str) or candidate not in RECORD_FIELDS[record_type]
                 or isinstance(confidence, bool) or not isinstance(confidence, (int, float))
                 or not 0 <= confidence <= 1 or not isinstance(rationale, str)
                 or not isinstance(evidence_items, list)):
+            continue
+        allowed_evidence = set(headers)
+        allowed_evidence.update(
+            str(row[source_header])[:160]
+            for row in sample_records
+            if row.get(source_header) is not None
+        )
+        verified_evidence = [
+            value[:240] for value in evidence_items[:5]
+            if isinstance(value, str) and value in allowed_evidence
+        ]
+        if not verified_evidence:
             continue
         suggestions.append(FieldMappingSuggestion(
             source_header=source_header,
             candidate_field=candidate,
             confidence=float(confidence),
             rationale=rationale[:500],
-            evidence=[str(value)[:240] for value in evidence_items[:5]],
+            evidence=verified_evidence,
         ))
     return MappingAssistantResult("suggestions_ready", suggestions, "Review every suggestion before applying a mapping.")
