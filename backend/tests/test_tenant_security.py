@@ -297,3 +297,114 @@ def test_product_identifier_cannot_reference_product_from_another_organization()
         assert "products.organization_id" in str(compiled)
     finally:
         clear_overrides()
+
+
+def test_postgres_enforces_live_tenant_isolation_and_viewer_permissions():
+    """Exercise real PostgreSQL rows through the API, not only compiled SQL."""
+    from app.core.database import SessionLocal
+    from app.models import Organization, Product, Subscription, SubscriptionPlan, User
+
+    db = SessionLocal()
+    organization_a = Organization(name=f"Tenant A {uuid4().hex[:8]}")
+    organization_b = Organization(name=f"Tenant B {uuid4().hex[:8]}")
+    plan_code = f"tenant_test_{uuid4().hex[:12]}"
+    owner = User(
+        organization_id=organization_a.id,
+        auth_user_id=uuid4(),
+        email=f"tenant-owner-{uuid4().hex[:8]}@example.test",
+        role="member",
+        is_active=True,
+        account_type="subscriber",
+    )
+    plan = SubscriptionPlan(
+        code=plan_code,
+        name=f"Tenant test plan {uuid4().hex[:8]}",
+        currency="USD",
+        is_active=True,
+        entitlements={"supplier_catalogs": True},
+    )
+    product_a = Product(
+        organization_id=organization_a.id,
+        sku=f"A-{uuid4().hex[:8]}",
+        name="Tenant A product",
+        manufacturer="Maker A",
+        part_number="A-100",
+        category="Test",
+    )
+    product_b = Product(
+        organization_id=organization_b.id,
+        sku=f"B-{uuid4().hex[:8]}",
+        name="Tenant B product",
+        manufacturer="Maker B",
+        part_number="B-100",
+        category="Test",
+    )
+    try:
+        db.add_all([organization_a, organization_b, plan])
+        db.flush()
+        owner.organization_id = organization_a.id
+        db.add_all([
+            owner,
+            product_a,
+            product_b,
+            Subscription(
+                organization_id=organization_a.id,
+                user_id=owner.id,
+                plan_code=plan_code,
+                status="active",
+                billing_interval="month",
+            ),
+        ])
+        db.commit()
+
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            identity=SupabaseIdentity(owner.auth_user_id, owner.email, "integration-test-token"),
+            profile=owner,
+        )
+        app.dependency_overrides[get_db] = lambda: db
+        client = TestClient(app)
+
+        listed = client.get("/api/v1/products")
+        assert listed.status_code == 200
+        assert [row["id"] for row in listed.json()] == [str(product_a.id)]
+        assert listed.json()[0]["sku"] == product_a.sku
+
+        foreign_lookup = client.get(f"/api/v1/products/{product_b.id}")
+        assert foreign_lookup.status_code == 404
+
+        viewer = User(
+            organization_id=organization_a.id,
+            auth_user_id=uuid4(),
+            email=f"tenant-viewer-{uuid4().hex[:8]}@example.test",
+            role="viewer",
+            is_active=True,
+            account_type="subscriber",
+        )
+        db.add(viewer)
+        db.commit()
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            identity=SupabaseIdentity(viewer.auth_user_id, viewer.email, "integration-test-token"),
+            profile=viewer,
+        )
+
+        viewer_read = client.get("/api/v1/products")
+        assert viewer_read.status_code == 200
+        assert [row["id"] for row in viewer_read.json()] == [str(product_a.id)]
+        viewer_write = client.post("/api/v1/products", json={
+            "sku": f"DENIED-{uuid4().hex[:8]}",
+            "name": "Should not be created",
+            "manufacturer": "Maker",
+            "part_number": "DENIED-1",
+            "category": "Test",
+        })
+        assert viewer_write.status_code == 403
+    finally:
+        clear_overrides()
+        try:
+            db.rollback()
+            db.delete(organization_a)
+            db.delete(organization_b)
+            db.delete(plan)
+            db.commit()
+        finally:
+            db.close()
