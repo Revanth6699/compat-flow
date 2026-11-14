@@ -33,6 +33,7 @@ from app.schemas import (
 )
 from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
+from app.services.catalog_ingestion import persist_validated_import
 from app.services.mapping_assistant import suggest_field_mappings
 from app.services.catalog_csv import (
     CatalogCSVValidationError,
@@ -289,6 +290,53 @@ async def suggest_multiformat_mappings(
         ],
         "source_data_sent": ai_opt_in and result.status != "provider_unconfigured",
     }
+
+
+
+@router.post("/catalog/import/commit", status_code=201)
+async def commit_multiformat_import(
+    file: UploadFile = File(...),
+    record_type: str = Form(...),
+    column_mapping_json: str | None = Form(None),
+    sheet_name: str | None = Form(None),
+    header_row: int = Form(1, ge=1, le=1000),
+    json_record_path: str | None = Form(None),
+    xml_record_tag: str | None = Form(None),
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    """Persist a reviewed multi-format import with row-level errors and lineage."""
+    filename = (file.filename or "").strip()
+    if not filename or len(filename) > 255:
+        await file.close()
+        raise HTTPException(status_code=400, detail="A valid filename is required.")
+    try:
+        raw = await file.read(settings.import_max_upload_bytes + 1)
+    finally:
+        await file.close()
+    if len(raw) > settings.import_max_upload_bytes:
+        raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
+    if not raw:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    try:
+        mapping = json.loads(column_mapping_json) if column_mapping_json else None
+        if mapping is not None and (
+            not isinstance(mapping, dict)
+            or not all(isinstance(key, str) and isinstance(value, str) for key, value in mapping.items())
+        ):
+            raise ValueError
+        parsed = parse_source(
+            raw, filename, sheet_name=sheet_name, header_row=header_row,
+            json_record_path=json_record_path, xml_record_tag=xml_record_tag,
+        )
+        result = validate_parsed_records(parsed, record_type, mapping)
+    except (IngestionParseError, RecordMappingError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    return persist_validated_import(
+        db=db, organization_id=current.profile.organization_id,
+        filename=filename, parsed=parsed, result=result,
+    )
 
 
 @router.post("/catalog/import")
