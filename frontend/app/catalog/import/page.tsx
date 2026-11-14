@@ -207,6 +207,18 @@ export default function CatalogImportPage() {
           {error && <div className="import-error" role="alert">{error}</div>}
         </section>
 
+        {file && user && (
+          <section className="panel result-section" aria-live="polite">
+            <h3>AI-assisted mapping suggestions</h3>
+            <p className="import-description">AI is optional. If enabled and a provider is configured, CompatFlow sends the source headers and up to five bounded sample values per header to that external HTTPS provider. Suggestions are never applied automatically.</p>
+            <label><input type="checkbox" checked={aiConsent} onChange={(event) => { setAiConsent(event.target.checked); setAiResult(null); }} /> I consent to sending this bounded sample evidence to the configured AI provider for mapping suggestions.</label>
+            <button className="button button-secondary" type="button" onClick={handleSuggestMappings} disabled={!aiConsent || loading}>Suggest mappings with AI</button>
+            {aiResult && <><p className="import-description">{aiResult.message} {aiResult.source_data_sent ? "Sample evidence was sent to the configured provider." : "No sample evidence was sent."}</p>
+              {aiResult.suggestions.length > 0 && <><ul className="error-list">{aiResult.suggestions.map((item, index) => <li key={index}><strong>{item.source_header} → {item.candidate_field}</strong> ({Math.round(item.confidence * 100)}%): {item.rationale}<br />Evidence: {item.evidence.join("; ")}</li>)}</ul>
+                <button className="button button-secondary" type="button" onClick={applyAiSuggestions}>Apply suggestions to mapping form</button></>}
+            </>}
+          </section>
+        )}
         {multiResult && (
           <section className="import-results" aria-live="polite">
             <div className="results-heading">
@@ -230,16 +242,6 @@ export default function CatalogImportPage() {
               </tbody></table></div>
               <button className="button button-secondary" type="button" onClick={handleValidate} disabled={loading || !file}>Revalidate with selected mapping</button>
               {multiResult.unmapped_headers.length > 0 && <p className="import-description">Unmapped columns: {multiResult.unmapped_headers.join(", ")}</p>}
-            </div>
-            <div className="panel result-section">
-              <h3>AI-assisted mapping suggestions</h3>
-              <p className="import-description">AI is optional. If enabled and a provider is configured, CompatFlow sends the source headers and up to five bounded sample values per header to that external HTTPS provider. Suggestions are never applied automatically.</p>
-              <label><input type="checkbox" checked={aiConsent} onChange={(event) => { setAiConsent(event.target.checked); setAiResult(null); }} /> I consent to sending this bounded sample evidence to the configured AI provider for mapping suggestions.</label>
-              <button className="button button-secondary" type="button" onClick={handleSuggestMappings} disabled={!file || !user || !aiConsent || loading}>Suggest mappings with AI</button>
-              {aiResult && <><p className="import-description">{aiResult.message} {aiResult.source_data_sent ? "Sample evidence was sent to the configured provider." : "No sample evidence was sent."}</p>
-                {aiResult.suggestions.length > 0 && <><ul className="error-list">{aiResult.suggestions.map((item, index) => <li key={index}><strong>{item.source_header} → {item.candidate_field}</strong> ({Math.round(item.confidence * 100)}%): {item.rationale}<br />Evidence: {item.evidence.join("; ")}</li>)}</ul>
-                  <button className="button button-secondary" type="button" onClick={applyAiSuggestions}>Apply suggestions to mapping form</button></>}
-              </>}
             </div>
             <div className="panel result-section">
               <h3>Required field completeness</h3>
