@@ -38,7 +38,7 @@ HEADER_ALIASES = {
         "product_mpn": 0.98, "google_shopping_manufacturer_part_number_mpn": 0.96, "mpn": 0.98, "part_no": 0.96,
     },
     "category": {
-        "category": 1.0, "product_category": 0.99, "category_name": 0.98,
+        "category": 1.0, "product_category": 0.99, "category_name": 0.98, "top_category": 0.97,
         "product_type": 0.92, "item_type": 0.88,
     },
     "compatibility": {
