@@ -343,18 +343,17 @@ def test_postgres_enforces_live_tenant_isolation_and_viewer_permissions():
         db.add_all([organization_a, organization_b, plan])
         db.flush()
         owner.organization_id = organization_a.id
-        db.add_all([
-            owner,
-            product_a,
-            product_b,
-            Subscription(
-                organization_id=organization_a.id,
-                user_id=owner.id,
-                plan_code=plan_code,
-                status="active",
-                billing_interval="month",
-            ),
-        ])
+        product_a.organization_id = organization_a.id
+        product_b.organization_id = organization_b.id
+        db.add_all([owner, product_a, product_b])
+        db.flush()
+        db.add(Subscription(
+            organization_id=organization_a.id,
+            user_id=owner.id,
+            plan_code=plan_code,
+            status="active",
+            billing_interval="month",
+        ))
         db.commit()
 
         app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
