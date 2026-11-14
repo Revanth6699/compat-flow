@@ -164,6 +164,36 @@ def _member_seat_limit(db: Session, organization_id: UUID) -> int | None:
     return limit
 
 
+def _member_seat_usage(db: Session, organization_id: UUID) -> dict:
+    limit = _member_seat_limit(db, organization_id)
+    active_members = db.scalar(
+        select(func.count(User.id)).where(
+            User.organization_id == organization_id,
+            User.is_active.is_(True),
+        )
+    ) or 0
+    now = datetime.now(timezone.utc)
+    pending_invitations = db.scalar(
+        select(func.count(UserInvitation.id)).where(
+            UserInvitation.organization_id == organization_id,
+            UserInvitation.accepted_at.is_(None),
+            UserInvitation.revoked_at.is_(None),
+            UserInvitation.expires_at > now,
+        )
+    ) or 0
+    occupied = active_members + pending_invitations
+    return {
+        "member_seat_limit": limit,
+        "active_members": active_members,
+        "pending_invitations": pending_invitations,
+        "occupied_seats": occupied,
+        "available_seats": max(0, limit - occupied) if limit is not None else None,
+        "over_limit": limit is not None and occupied > limit,
+        "active_members_over_limit": limit is not None and active_members > limit,
+        "existing_members_retained": True,
+    }
+
+
 def _ensure_invitation_seat_available(
     db: Session,
     organization_id: UUID,
