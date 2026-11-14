@@ -179,6 +179,47 @@ async def preview_catalog_import(
 
 
 
+@router.post("/catalog/import/preview-records")
+async def preview_public_spreadsheet(file: UploadFile = File(...)):
+    """Public, stateless XLS/XLSX product validation with the same small demo limits as CSV."""
+    filename = (file.filename or "").strip()
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if extension not in {"xlsx", "xls"}:
+        await file.close()
+        raise HTTPException(status_code=415, detail="The public spreadsheet demo accepts XLSX and XLS files only.")
+    if not filename or len(filename) > 255:
+        await file.close()
+        raise HTTPException(status_code=400, detail="A valid filename is required.")
+    upload_limit = min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
+    try:
+        raw = await file.read(upload_limit + 1)
+    finally:
+        await file.close()
+    if len(raw) > upload_limit:
+        raise HTTPException(status_code=413, detail="Public demo uploads cannot exceed 5 MB.")
+    try:
+        parsed = parse_source(raw, filename)
+        result = validate_parsed_records(parsed, "products", None)
+    except (IngestionParseError, RecordMappingError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    return {
+        "filename": filename,
+        "format": parsed.format,
+        "record_type": "products",
+        "total_records": result.total_records,
+        "valid_records": len(result.valid_records),
+        "invalid_records": result.invalid_records,
+        "mappings": result.mappings,
+        "unmapped_headers": result.unmapped_headers,
+        "field_completeness": result.field_completeness,
+        "errors": result.errors[:50],
+        "preview": result.valid_records[:10],
+        "persisted": False,
+        "validation_scope": "schema_and_in_file_duplicates",
+        "referential_checks": "not_run",
+    }
+
+
 @router.post("/catalog/import/validate-records")
 async def validate_multiformat_records(
     file: UploadFile = File(...),
