@@ -995,6 +995,8 @@ button:disabled, .button:disabled {
 /* Account deletion and customer reviews */
 .danger-zone { border-color: #FECACA; }
 .danger-zone h2 { color: var(--red); }
+.delete-confirmation-input { display: block; width: 100%; max-width: 560px; min-height: 48px; margin: 8px 0 10px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; color: var(--ink); text-align: left; letter-spacing: .02em; }
+.delete-confirmation-input:focus { border-color: var(--navy); outline: 3px solid rgba(36,82,125,.14); outline-offset: 1px; }
 .button-danger { background: var(--red); border-color: var(--red); color: #fff; }
 .button-danger:hover { background: #B91C1C; border-color: #B91C1C; }
 .button-danger:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
