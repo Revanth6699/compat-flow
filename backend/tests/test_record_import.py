@@ -54,3 +54,11 @@ def test_manual_mapping_is_record_type_scoped():
     result = validate_parsed_records(parsed, "products", mapping)
     assert len(result.valid_records) == 1
     assert result.mappings[0]["confidence"] == 1.0
+
+
+def test_ambiguous_aliases_are_returned_for_manual_review():
+    parsed = parse_json(b'[{"sku":"A","product_sku":"B","name":"Widget","manufacturer":"Acme","part_number":"P1","category":"Parts"}]')
+    result = validate_parsed_records(parsed, "products")
+    assert "sku" not in {item["field"] for item in result.mappings}
+    assert "sku" in result.unmapped_headers
+    assert "product_sku" in result.unmapped_headers
