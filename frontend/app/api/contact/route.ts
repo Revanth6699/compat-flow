@@ -12,7 +12,7 @@ export async function POST(request:Request){
   if(intent==="demo"){
    const apiBase=process.env.NEXT_PUBLIC_API_BASE_URL;
    if(!apiBase?.startsWith("https://"))return NextResponse.json({error:"Demo requests are not configured. Please try again later."},{status:503});
-   const upstream=await fetch(`${apiBase.replace(/\\/$/,"")}/api/v1/demo-requests`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,email,organization,role,message})});
+   const upstream=await fetch(`${apiBase.replace(/\/$/,"")}/api/v1/demo-requests`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,email,organization,role,message})});
    if(!upstream.ok)return NextResponse.json({error:"We could not save your demo request. Please try again later."},{status:upstream.status===422?400:502});
    return NextResponse.json({ok:true});
   }
