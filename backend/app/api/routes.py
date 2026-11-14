@@ -9,7 +9,7 @@ from uuid import UUID
 
 from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.database import get_db
-from app.models import InventorySnapshot, Product, ProductVariant, Supplier, SupplierOffer
+from app.models import InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer
 from app.core.config import settings
 from app.schemas import (
     HealthResponse,
@@ -28,6 +28,8 @@ from app.schemas import (
     SupplierOfferResponse,
     InventorySnapshotCreateRequest,
     InventorySnapshotResponse,
+    ProductIdentifierCreateRequest,
+    ProductIdentifierResponse,
 )
 from app.services.catalog_csv import (
     CatalogCSVValidationError,
@@ -443,3 +445,50 @@ def create_inventory_snapshot(
     db.commit()
     db.refresh(snapshot)
     return snapshot
+
+
+@router.get("/product-identifiers", response_model=list[ProductIdentifierResponse])
+def list_product_identifiers(
+    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    return list(db.scalars(
+        select(ProductIdentifier)
+        .where(ProductIdentifier.organization_id == current.profile.organization_id)
+        .order_by(ProductIdentifier.created_at.desc())
+        .limit(500)
+    ).all())
+
+
+@router.post("/product-identifiers", response_model=ProductIdentifierResponse, status_code=201)
+def create_product_identifier(
+    payload: ProductIdentifierCreateRequest,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    organization_id = current.profile.organization_id
+    product = db.scalar(select(Product.id).where(
+        Product.id == payload.product_id,
+        Product.organization_id == organization_id,
+    ))
+    if product is None:
+        raise HTTPException(status_code=404, detail="Product not found.")
+    identifier = ProductIdentifier(
+        organization_id=organization_id,
+        product_id=payload.product_id,
+        identifier_type=payload.identifier_type,
+        namespace=payload.namespace.strip(),
+        value=payload.value.strip(),
+        source_reference=payload.source_reference,
+        is_primary=payload.is_primary,
+    )
+    db.add(identifier)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="This identifier already exists in the organization and namespace.") from None
+    db.refresh(identifier)
+    return identifier
