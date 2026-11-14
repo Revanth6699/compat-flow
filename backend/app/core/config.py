@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     connector_allowed_hosts: str = ""
     sftp_known_hosts_path: str = ""
 
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
+    razorpay_plan_ids_json: str = "{}"
+
     model_config = SettingsConfigDict(
         env_file="../.env",
         extra="ignore",
