@@ -227,6 +227,27 @@ def test_product_type_is_not_automatically_mapped_to_category():
     assert "product_type" in result.unmapped_headers
 
 
+def test_ambiguous_item_identifiers_are_not_automatically_mapped_to_sku():
+    for header in ("item_code", "item_number", "part_id", "stock_code"):
+        content = (
+            f"{header},product_name,manufacturer,mpn,category\n"
+            "ID-001,Widget,Maker A,MPN-001,Tools\n"
+        )
+        result = parse_catalog_csv(content, allow_incomplete_mapping=True)
+        assert "sku" not in {item.field for item in result.column_mappings}
+        assert header in result.unmapped_headers
+
+
+def test_generic_part_no_is_not_assumed_to_be_manufacturer_part_number():
+    content = (
+        "sku,name,manufacturer,part_no,category\n"
+        "SKU-1,Seal,Maker A,SP-100,Parts\n"
+    )
+    result = parse_catalog_csv(content, allow_incomplete_mapping=True)
+    assert "part_number" not in {item.field for item in result.column_mappings}
+    assert "part_no" in result.unmapped_headers
+
+
 def test_header_normalization_accepts_spaces_and_punctuation():
     content = (
         " Product SKU , Product Name , Manufacturer Name , Part No. , Category Name \n"
