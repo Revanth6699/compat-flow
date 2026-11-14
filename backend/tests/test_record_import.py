@@ -37,10 +37,11 @@ def test_validate_product_identifier_records_and_duplicate_detection():
     assert result.errors[0]["error_code"] == "DUPLICATE_IN_FILE"
 
 
-def test_required_mapping_fields_must_be_explicit():
+def test_missing_required_mappings_are_reported_as_row_validation_errors():
     parsed = parse_json(b'[{"sku":"001","name":"Widget"}]')
-    with pytest.raises(RecordMappingError, match="Required fields"):
-        validate_parsed_records(parsed, "products")
+    result = validate_parsed_records(parsed, "products")
+    assert result.invalid_records == 1
+    assert any(error["field"] == "manufacturer" for error in result.errors)
 
 
 def test_manual_mapping_is_record_type_scoped():
