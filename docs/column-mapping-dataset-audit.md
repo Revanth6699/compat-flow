@@ -783,3 +783,12 @@ Continue inspecting datasets individually and append each verified file here. Af
 5. Manufacturing procurement feeds distinguish manufacturer from vendor, and unit cost may depend on an explicit pricing basis.
 6. Inventory and perishable planning feeds include derived contributions, demand assumptions, reorder rules, shelf life, and business-type-specific stock definitions. These are not product identity fields.
 7. Templates can contain malformed boolean values and blank required identifiers. Structural import should preserve the source value and deterministic validation should report the exact malformed cell.
+
+
+## Implementation update after the first 70 samples
+
+- Added `sku_id` and `sku_code` as explicit SKU aliases, supported by separate observed product-master files. Generic `product_id` remains unmapped.
+- Added tests for both aliases. The top_category and UTF-8 BOM regression tests passed in CI run 43559543754.
+- CI run 43559764619 is checking the latest SKU ID/code alias tests. Backend container initialization and frontend setup have started; test and build steps are still pending.
+- No barcode/GTIN aliases were added. UPC, EAN, GTIN-14, ASIN, and marketplace item identifiers remain distinct from SKU and MPN.
+- The AI mapping design remains a controlled suggestion layer; no model or external AI provider is active.
