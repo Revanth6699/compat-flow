@@ -35,7 +35,7 @@ function SettingsContent() {
   }
 
   return <main id="main" className="page"><div className="container account-settings">
-    <header className="workspace-heading"><div><span className="eyebrow">ACCOUNT</span><h1>Profile settings</h1><p>Manage your account details and sign-in credentials.</p></div><Link className="button button-secondary" href="/workspace">Back to workspace</Link></header>
+    <header className="workspace-heading"><div><span className="eyebrow">ACCOUNT</span><h1>Profile settings</h1><p>Manage your account details and sign-in credentials.</p></div><div className="workspace-actions"><Link className="button button-secondary" href="/billing">Billing and subscription</Link><Link className="button button-secondary" href="/workspace">Back to workspace</Link></div></header>
     <section className="panel settings-panel"><h2>Profile information</h2><form className="auth-form" onSubmit={saveProfile}>
       <label htmlFor="profile-name">Full name</label><input id="profile-name" autoComplete="name" maxLength={100} value={fullName} onChange={event => setFullName(event.target.value)} placeholder="Enter your name" />
       <label htmlFor="profile-email">Account email</label><input id="profile-email" type="email" value={user?.email || ""} readOnly aria-describedby="email-help" /><small id="email-help">Your sign-in email is managed by your authentication account. Contact an administrator if it needs to change.</small>
