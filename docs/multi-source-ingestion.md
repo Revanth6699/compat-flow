@@ -43,7 +43,7 @@ Not yet an end-to-end production import workflow:
 - The preview endpoint does not persist data.
 - No connector configuration UI, encrypted credential vault, API pagination scheduler, SFTP polling/deduplication scheduler, or SQL Server incremental watermark scheduler exists.
 - Durable job orchestration, retry/recovery, full row/item lineage storage, and transactional batch persistence remain to be implemented.
-- The frontend does not yet expose format selectors, mapping review, or connector setup.
-- AI suggestions are exposed through a backend endpoint only; the frontend mapping-review/consent UI is not implemented. No AI provider credentials are configured and no model has been trained.
+- The frontend import page now exposes CSV/XLSX/XLS/JSON/XML uploads, record-type selection, field-mapping review, and explicit AI sample-consent controls. API, SFTP, and SQL Server connector configuration screens are not implemented.
+- AI suggestions are exposed through a backend endpoint and an explicit-consent frontend flow. No AI provider credentials are configured and no model has been trained.
 
 Do not label these incomplete capabilities generally available. SQL Server requires the Python pyodbc package, Microsoft ODBC Driver 18, and a least-privilege read-only login in the runtime environment. Configure encryption and certificate verification; never disable TLS verification for a production source.
