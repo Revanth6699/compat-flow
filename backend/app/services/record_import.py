@@ -109,10 +109,6 @@ def _resolve_mapping(
             used.add(header)
         confidence = 0.95
 
-    required = {
-        name for name, field in RECORD_MODELS[record_type].model_fields.items()
-        if field.is_required()
-    }
     mapped_sources = set(mapping.values())
     details = [
         {"field": field, "source_header": source, "confidence": confidence}
