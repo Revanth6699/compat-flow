@@ -145,9 +145,9 @@ def test_public_spreadsheet_preview_rejects_json():
 
 def test_public_product_preview_rejects_seller_dataset_instead_of_scoring_every_row_invalid():
     payload = (
-        "seller_id,seller_zip_code_prefix,seller_city,seller_state\\n"
-        "001,01001,sao paulo,SP\\n"
-        "002,02002,rio de janeiro,RJ\\n"
+        "seller_id,seller_zip_code_prefix,seller_city,seller_state\n"
+        "001,01001,sao paulo,SP\n"
+        "002,02002,rio de janeiro,RJ\n"
     )
     response = client.post(
         "/api/v1/catalog/import/preview",
@@ -162,7 +162,7 @@ def test_public_product_preview_rejects_seller_dataset_instead_of_scoring_every_
 def test_public_dataset_profile_accepts_seller_dataset_and_returns_real_statistics():
     response = client.post(
         "/api/v1/catalog/import/profile",
-        files={"file": ("olist_sellers_dataset.csv", b"seller_id,seller_zip_code_prefix,seller_city,seller_state\\ns1,12345,city_a,SP\\ns2,23456,city_b,RJ\\ns2,23456,city_b,RJ", "text/csv")},
+        files={"file": ("olist_sellers_dataset.csv", b"seller_id,seller_zip_code_prefix,seller_city,seller_state\ns1,12345,city_a,SP\ns2,23456,city_b,RJ\ns2,23456,city_b,RJ", "text/csv")},
     )
     assert response.status_code == 200, response.text
     result = response.json()
