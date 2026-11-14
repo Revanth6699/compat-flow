@@ -80,7 +80,7 @@ function BillingContent() {
     }
   }, []);
 
-  useEffect(() => { void loadSubscription(); }, [loadSubscription]);
+  useEffect(() => { void Promise.resolve().then(() => loadSubscription()); }, [loadSubscription]);
 
   async function startCheckout() {
     setError("");
