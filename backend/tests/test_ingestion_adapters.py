@@ -79,4 +79,4 @@ def test_xml_single_record_root_is_not_split_into_field_records():
 
 def test_xml_multiple_repeated_groups_require_explicit_record_tag():
     with pytest.raises(IngestionParseError, match="multiple repeated record groups"):
-        parse_xml(b'<feed><products><product/><product/></products><variants><variant/><variant/></variants></feed>')
+        parse_xml(b'<feed><products><product><sku>A</sku></product><product><sku>B</sku></product></products><variants><variant><code>A</code></variant><variant><code>B</code></variant></variants></feed>')
