@@ -1143,3 +1143,11 @@ Continue inspecting datasets individually and append each verified file here. Af
 - Updated `docs/column-mapping-ai-design.md` to reference the benchmark seed and source-separated evaluation rules.
 - CI run 43560733690 passed the manufacturer_part alias and previous changes.
 - A later CI failure was caused by an old punctuation-normalization test still using the ambiguous generic header `Part No.` after that alias was intentionally removed. The test now uses explicit `Manufacturer Part Number`; generic `part_no` has its own negative test. The corrected run 43561207116 is in progress; do not claim it green until completion.
+
+
+## Final benchmark implementation update
+
+- The 72-example reviewed mapping seed is now checked by backend regression tests: positive examples must match the deterministic alias map; negative/manual-review examples must remain unmapped.
+- The latest alias cleanup removes item_code, item_number, part_id, stock_code, and generic part_no from automatic identifier mapping; those fields remain available for explicit manual mapping or future AI suggestions.
+- Product type and item type are no longer automatically treated as category. The latest test fixture was updated to use an explicit Manufacturer Part Number header instead of the ambiguous Part No. label.
+- CI is still being rerun after these final changes. The last completed successful run is 43560733690; later failures identified stale tests and an alias block that had not been fully replaced. The fix and benchmark regression test are now committed, but must pass CI before this branch is considered green.
