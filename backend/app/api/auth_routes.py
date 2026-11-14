@@ -3,9 +3,9 @@ from hashlib import sha256
 import secrets
 from uuid import uuid4, UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+import httpx\nfrom fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -18,7 +18,7 @@ from app.core.auth import (
     get_active_plan,
     require_verified_supabase_email,
 )
-from app.core.database import get_db
+from app.core.database import get_db\nfrom app.core.config import settings\nfrom app.services.razorpay_client import razorpay_request
 from app.models import Organization, Subscription, SubscriptionPlan, User, UserInvitation
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
@@ -38,6 +38,78 @@ class CurrentUserResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+
+class DeleteAccountRequest(BaseModel):
+    confirmation: str = Field(min_length=8, max_length=32)
+
+
+def _delete_supabase_user(auth_user_id: UUID) -> None:
+    service_key = settings.supabase_service_role_key
+    if not service_key:
+        raise HTTPException(status_code=503, detail="Account deletion is not configured. The Supabase service-role key is missing.")
+    try:
+        response = httpx.delete(
+            f"{settings.supabase_url.rstrip('/')}/auth/v1/admin/users/{auth_user_id}",
+            headers={"apikey": service_key, "Authorization": f"Bearer {service_key}"},
+            timeout=10.0,
+        )
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Supabase could not complete account deletion. No CompatFlow database records were deleted.") from None
+    if response.status_code not in {200, 204, 404}:
+        raise HTTPException(status_code=502, detail="Supabase rejected account deletion. No CompatFlow database records were deleted.")
+
+
+@router.delete("/account")
+def delete_account(
+    payload: DeleteAccountRequest,
+    identity: SupabaseIdentity = Depends(get_supabase_identity),
+    db: Session = Depends(get_db),
+):
+    """Delete the authenticated identity; owners delete their entire organization and its history."""
+    profile = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
+    if profile is None:
+        if payload.confirmation != "DELETE MY ACCOUNT":
+            raise HTTPException(status_code=422, detail="Type DELETE MY ACCOUNT to confirm.")
+        _delete_supabase_user(identity.auth_user_id)
+        return {"deleted": True, "scope": "account"}
+
+    if profile.role == "owner":
+        if payload.confirmation != "DELETE ORGANIZATION":
+            raise HTTPException(status_code=422, detail="As the organization owner, type DELETE ORGANIZATION to remove the company workspace and all associated data.")
+        members = list(db.scalars(select(User).where(User.organization_id == profile.organization_id)).all())
+        subscriptions = list(db.scalars(
+            select(Subscription).where(Subscription.organization_id == profile.organization_id).with_for_update()
+        ).all())
+        # Stop provider-side recurring billing before deleting local subscription history.
+        for subscription in subscriptions:
+            if subscription.status in {"canceled", "expired", "incomplete"}:
+                continue
+            if subscription.provider == "razorpay" and subscription.provider_subscription_id:
+                try:
+                    razorpay_request(
+                        "POST",
+                        f"/subscriptions/{subscription.provider_subscription_id}/cancel",
+                        {"cancel_at_cycle_end": False},
+                    )
+                except (httpx.HTTPError, ValueError, RuntimeError):
+                    raise HTTPException(status_code=502, detail="The payment provider could not confirm immediate cancellation. Your organization data has not been deleted.") from None
+            elif subscription.status in {"active", "trialing", "pending", "past_due"}:
+                raise HTTPException(status_code=409, detail="An active external subscription cannot be safely canceled automatically. Contact support before deleting this organization.")
+        # Delete every Supabase identity belonging to this organization before removing tenant data.
+        for member in members:
+            if member.auth_user_id:
+                _delete_supabase_user(member.auth_user_id)
+        db.execute(delete(Organization).where(Organization.id == profile.organization_id))
+        db.commit()
+        return {"deleted": True, "scope": "organization", "deleted_accounts": len(members)}
+
+    if payload.confirmation != "DELETE MY ACCOUNT":
+        raise HTTPException(status_code=422, detail="Type DELETE MY ACCOUNT to confirm.")
+    _delete_supabase_user(identity.auth_user_id)
+    db.execute(delete(User).where(User.id == profile.id, User.organization_id == profile.organization_id))
+    db.commit()
+    return {"deleted": True, "scope": "account"}
 
 
 class OrganizationCreateRequest(BaseModel):
