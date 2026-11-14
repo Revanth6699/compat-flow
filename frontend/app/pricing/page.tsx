@@ -83,11 +83,11 @@ export default function PricingPage() {
       <div className="container">
         <section className="pricing-intro">
           <div className="eyebrow">Plans built around your workflow</div>
-          <h1>Start with a demo. Upgrade when your catalog operations need more.</h1>
-          <p>Reference prices are in USD per month. Paid checkout is not enabled until the Razorpay account, plan IDs and webhook are configured. Features marked Planned are not currently available.</p>
+          <h1>{user ? "Choose a plan for your organization." : "Start with a demo. Upgrade when your catalog operations need more."}</h1>
+          <p>{user ? "Compare organization plans and select the subscription that matches your catalog operations. Paid checkout is subject to provider configuration and verified payment activation." : "Reference prices are in USD per month. Paid checkout is not enabled until the Razorpay account, plan IDs and webhook are configured. Features marked Planned are not currently available."}</p>
         </section>
         <section className="pricing-grid" aria-label="CompatFlow plans">
-          {plans.filter(plan => !user || plan.code).map(plan => {
+          {plans.filter(plan => !user || plan.name !== "Demo").map(plan => {
             const href = plan.code
               ? (user ? `/billing?plan=${plan.code}` : `/sign-up?plan=${plan.code}`)
               : plan.href;
