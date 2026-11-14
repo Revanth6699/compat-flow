@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import RolePermission, Subscription, SubscriptionPlan, User
+from app.models import DemoAccessRequest, RolePermission, Subscription, SubscriptionPlan, User
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -190,5 +190,26 @@ def require_plan_feature(feature: str):
                 "required_feature": feature,
                 "upgrade_url": "/pricing",
             })
+        return current
+    return dependency
+
+
+def require_demo_or_paid_access():
+    """Allow only a current paid CSV entitlement or an explicitly approved demo email."""
+    def dependency(
+        current: AuthenticatedUser = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> AuthenticatedUser:
+        subscription, plan = get_active_plan(current, db)
+        if subscription is not None and plan is not None and bool((plan.entitlements or {}).get("csv_validation", False)):
+            return current
+        approved = db.scalar(
+            select(DemoAccessRequest.id).where(
+                DemoAccessRequest.email == current.identity.email,
+                DemoAccessRequest.status == "approved",
+            ).limit(1)
+        )
+        if approved is None:
+            raise HTTPException(status_code=403, detail="Approved demo access or an active CSV-validation subscription is required.")
         return current
     return dependency

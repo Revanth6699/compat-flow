@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Script from "next/script";
 import { AuthRequired } from "@/components/auth-required";
@@ -55,9 +56,12 @@ const plans = [
 ];
 
 function BillingContent() {
+  const search = useSearchParams();
+  const requestedPlan = search.get("plan");
+  const initialPlan = requestedPlan && plans.some(plan => plan.code === requestedPlan) ? requestedPlan : "starter";
   const [role, setRole] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState("starter");
+  const [selectedPlan, setSelectedPlan] = useState(initialPlan);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -152,6 +156,7 @@ function BillingContent() {
   }
 
   const isOwner = role === "owner";
+  const subscriptionLocked = !!(subscription && ["active", "trialing", "pending", "past_due"].includes(subscription.status));
 
   return (
     <>
@@ -196,6 +201,7 @@ function BillingContent() {
             <h2>Choose a monthly plan</h2>
             <p className="settings-description">Checkout is available to the organization owner only. Prices below are the current reference prices in USD; payment availability and final currency depend on your Razorpay merchant account and configured plan IDs.</p>
             {!isOwner && <p className="notice">Only the organization owner can create or cancel a subscription. Contact your owner to manage billing.</p>}
+            {subscriptionLocked && <p className="notice">Your organization already has a subscription in progress. Self-service upgrades and downgrades are not enabled yet; plan selection is locked until the current subscription is resolved.</p>}
             <div className="pricing-grid">
               {plans.map((plan) => (
                 <button
@@ -211,7 +217,7 @@ function BillingContent() {
               ))}
             </div>
             <p className="settings-description">Enterprise remains a custom commercial plan and is not available through self-service checkout. Annual billing is not enabled until annual prices and provider plans are explicitly configured.</p>
-            <button className="button auth-submit" disabled={!isOwner || busy || loading || !!(subscription && ["active", "trialing", "pending", "past_due"].includes(subscription.status))} onClick={() => void startCheckout()}>
+            <button className="button auth-submit" disabled={!isOwner || busy || loading || subscriptionLocked} onClick={() => void startCheckout()}>
               {busy ? "Please wait…" : "Continue to secure checkout"}
             </button>
             <p className="settings-description">A successful checkout signature does not activate access by itself. CompatFlow waits for a verified Razorpay subscription webhook before treating the subscription as active.</p>
@@ -223,5 +229,5 @@ function BillingContent() {
 }
 
 export default function BillingPage() {
-  return <AuthRequired><BillingContent /></AuthRequired>;
+  return <Suspense fallback={<main id="main" className="page">Loading billing…</main>}><AuthRequired><BillingContent /></AuthRequired></Suspense>;
 }

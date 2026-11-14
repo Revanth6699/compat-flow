@@ -12,16 +12,30 @@ export function SiteHeader() {
         <Link className="brand" href="/" aria-label="CompatFlow home">
           compat<span className="brand-mark">flow</span>
         </Link>
-        <nav className="nav" aria-label="Main navigation">
-          <Link href="/">Home</Link>
-          <Link href="/#capabilities">Capabilities</Link>
-          <Link href="/#workflow">How it works</Link>
-          <Link href="/pricing">Pricing</Link>
-          <Link href="/contact?intent=demo">Request demo</Link>
-          <Link href="/catalog/import">Public CSV demo</Link>
+        <nav className="nav header-main-nav" aria-label="Main navigation">
+          {user ? (
+            <>
+              <Link href="/">Home</Link>
+              <Link href="/workspace">Workspace</Link>
+              <Link href="/catalog/import">Catalog</Link>
+              <Link href="/catalog/sources">Data sources</Link>
+              <Link href="/pricing">Plans</Link>
+              {user.email?.toLowerCase() === "sarvasettyrevanth.66@gmail.com" && <Link href="/platform-admin">Platform admin</Link>}
+            </>
+          ) : (
+            <>
+              <Link href="/">Home</Link>
+              <Link href="/#capabilities">Capabilities</Link>
+              <Link href="/#workflow">How it works</Link>
+              <Link href="/pricing">Pricing</Link>
+              <Link href="/contact?intent=demo">Request demo</Link>
+              <Link href="/reviews">Reviews</Link>
+            </>
+          )}
+        </nav>
+        <nav className="nav header-account-nav" aria-label="Account navigation">
           {!loading && (user ? (
             <>
-              <Link href="/workspace">Workspace</Link>
               <Link href="/settings">Profile</Link>
               <Link href="/" onClick={() => void signOut()}>Sign out</Link>
             </>

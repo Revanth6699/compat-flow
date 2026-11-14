@@ -285,12 +285,20 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         )
         db.add(seat_plan)
         db.flush()
-        db.add(Subscription(
-            organization_id=organization_a.id,
-            user_id=owner_a.id,
-            plan_code=seat_plan.code,
-            status="active",
-        ))
+        db.add_all([
+            Subscription(
+                organization_id=organization_a.id,
+                user_id=owner_a.id,
+                plan_code=seat_plan.code,
+                status="active",
+            ),
+            Subscription(
+                organization_id=organization_b.id,
+                user_id=owner_b.id,
+                plan_code=seat_plan.code,
+                status="active",
+            ),
+        ])
         db.commit()
 
         app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
@@ -353,6 +361,40 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
             "token": invitation_a["invitation_token"],
         })
         assert reused.status_code == 400
+
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            identity=SupabaseIdentity(owner_a.auth_user_id, owner_a.email, "owner-a-token"),
+            profile=owner_a,
+        )
+        members = client.get("/api/v1/invitations/members")
+        assert members.status_code == 200, members.text
+        assert {row["id"] for row in members.json()} == {str(owner_a.id), accepted.json()["id"]}
+
+        changed_role = client.patch(
+            f"/api/v1/invitations/members/{accepted.json()['id']}",
+            json={"role": "viewer"},
+        )
+        assert changed_role.status_code == 200, changed_role.text
+        assert changed_role.json()["role"] == "viewer"
+
+        deactivated = client.patch(
+            f"/api/v1/invitations/members/{accepted.json()['id']}",
+            json={"is_active": False},
+        )
+        assert deactivated.status_code == 200, deactivated.text
+        assert deactivated.json()["is_active"] is False
+
+        owner_change = client.patch(
+            f"/api/v1/invitations/members/{owner_a.id}",
+            json={"role": "viewer"},
+        )
+        assert owner_change.status_code == 403
+
+        foreign_member = client.patch(
+            f"/api/v1/invitations/members/{owner_b.id}",
+            json={"role": "viewer"},
+        )
+        assert foreign_member.status_code == 404
 
         stored_a = db.get(UserInvitation, invitation_a["id"])
         stored_b = db.get(UserInvitation, invitation_b["id"])

@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta, timezone
+import json
 from hashlib import sha256
 import secrets
 from uuid import uuid4, UUID
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -19,7 +21,9 @@ from app.core.auth import (
     require_verified_supabase_email,
 )
 from app.core.database import get_db
-from app.models import Organization, Subscription, SubscriptionPlan, User, UserInvitation
+from app.core.config import settings
+from app.services.razorpay_client import razorpay_request
+from app.models import Organization, Payment, PaymentWebhookEvent, Subscription, SubscriptionPlan, User, UserInvitation
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 invitation_router = APIRouter(prefix="/invitations", tags=["invitations"])
@@ -38,6 +42,86 @@ class CurrentUserResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+
+class DeleteAccountRequest(BaseModel):
+    confirmation: str = Field(min_length=8, max_length=32)
+
+
+def _delete_supabase_user(auth_user_id: UUID) -> None:
+    service_key = settings.supabase_service_role_key
+    if not service_key:
+        raise HTTPException(status_code=503, detail="Account deletion is not configured. The Supabase service-role key is missing.")
+    try:
+        response = httpx.delete(
+            f"{settings.supabase_url.rstrip('/')}/auth/v1/admin/users/{auth_user_id}",
+            headers={"apikey": service_key, "Authorization": f"Bearer {service_key}"},
+            timeout=10.0,
+        )
+    except httpx.HTTPError:
+        raise HTTPException(status_code=502, detail="Supabase could not complete account deletion. No CompatFlow database records were deleted.") from None
+    if response.status_code not in {200, 204, 404}:
+        raise HTTPException(status_code=502, detail="Supabase rejected account deletion. No CompatFlow database records were deleted.")
+
+
+@router.delete("/account")
+def delete_account(
+    payload: DeleteAccountRequest,
+    identity: SupabaseIdentity = Depends(get_supabase_identity),
+    db: Session = Depends(get_db),
+):
+    """Delete the authenticated identity; owners delete their entire organization and its history."""
+    profile = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
+    if profile is None:
+        if payload.confirmation != "DELETE MY ACCOUNT":
+            raise HTTPException(status_code=422, detail="Type DELETE MY ACCOUNT to confirm.")
+        _delete_supabase_user(identity.auth_user_id)
+        return {"deleted": True, "scope": "account"}
+
+    if profile.role == "owner":
+        if payload.confirmation != "DELETE ORGANIZATION":
+            raise HTTPException(status_code=422, detail="As the organization owner, type DELETE ORGANIZATION to remove the company workspace and all associated data.")
+        db.scalar(select(Organization.id).where(Organization.id == profile.organization_id).with_for_update())
+        members = list(db.scalars(select(User).where(User.organization_id == profile.organization_id)).all())
+        subscriptions = list(db.scalars(
+            select(Subscription).where(Subscription.organization_id == profile.organization_id).with_for_update()
+        ).all())
+        # Stop provider-side recurring billing before deleting local subscription history.
+        for subscription in subscriptions:
+            if subscription.status in {"canceled", "expired", "incomplete"}:
+                continue
+            if subscription.provider == "razorpay" and subscription.provider_subscription_id:
+                try:
+                    razorpay_request(
+                        "POST",
+                        f"/subscriptions/{subscription.provider_subscription_id}/cancel",
+                        {"cancel_at_cycle_end": False},
+                    )
+                except (httpx.HTTPError, ValueError, RuntimeError):
+                    raise HTTPException(status_code=502, detail="The payment provider could not confirm immediate cancellation. Your organization data has not been deleted.") from None
+            elif subscription.status in {"active", "trialing", "pending", "past_due"}:
+                raise HTTPException(status_code=409, detail="An active external subscription cannot be safely canceled automatically. Contact support before deleting this organization.")
+        # Delete every Supabase identity belonging to this organization before removing tenant data.
+        for member in members:
+            if member.auth_user_id:
+                _delete_supabase_user(member.auth_user_id)
+        db.execute(delete(Payment).where(Payment.organization_id == profile.organization_id))
+        provider_ids = [item.provider_subscription_id for item in subscriptions if item.provider_subscription_id]
+        if provider_ids:
+            for event in db.scalars(select(PaymentWebhookEvent)).all():
+                payload_text = json.dumps(event.payload, default=str)
+                if any(provider_id in payload_text for provider_id in provider_ids):
+                    db.delete(event)
+        db.execute(delete(Organization).where(Organization.id == profile.organization_id))
+        db.commit()
+        return {"deleted": True, "scope": "organization", "deleted_accounts": len(members)}
+
+    if payload.confirmation != "DELETE MY ACCOUNT":
+        raise HTTPException(status_code=422, detail="Type DELETE MY ACCOUNT to confirm.")
+    _delete_supabase_user(identity.auth_user_id)
+    db.execute(delete(User).where(User.id == profile.id, User.organization_id == profile.organization_id))
+    db.commit()
+    return {"deleted": True, "scope": "account"}
 
 
 class OrganizationCreateRequest(BaseModel):
@@ -151,12 +235,18 @@ def _member_seat_limit(db: Session, organization_id: UUID) -> int | None:
             (Subscription.current_period_end.is_(None)) | (Subscription.current_period_end > now),
         ).order_by(Subscription.created_at.desc())
     )
+    # An unsubscribed organization gets one seat for its owner only.
+    # Missing entitlement data fails closed; explicit JSON null means unlimited
+    # seats (reserved for the Enterprise plan).
     if subscription is None:
-        return None
+        return 1
     plan = db.get(SubscriptionPlan, subscription.plan_code)
     if plan is None or not plan.is_active:
-        return None
-    limit = (plan.entitlements or {}).get("member_seats")
+        return 1
+    entitlements = plan.entitlements or {}
+    if "member_seats" not in entitlements:
+        return 1
+    limit = entitlements["member_seats"]
     if limit is None:
         return None
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
@@ -362,6 +452,77 @@ def accept_invitation(
         role=profile.role,
         is_active=profile.is_active,
     )
+
+
+class MemberResponse(BaseModel):
+    id: UUID
+    email: str
+    role: str
+    is_active: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MemberUpdateRequest(BaseModel):
+    role: str | None = Field(default=None, pattern="^(admin|member|viewer)$")
+    is_active: bool | None = None
+
+
+@invitation_router.get("/members", response_model=list[MemberResponse])
+def list_organization_members(
+    current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    return list(
+        db.scalars(
+            select(User)
+            .where(User.organization_id == current.profile.organization_id)
+            .order_by(User.created_at.asc())
+        ).all()
+    )
+
+
+@invitation_router.patch("/members/{member_id}", response_model=MemberResponse)
+def update_organization_member(
+    member_id: UUID,
+    payload: MemberUpdateRequest,
+    current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
+    db: Session = Depends(get_db),
+):
+    if payload.role is None and payload.is_active is None:
+        raise HTTPException(status_code=422, detail="Provide a role or active-state change.")
+
+    member = db.scalar(
+        select(User)
+        .where(
+            User.id == member_id,
+            User.organization_id == current.profile.organization_id,
+        )
+        .with_for_update()
+    )
+    if member is None:
+        raise HTTPException(status_code=404, detail="Organization member not found.")
+    if member.role == "owner":
+        raise HTTPException(status_code=403, detail="The organization owner cannot be modified through member management.")
+    if member.id == current.profile.id:
+        raise HTTPException(status_code=403, detail="You cannot change your own organization access.")
+    if current.profile.role != "owner" and member.role == "admin":
+        raise HTTPException(status_code=403, detail="Only the organization owner can modify an administrator.")
+    if payload.role is not None:
+        if payload.role == "admin" and current.profile.role != "owner":
+            raise HTTPException(status_code=403, detail="Only the organization owner can assign administrator access.")
+        member.role = payload.role
+    if payload.is_active is not None:
+        if payload.is_active and not member.is_active:
+            _ensure_invitation_seat_available(
+                db, current.profile.organization_id, include_pending_invitations=False
+            )
+        member.is_active = payload.is_active
+
+    db.commit()
+    db.refresh(member)
+    return member
 
 
 @invitation_router.get("", response_model=list[InvitationResponse])

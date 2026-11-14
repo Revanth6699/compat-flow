@@ -7,6 +7,8 @@ from app.api.routes import router
 from app.api.auth_routes import router as auth_router, invitation_router
 from app.api.connector_import_routes import router as connector_import_router
 from app.api.billing_routes import router as billing_router
+from app.api.review_routes import router as review_router
+from app.api.demo_routes import router as demo_router
 from app.core.config import settings
 
 
@@ -20,6 +22,7 @@ class UploadBodyLimitMiddleware:
     async def __call__(self, scope, receive, send):
         protected_paths = {
             "/api/v1/catalog/import/preview",
+            "/api/v1/catalog/import/profile",
             "/api/v1/catalog/import/preview-records",
             "/api/v1/catalog/import/validate",
             "/api/v1/catalog/import/parse-preview",
@@ -109,7 +112,7 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_origin_regex=staging_preview_origin_regex,
     allow_credentials=False,
-    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
 )
 
@@ -140,6 +143,8 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(invitation_router, prefix="/api/v1")
 app.include_router(connector_import_router, prefix="/api/v1")
 app.include_router(billing_router, prefix="/api/v1")
+app.include_router(review_router, prefix="/api/v1")
+app.include_router(demo_router, prefix="/api/v1")
 
 
 @app.get("/", include_in_schema=False)
