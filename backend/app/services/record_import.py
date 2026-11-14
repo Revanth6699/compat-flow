@@ -113,11 +113,6 @@ def _resolve_mapping(
         name for name, field in RECORD_MODELS[record_type].model_fields.items()
         if field.is_required()
     }
-    missing = sorted(required - set(mapping))
-    if missing:
-        raise RecordMappingError(
-            "Required fields are not mapped for this record type: " + ", ".join(missing)
-        )
     mapped_sources = set(mapping.values())
     details = [
         {"field": field, "source_header": source, "confidence": confidence}
