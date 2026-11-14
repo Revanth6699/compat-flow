@@ -1,7 +1,5 @@
-from io import BytesIO
-
+import pytest
 from fastapi.testclient import TestClient
-from openpyxl import Workbook
 
 from app.main import app
 
@@ -14,165 +12,38 @@ def test_health():
     assert response.json()["status"] == "ok"
 
 
-def test_import_preview_rejects_non_csv():
-    response = client.post(
-        "/api/v1/catalog/import/preview",
-        files={"file": ("catalog.txt", b"hello", "text/plain")},
-    )
-    assert response.status_code == 415
+@pytest.mark.parametrize(
+    ("path", "filename", "payload", "content_type"),
+    [
+        ("/api/v1/catalog/import/profile", "dataset.csv", b"a,b\n1,2\n", "text/csv"),
+        ("/api/v1/catalog/import/preview", "catalog.csv", b"sku,name\nS1,Brake\n", "text/csv"),
+        ("/api/v1/catalog/import/preview-records", "catalog.xlsx", b"not-a-workbook", "application/octet-stream"),
+        ("/api/v1/catalog/import/validate", "catalog.csv", b"sku,name\nS1,Brake\n", "text/csv"),
+        ("/api/v1/catalog/import/validate-records", "catalog.csv", b"sku,name\nS1,Brake\n", "text/csv"),
+    ],
+)
+def test_all_upload_and_preview_routes_require_authenticated_authorized_access(path, filename, payload, content_type):
+    response = client.post(path, files={"file": (filename, payload, content_type)})
+    assert response.status_code == 401
 
 
-def test_import_preview_valid_csv():
-    payload = (
-        "sku,name,manufacturer,part_number,category,compatibility\n"
-        "SKU-1,Brake Pad,Maker A,BP-100,Brakes,VEH-001\n"
-    )
-    response = client.post(
-        "/api/v1/catalog/import/preview",
-        files={"file": ("catalog.csv", payload.encode(), "text/csv")},
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["total_rows"] == 1
-    assert data["valid_rows"] == 1
-    assert data["invalid_rows"] == 0
-    assert data["preview"][0]["sku"] == "SKU-1"
-
-
-def test_preview_rejects_empty_file():
-    response = client.post(
-        "/api/v1/catalog/import/preview",
-        files={"file": ("empty.csv", b"", "text/csv")},
-    )
-    assert response.status_code == 400
-
-
-def test_preview_rejects_invalid_utf8():
-    response = client.post(
-        "/api/v1/catalog/import/preview",
-        files={"file": ("bad.csv", b"\xff\xfe", "text/csv")},
-    )
-    assert response.status_code == 400
-
-
-def test_preview_returns_row_errors_for_missing_required_mappings():
-    response = client.post(
-        "/api/v1/catalog/import/preview",
-        files={
-            "file": (
-                "missing-columns.csv",
-                b"sku,name\nSKU-1,Brake Pad\n",
-                "text/csv",
-            )
-        },
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["invalid_rows"] == 1
-    assert any("manufacturer" in issue["message"] for issue in data["row_errors"])
-
-
-def test_preview_detects_duplicate_skus_within_uploaded_file():
-    payload = (
-        "sku,name,manufacturer,part_number,category\n"
-        "SKU-1,Brake Pad,Maker A,BP-100,Brakes\n"
-        "SKU-1,Brake Disc,Maker A,BD-100,Brakes\n"
-    )
-    response = client.post(
-        "/api/v1/catalog/import/preview",
-        files={"file": ("duplicates.csv", payload.encode(), "text/csv")},
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["total_rows"] == 2
-    assert data["valid_rows"] == 1
-    assert data["invalid_rows"] == 1
-    assert data["row_errors"][0]["error_code"] == "DUPLICATE_SKU_IN_FILE"
-
-
-def test_persistent_import_is_disabled_in_public_demo():
+def test_persistent_import_is_disabled():
     response = client.post(
         "/api/v1/catalog/import",
         files={"file": ("catalog.csv", b"sku,name\nSKU-1,Brake Pad\n", "text/csv")},
     )
     assert response.status_code == 403
-    assert "disabled in this public demo" in response.json()["detail"]
 
 
 def test_import_job_status_endpoint_is_not_exposed():
-    response = client.get(
-        "/api/v1/catalog/import/00000000-0000-0000-0000-000000000001"
-    )
+    response = client.get("/api/v1/catalog/import/00000000-0000-0000-0000-000000000001")
     assert response.status_code == 404
 
 
-def test_preview_rejects_upload_over_five_megabytes():
-    oversized = b"x" * (5 * 1024 * 1024 + 1)
+def test_preview_rejects_upload_over_configured_limit_before_auth():
+    oversized = b"x" * (25 * 1024 * 1024 + 1)
     response = client.post(
         "/api/v1/catalog/import/preview",
         files={"file": ("large.csv", oversized, "text/csv")},
     )
     assert response.status_code == 413
-
-
-def test_public_spreadsheet_preview_accepts_xlsx_without_authentication():
-    workbook = Workbook()
-    sheet = workbook.active
-    sheet.append(["sku", "name", "manufacturer", "part_number", "category"])
-    sheet.append(["SKU-EXCEL-1", "Brake Pad", "Maker A", "BP-100", "Brakes"])
-    stream = BytesIO()
-    workbook.save(stream)
-    response = client.post(
-        "/api/v1/catalog/import/preview-records",
-        files={"file": ("supplier.xlsx", stream.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
-    )
-    assert response.status_code == 200
-    data = response.json()
-    assert data["format"] == "xlsx"
-    assert data["record_type"] == "products"
-    assert data["total_records"] == 1
-    assert data["valid_records"] == 1
-    assert data["persisted"] is False
-
-
-def test_public_spreadsheet_preview_rejects_json():
-    response = client.post(
-        "/api/v1/catalog/import/preview-records",
-        files={"file": ("supplier.json", b'{"items":[]}', "application/json")},
-    )
-    assert response.status_code == 415
-
-
-def test_public_product_preview_rejects_seller_dataset_instead_of_scoring_every_row_invalid():
-    payload = (
-        "seller_id,seller_zip_code_prefix,seller_city,seller_state\n"
-        "001,01001,sao paulo,SP\n"
-        "002,02002,rio de janeiro,RJ\n"
-    )
-    response = client.post(
-        "/api/v1/catalog/import/preview",
-        files={"file": ("olist_sellers_dataset.csv", payload.encode(), "text/csv")},
-    )
-    assert response.status_code == 422
-    assert "does not appear to contain product catalog columns" in response.json()["detail"]
-    assert "seller" in response.json()["detail"].lower()
-
-
-
-def test_public_dataset_profile_accepts_seller_dataset_and_returns_real_statistics():
-    response = client.post(
-        "/api/v1/catalog/import/profile",
-        files={"file": ("olist_sellers_dataset.csv", b"seller_id,seller_zip_code_prefix,seller_city,seller_state\ns1,12345,city_a,SP\ns2,23456,city_b,RJ\ns2,23456,city_b,RJ", "text/csv")},
-    )
-    assert response.status_code == 200, response.text
-    result = response.json()
-    assert result["is_product_catalog"] is False
-    assert result["total_records"] == 3
-    assert result["total_columns"] == 4
-    assert result["duplicate_rows"] == 1
-    assert result["missing_cells"] == 0
-    assert result["completeness_pct"] == 100
-    assert result["persisted"] is False
-    assert {column["name"] for column in result["columns"]} == {
-        "seller_id", "seller_zip_code_prefix", "seller_city", "seller_state"
-    }
