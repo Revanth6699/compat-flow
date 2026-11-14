@@ -25,6 +25,8 @@ class Settings(BaseSettings):
 
     import_storage_dir: str = "/data/imports"
     import_max_upload_bytes: int = 5 * 1024 * 1024
+    connector_allowed_hosts: str = ""
+    sftp_known_hosts_path: str = ""
 
     model_config = SettingsConfigDict(
         env_file="../.env",
