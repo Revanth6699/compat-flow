@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
-import { apiRequest } from "@/lib/auth-client";
+import { apiRequest, updatePassword } from "@/lib/auth-client";
 
 type Overview = {
   users: number; active_users: number; organizations: number; subscriptions: number; active_subscriptions: number; reviews: number;
@@ -21,6 +21,11 @@ export default function PlatformAdminPage() {
   const [requests, setRequests] = useState<DemoRequest[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordMessage, setPasswordMessage] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
 
   const load = useCallback(async () => {
     const [summary, items] = await Promise.all([
@@ -44,6 +49,31 @@ export default function PlatformAdminPage() {
     });
     return () => { active = false; };
   }, [user]);
+
+  async function changeOwnerPassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPasswordMessage("");
+    setPasswordError("");
+    if (newPassword.length < 10) {
+      setPasswordError("Use a password with at least 10 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("The passwords do not match.");
+      return;
+    }
+    setPasswordBusy(true);
+    try {
+      await updatePassword(newPassword);
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordMessage("Your owner-account password has been updated.");
+    } catch (cause) {
+      setPasswordError(cause instanceof Error ? cause.message : "Could not update your password.");
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
 
   async function decide(id: string, decision: "approve" | "revoke" | "reject") {
     setBusy(id); setError("");
@@ -74,6 +104,20 @@ export default function PlatformAdminPage() {
         </div>
       </div>
       <p><strong>Access level:</strong> Full platform administration</p>
+    </section>
+    <section className="panel result-section" aria-label="Owner password settings">
+      <h2>Change owner password</h2>
+      <p>Set or change the password for your CompatFlow owner account. Your password is handled by the authentication provider and is never displayed here.</p>
+      <form className="auth-form" onSubmit={changeOwnerPassword}>
+        <label htmlFor="owner-new-password">New password</label>
+        <input id="owner-new-password" type="password" autoComplete="new-password" minLength={10} required value={newPassword} onChange={event => setNewPassword(event.target.value)} />
+        <label htmlFor="owner-confirm-password">Confirm new password</label>
+        <input id="owner-confirm-password" type="password" autoComplete="new-password" minLength={10} required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} />
+        {passwordError && <p className="auth-error" role="alert">{passwordError}</p>}
+        {passwordMessage && <p className="auth-success" role="status">{passwordMessage}</p>}
+        <button className="button" disabled={passwordBusy}>{passwordBusy ? "Updating…" : "Update password"}</button>
+      </form>
+      <p><Link href="/forgot-password">Forgot your password? Reset it by email.</Link></p>
     </section>
     {error && <p className="form-error" role="alert">{error}</p>}
     {overview && <div className="result-stats">
