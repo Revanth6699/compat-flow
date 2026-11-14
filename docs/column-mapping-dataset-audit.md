@@ -247,3 +247,113 @@ Continue inspecting datasets individually and append each verified file here. Af
 - Dataset review does not justify global aliases for `product`, `model`, `manufacturer_reference`, `external_id`, generic IDs, lot, UPC/EAN, or brand/vendor.
 - The latest CI run (43557274169) completed successfully: backend tests, Alembic upgrade, Ruff, Bandit, frontend lint, and frontend production build all passed.
 - No ML model has been trained or integrated yet. A labelled, source-separated mapping evaluation set and deterministic baseline are required before selecting or training a model.
+
+
+### 21. Nagual legacy commerce product export
+
+- Source: https://github.com/magma-labs/nagual/blob/988d7d1991041ba4bbb5c48fcb0b9d481953fd40/data_examples/products.csv
+- Type: legacy commerce product export fixture
+- Delimiter: comma
+- Header: `id,mode,ean,upc,unit,step,name,description,long_description,status,from,to,searchable?,searchable if unavailable?,template,tax class id,brand,manufacturer,SKU,placement,rank,sitemap?,sitemap change frequency,sitemap priority,page title,page keywords,color,organization`
+- Mapping observations: `name`, `SKU`, and `manufacturer` are explicit headers. `id`, EAN, and UPC remain separate identifiers. The sample rows look like schema fixtures/placeholders rather than reliable commercial records; values such as `EAN`, `UPC`, and `MANUFACTURER` are literal placeholders. The `color` value contains a comma and is correctly quoted.
+- Current mapper gap: no barcode/GTIN, unit, tax, status, dates, SEO, or product-attribute fields.
+
+### 22. Cordango warehouse inventory sample
+
+- Source: https://github.com/Cordango/examples/blob/457ada54c4850231b31507abb09cbbc8c6c58ac7/warehouse/samples/inventory.csv
+- Type: automotive parts warehouse inventory feed
+- Delimiter: comma
+- Header: `SKU,Name,ManufacturerPartNumber,Barcode,Category,Location,Quantity,SafetyStock,Supplier,SupplierSKU,UnitCost`
+- Mapping observations: SKU, Name, Category, and ManufacturerPartNumber are explicit. CamelCase `ManufacturerPartNumber` normalizes to `manufacturerpartnumber`, not the existing snake_case alias. `SupplierSKU` is a separate supplier-specific identifier and must not replace the internal SKU. Barcode, quantity, safety stock, location, and unit cost are separate fields. One SKU appears twice with the same product/stock details, so duplicate interpretation needs source context.
+- Current mapper gap: add the exact camelCase MPN header form; inventory quantity, safety stock, location, supplier SKU, barcode, and unit cost remain outside the current product master.
+
+### 23. StoreFrontServer inventory sample
+
+- Source: https://github.com/DammitJavi/StoreFrontServer/blob/d0949f4bd820a90196262d30be7f38e9fd3e9d3f/src/assets/inventory.csv
+- Type: general retail inventory export
+- Delimiter: comma
+- Header: `ID,Name,Category,Price,Quantity,SKU,Barcode,Supplier,Last Restock Date,Low Stock Threshold,Weight (lbs),Dimensions (in),Status`
+- Mapping observations: Name, Category, and SKU are explicit. Generic ID is a database key; Barcode is not SKU; Supplier is not necessarily Manufacturer. Quantity and low-stock threshold have different meanings. The sample includes multiple product categories and status values.
+- Current mapper gap: no barcode, supplier, stock quantity, reorder threshold, restock date, weight, dimensions, price, or status fields.
+
+### 24. MedCure drug inventory sample
+
+- Source: https://github.com/KurisuuChan/MedCure_Official/blob/0f462dfc4fa77983d358efc25302c4f13782d84c/public/sample_drug_inventory.csv
+- Type: pharmacy/drug inventory catalog
+- Delimiter: comma
+- Header: `product_name,generic_name,brand,category,dosage_form,dosage_strength,unit,price,quantity,reorder_level,expiry_date,supplier,description,barcode,sku`
+- Mapping observations: Product name, SKU, and category are explicit. Generic name, brand, and supplier are distinct attributes; supplier must not be inferred as manufacturer. Dosage form/strength, expiry date, barcode, and inventory quantity carry domain-specific meaning.
+- Current mapper gap: no generic name, dosage, expiry, barcode, inventory, supplier, or unit fields. This is a specialized inventory/product schema, not evidence for mapping medicine attributes into existing generic fields.
+
+### 25. Brelinx inventory sample
+
+- Source: https://github.com/Uwami-Mgxekwa/Brelinx-Inventory/blob/540cdad9b24485514d320221f337a329f1bbd1c1/sample_inventory.csv
+- Type: general stock and supplier inventory
+- Delimiter: comma
+- Header: `name,sku,category,price,cost,quantity,min_stock,max_stock,supplier,barcode,description`
+- Mapping observations: Name, SKU, and category are explicit. Supplier and barcode remain separate from manufacturer and SKU. Cost and price are different monetary measures; quantity, min_stock, and max_stock are different inventory measures.
+- Current mapper gap: no cost, price, stock bounds, supplier, or barcode fields.
+
+### 26. Steelite Utopia scraped catalog
+
+- Source: https://github.com/Aru-gxtx/Web-Scraping-Test/blob/3565764b4a2e632626dca538547db86419d1e4da/steelite/utopia_products.csv
+- Type: hospitality/tableware scraped product catalog
+- Delimiter: comma
+- Header: `name,item_sku,model_number,manufacturer,image_link,overview,material,color,pattern,length,width,height,volume_capacity,diameter,country_of_origin,upc_barcode,ean_code,hazmat,oversize,marketplace_uom,product_url`
+- Mapping observations: Name and item_sku are explicit. `model_number` is distinct from item_sku and is frequently `N/A`; it should not be automatically treated as an MPN. More seriously, the sampled `manufacturer` values repeat the item SKU rather than a manufacturer name, so the header label alone does not guarantee semantically valid data. UPC and EAN remain separate identifiers.
+- Current mapper gap: material, dimensions, country of origin, barcode, images, product URL, and handling flags are not represented. Sample values show why header-only mapping confidence is insufficient.
+
+### 27. Steelite/Wasserstrom scraped catalog
+
+- Source: https://github.com/Aru-gxtx/Web-Scraping-Test/blob/3565764b4a2e632626dca538547db86419d1e4da/steelite/wasserstrom_products.csv
+- Type: hospitality/tableware distributor catalog
+- Delimiter: comma
+- Header: `name,item_sku,model_number,manufacturer,image_link,overview,material,color,pattern,length,width,height,volume_capacity,diameter,country_of_origin,upc_barcode,ean_code,hazmat,oversize,marketplace_uom,product_url`
+- Mapping observations: this is a separate file from the same repository and shares the Utopia schema, so it is an individually inspected file but not independent evidence for a new schema family. `item_sku` and `model_number` are separate. Manufacturer values again appear identical to item SKUs, and many fields use `N/A`. Quoted product names/descriptions contain embedded quotes and commas, which must be parsed without shifting columns.
+- Current mapper gap: same extended hospitality attributes as dataset 26. Keep this as a parser/value-quality test fixture, not a source for new manufacturer/MPN aliases.
+
+### 28. WooCommerce Pawsome product export
+
+- Source: https://github.com/madrasthemes/assets/blob/6cda2aee8f0dc00386f3d9a76c70d0df6073a3c2/data/pawsome/products.csv
+- Type: WooCommerce product import/export
+- Delimiter: comma
+- Header: wide WooCommerce schema including `ID,Type,SKU,GTIN, UPC, EAN, or ISBN,Name,Published,Is featured?,Visibility in catalog,Short description,Description,...,Stock,...,Sale price,Regular price,Categories,Tags,...,Parent,Grouped products,...,Brands,Attribute 1 name,...`
+- Mapping observations: the combined barcode header is a distinct product identifier field, not SKU/MPN. Product ID, product type, SKU, name, parent/grouped product references, categories, brands, and variation attributes have separate roles. The inspected rows contain empty SKU/barcode values, and the wide import has many optional/relationship columns.
+- Current mapper gap: no product-type, parent/variant, barcode, publication, inventory, price, brand, taxonomy, or attribute support. The current seven-field product schema cannot represent this feed without an extended profile or preservation of source columns.
+
+### 29. InsightMesh product inventory sample
+
+- Source: https://github.com/murugadossp/insightmesh_backend/blob/23e5faa322fca6a69df3e5bf051ff383f05838a4/sample_data/product_inventory.csv
+- Type: broad warehouse/product analytics inventory export
+- Delimiter: comma
+- Header: 45 fields including `product_id,product_name,category,subcategory,brand,supplier_id,cost_price,selling_price,discount_percentage,tax_rate,stock_quantity,reorder_level,minimum_order_quantity,lead_time_days,shelf_location,warehouse_location,...,batch_number,barcode,sku,condition,warranty_months,...,average_daily_demand,demand_variability,abc_classification`
+- Mapping observations: Product name, category, and SKU are explicit. Product ID and supplier ID are source keys; brand is not manufacturer; subcategory is not necessarily the canonical category. Cost/selling price, inventory thresholds, batch, barcode, and derived analytics remain separate fields.
+- Current mapper gap: inventory, commercial, traceability, warranty, product-attribute, and demand-planning fields require separate domain models or extended profiles. Do not treat precomputed metrics as raw product attributes.
+
+### 30. Cosmic-Mart compact product feed
+
+- Source: https://github.com/btbferguson/Cosmic-Mart/blob/f18b84ac90011cc35d2af4362f2022670e655b0e/src/data/cosmic_mart_products.csv
+- Type: compact multi-category product feed with free-text specifications
+- Delimiter: comma
+- Header: `sku_id,product_name,product_category,specs`
+- Mapping observations: product name and category are explicit. `sku_id` contains SKU-like values such as `SKU-1001`, but the suffix `_id` can also mean a database key; treat it as an AI/manual suggestion until the source contract confirms it. Specs are long free-text descriptions containing attributes and claims, not a manufacturer part number.
+- Current mapper gap: no explicit manufacturer or MPN. A compact feed like this cannot satisfy the current general profile without missing-field handling or a different profile.
+
+## Findings after 30 individually inspected files
+
+1. CamelCase headers are a real gap: `ManufacturerPartNumber` normalizes to `manufacturerpartnumber`. Add that exact high-confidence alias rather than rewriting all header normalization in a way that could create collisions.
+2. `model_number` is not a safe automatic MPN alias. Multiple inspected schemas keep model number separate from SKU, and sampled values may be placeholders or inconsistent. Remove it from automatic MPN mapping; it can remain an AI/manual candidate when the source values and supplier context support it.
+3. Supplier SKU, internal SKU, barcode/GTIN, product ID, and MPN are separate identifier namespaces.
+4. Manufacturer and supplier are not interchangeable. A supplier can distribute a product made by another company.
+5. Inventory exports are not product-master exports. Repeated SKU across location/lot is often valid and requires a compound inventory key; don't run product-master duplicate logic on such rows.
+6. Wide commerce exports carry variant relationships, publication state, multiple prices, stock, categories, brands, attributes, and identifiers. The current canonical schema is intentionally narrower and should not silently discard or misclassify these fields.
+7. Some datasets contain placeholder or semantically inconsistent values despite plausible headers. A mapping assistant must inspect value distributions and consistency, not just match header strings.
+8. The compact `sku_id` feed is a good candidate for contextual AI suggestion, not a global deterministic alias.
+
+## Implementation update after the first 30 samples
+
+- Added the normalized CamelCase header `manufacturerpartnumber` as a high-confidence alias for `part_number`.
+- Removed `model_number` and `model_no` from automatic MPN mapping because the inspected evidence shows they are not reliably equivalent.
+- Added regression tests for CamelCase MPN detection and for keeping `model_number` unmapped by default.
+- The first CI run after the product_mpn test addition failed because the new test fixture contained literal backslash-n text instead of line breaks (67 passed, 1 failed). The fixture was corrected and the stricter alias tests were pushed afterward. The newest CI run is still in progress; do not treat it as green until it completes.
+- No ML model is trained or active. The next useful ML/AI step is a candidate ranker that combines header semantics, sample-value patterns, related columns, and source context; deterministic validation and metric computation stay outside the model.
