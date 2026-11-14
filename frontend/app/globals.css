@@ -103,6 +103,8 @@ p { margin-top: 0; }
 .brand:hover { color: #0B8F85; transform: translateY(-1px); }
 .brand:hover .brand-mark { color: #08766F; }
 .nav { display: flex; align-items: center; gap: 30px; flex-wrap: wrap; }
+.header-main-nav { justify-content: center; }
+.header-account-nav { justify-self: end; justify-content: flex-end; white-space: nowrap; }
 .nav a {
   position: relative; color: var(--muted); font-size: 13px; font-weight: 700;
   transition: color var(--ease);
@@ -393,7 +395,9 @@ button.button:disabled { opacity: .5; cursor: not-allowed; transform: none; box-
 }
 @media (max-width: 760px) {
   .container { width: calc(100% - 36px); }
-  .header-inner { min-height: 0; align-items: flex-start; flex-direction: column; gap: 14px; padding: 16px 0; }
+  .header-inner { min-height: 0; grid-template-columns: 1fr; align-items: start; gap: 14px; padding: 16px 0; }
+  .header-main-nav { justify-content: flex-start; }
+  .header-account-nav { justify-self: start; justify-content: flex-start; }
   .nav { gap: 13px 20px; }
   .home-hero { padding: 58px 0 48px; }
   .home-section { padding: 60px 0; }
