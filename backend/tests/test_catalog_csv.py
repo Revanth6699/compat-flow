@@ -216,6 +216,17 @@ def test_manufacturer_part_number_hash_header_maps_to_part_number():
     assert {item.field: item.source_header for item in result.column_mappings}["part_number"] == "Manufacturer Part #"
 
 
+def test_product_type_is_not_automatically_mapped_to_category():
+    content = (
+        "sku,title,manufacturer,mpn,category,product_type\n"
+        "HC-001,Coca-Cola Can,The Coca-Cola Company,CC-001,Beverages,Soda\n"
+    )
+    result = parse_catalog_csv(content)
+    mapped = {item.field: item.source_header for item in result.column_mappings}
+    assert mapped["category"] == "category"
+    assert "product_type" in result.unmapped_headers
+
+
 def test_header_normalization_accepts_spaces_and_punctuation():
     content = (
         " Product SKU , Product Name , Manufacturer Name , Part No. , Category Name \n"
