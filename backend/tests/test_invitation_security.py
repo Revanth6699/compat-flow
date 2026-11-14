@@ -388,6 +388,7 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
     db = SessionLocal()
     organization_a = Organization(name=f"Integrity tenant A {uuid4().hex[:8]}")
     organization_b = Organization(name=f"Integrity tenant B {uuid4().hex[:8]}")
+    plan = None
     try:
         db.add_all([organization_a, organization_b])
         db.flush()
@@ -485,5 +486,7 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
         db.rollback()
         db.delete(organization_a)
         db.delete(organization_b)
+        if plan is not None:
+            db.delete(plan)
         db.commit()
         db.close()
