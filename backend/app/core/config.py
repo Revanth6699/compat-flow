@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/2"
 
     import_storage_dir: str = "/data/imports"
-    import_max_upload_bytes: int = 5 * 1024 * 1024
+    import_max_upload_bytes: int = 25 * 1024 * 1024
     connector_allowed_hosts: str = ""
     sftp_known_hosts_path: str = ""
 
