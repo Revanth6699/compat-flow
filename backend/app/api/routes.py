@@ -75,6 +75,13 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
 
     try:
         result = parse_catalog_csv(content, profile_id=profile_id, column_mapping=column_mapping, allow_incomplete_mapping=column_mapping is None)
+        if not result.column_mappings:
+            raise CatalogCSVValidationError(
+                "This file does not appear to contain product catalog columns. "
+                "No SKU, product name, manufacturer, part number or category columns were recognized. "
+                "The uploaded file may describe sellers, customers or another record type. "
+                "Upload a product catalog or map at least one product field."
+            )
     except CatalogCSVValidationError as exc:
         message = str(exc)
         status_code = 413 if "row limit" in message else 422
@@ -200,6 +207,12 @@ async def preview_public_spreadsheet(file: UploadFile = File(...)):
     try:
         parsed = parse_source(raw, filename)
         result = validate_parsed_records(parsed, "products", None)
+        if not result.mappings:
+            raise RecordMappingError(
+                "This file does not appear to contain product catalog columns. "
+                "No SKU, product name, manufacturer, part number or category columns were recognized. "
+                "Upload a product catalog instead of a seller, customer or other record dataset."
+            )
     except (IngestionParseError, RecordMappingError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     return {
