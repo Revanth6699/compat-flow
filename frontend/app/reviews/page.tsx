@@ -15,7 +15,7 @@ export default function ReviewsPage() {
 
   useEffect(() => {
     let active = true;
-    fetch(`${API_BASE.replace(/\\/$/, "")}/api/v1/reviews`)
+    fetch(`${API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE}/api/v1/reviews`)
       .then(async response => {
         const data = await response.json();
         if (!response.ok) throw new Error("Customer reviews are temporarily unavailable.");
