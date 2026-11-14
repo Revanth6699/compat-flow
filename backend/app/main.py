@@ -18,7 +18,8 @@ class UploadBodyLimitMiddleware:
     async def __call__(self, scope, receive, send):
         protected_paths = {
             "/api/v1/catalog/import/preview",
-            "/api/v1/catalog/import/validate",\n            "/api/v1/catalog/import/parse-preview",
+            "/api/v1/catalog/import/validate",
+            "/api/v1/catalog/import/parse-preview",
         }
         if (
             scope["type"] != "http"
