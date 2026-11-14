@@ -196,3 +196,12 @@ def test_metrics_separate_affected_records_from_issue_count():
     assert result.duplicate_rate == 50.0
     assert result.issue_density == 0.5
     assert result.critical_record_rate == 50.0
+
+
+
+def test_first_pass_preview_surfaces_ambiguous_aliases_for_manual_mapping():
+    content = "sku,product_sku,name,manufacturer,part_number,category\nSKU-1,SKU-2,Brake Pad,Maker A,BP-100,Brakes\n"
+    result = parse_catalog_csv(content, allow_incomplete_mapping=True)
+    assert "sku" not in {mapping.field for mapping in result.column_mappings}
+    assert "sku" in result.unmapped_headers
+    assert "product_sku" in result.unmapped_headers
