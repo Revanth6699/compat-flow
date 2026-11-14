@@ -141,3 +141,18 @@ def test_public_spreadsheet_preview_rejects_json():
         files={"file": ("supplier.json", b'{"items":[]}', "application/json")},
     )
     assert response.status_code == 415
+
+
+def test_public_product_preview_rejects_seller_dataset_instead_of_scoring_every_row_invalid():
+    payload = (
+        "seller_id,seller_zip_code_prefix,seller_city,seller_state\\n"
+        "001,01001,sao paulo,SP\\n"
+        "002,02002,rio de janeiro,RJ\\n"
+    )
+    response = client.post(
+        "/api/v1/catalog/import/preview",
+        files={"file": ("olist_sellers_dataset.csv", payload.encode(), "text/csv")},
+    )
+    assert response.status_code == 422
+    assert "does not appear to contain product catalog columns" in response.json()["detail"]
+    assert "seller" in response.json()["detail"].lower()
