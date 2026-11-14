@@ -3,6 +3,8 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
+import pytest
+from sqlalchemy.exc import IntegrityError
 
 from app.api import auth_routes
 from app.core.auth import AuthenticatedUser, SupabaseIdentity, get_current_user, get_supabase_identity
@@ -367,3 +369,121 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
             db.commit()
         finally:
             db.close()
+
+
+def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links():
+    """Database composite foreign keys must reject cross-organization references."""
+    from app.core.database import SessionLocal
+    from app.models import (
+        ImportJob,
+        ImportRecordLineage,
+        Organization,
+        Payment,
+        Subscription,
+        SubscriptionPlan,
+        User,
+        UserInvitation,
+    )
+
+    db = SessionLocal()
+    organization_a = Organization(name=f"Integrity tenant A {uuid4().hex[:8]}")
+    organization_b = Organization(name=f"Integrity tenant B {uuid4().hex[:8]}")
+    try:
+        db.add_all([organization_a, organization_b])
+        db.flush()
+        owner_a = User(
+            organization_id=organization_a.id,
+            auth_user_id=uuid4(),
+            email=f"integrity-a-{uuid4().hex[:8]}@example.com",
+            role="owner",
+            is_active=True,
+            account_type="demo",
+        )
+        owner_b = User(
+            organization_id=organization_b.id,
+            auth_user_id=uuid4(),
+            email=f"integrity-b-{uuid4().hex[:8]}@example.com",
+            role="owner",
+            is_active=True,
+            account_type="demo",
+        )
+        plan = SubscriptionPlan(
+            code=f"integrity-{uuid4().hex[:8]}",
+            name=f"Integrity Plan {uuid4().hex[:8]}",
+            entitlements={},
+            is_active=True,
+        )
+        db.add_all([owner_a, owner_b, plan])
+        db.flush()
+
+        bad_invitation = UserInvitation(
+            organization_id=organization_a.id,
+            email=f"cross-inviter-{uuid4().hex[:8]}@example.com",
+            role="viewer",
+            token_hash=uuid4().hex + uuid4().hex,
+            invited_by_user_id=owner_b.id,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
+        )
+        db.add(bad_invitation)
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+        bad_subscription = Subscription(
+            organization_id=organization_a.id,
+            user_id=owner_b.id,
+            plan_code=plan.code,
+            status="active",
+        )
+        db.add(bad_subscription)
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+        valid_subscription = Subscription(
+            organization_id=organization_a.id,
+            user_id=owner_a.id,
+            plan_code=plan.code,
+            status="active",
+        )
+        db.add(valid_subscription)
+        db.commit()
+
+        bad_payment = Payment(
+            organization_id=organization_a.id,
+            user_id=owner_b.id,
+            subscription_id=valid_subscription.id,
+            provider="test",
+            amount_minor=100,
+            currency="USD",
+            status="pending",
+        )
+        db.add(bad_payment)
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+
+        foreign_job = ImportJob(
+            organization_id=organization_b.id,
+            filename="foreign-tenant.csv",
+        )
+        db.add(foreign_job)
+        db.commit()
+
+        bad_lineage = ImportRecordLineage(
+            organization_id=organization_a.id,
+            job_id=foreign_job.id,
+            record_type="products",
+            source_location="row:1",
+            target_record_id=uuid4(),
+        )
+        db.add(bad_lineage)
+        with pytest.raises(IntegrityError):
+            db.commit()
+        db.rollback()
+    finally:
+        db.rollback()
+        db.delete(organization_a)
+        db.delete(organization_b)
+        db.commit()
+        db.close()
