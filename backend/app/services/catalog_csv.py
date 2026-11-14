@@ -20,8 +20,7 @@ ERROR_LIMIT = 500
 HEADER_ALIASES = {
     "sku": {
         "sku": 1.0, "product_sku": 0.98, "item_sku": 0.98,
-        "product_code": 0.96, "item_code": 0.96, "item_number": 0.92,
-        "part_id": 0.90, "stock_code": 0.90, "sku_number": 0.98,
+        "product_code": 0.96, "sku_number": 0.98,
         "sku_id": 0.98, "sku_code": 0.98,
         "sku_pioneer_part_number": 0.95,
     },
