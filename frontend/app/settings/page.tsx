@@ -8,7 +8,13 @@ import { updatePassword, updateProfile } from "@/lib/auth-client";
 
 function SettingsContent() {
   const { user, signOut } = useAuth();
-  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
+  const metadata = user?.user_metadata || {};
+  const [fullName, setFullName] = useState(metadata.full_name || "");
+  const [jobTitle, setJobTitle] = useState(metadata.job_title || "");
+  const [phone, setPhone] = useState(metadata.phone || "");
+  const [companyWebsite, setCompanyWebsite] = useState(metadata.company_website || "");
+  const [industry, setIndustry] = useState(metadata.industry || "");
+  const [teamSize, setTeamSize] = useState(metadata.team_size || "");
   const [profileMessage, setProfileMessage] = useState("");
   const [profileError, setProfileError] = useState("");
   const [password, setPassword] = useState("");
@@ -19,11 +25,19 @@ function SettingsContent() {
   const [busyPassword, setBusyPassword] = useState(false);
 
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setProfileMessage(""); setProfileError(""); setBusyProfile(true);
-    try { await updateProfile(fullName); setProfileMessage("Your profile details have been updated."); }
-    catch (error) { setProfileError(error instanceof Error ? error.message : "Could not update profile."); }
+    event.preventDefault(); setProfileMessage(""); setProfileError("");
+    if (fullName.trim().length < 2 || jobTitle.trim().length < 2) { setProfileError("Enter a valid name and job title."); return; }
+    if (phone && !/^\\+?[0-9() .-]{7,20}$/.test(phone)) { setProfileError("Enter a valid phone number."); return; }
+    if (companyWebsite && !/^https?:\\/\\//i.test(companyWebsite)) { setProfileError("Enter a valid company website URL."); return; }
+    if (!industry || !teamSize) { setProfileError("Select your industry and team size."); return; }
+    setBusyProfile(true);
+    try {
+      await updateProfile(fullName, { job_title: jobTitle.trim(), phone: phone.trim(), company_website: companyWebsite.trim(), industry, team_size: teamSize });
+      setProfileMessage("Your profile details have been updated.");
+    } catch (error) { setProfileError(error instanceof Error ? error.message : "Could not update profile."); }
     finally { setBusyProfile(false); }
   }
+
   async function savePassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setPasswordMessage(""); setPasswordError("");
     if (password.length < 10) { setPasswordError("Use at least 10 characters."); return; }
@@ -35,10 +49,15 @@ function SettingsContent() {
   }
 
   return <main id="main" className="page"><div className="container account-settings">
-    <header className="workspace-heading"><div><span className="eyebrow">ACCOUNT</span><h1>Profile settings</h1><p>Manage your account details and sign-in credentials.</p></div><div className="workspace-actions"><Link className="button button-secondary" href="/billing">Billing and subscription</Link><Link className="button button-secondary" href="/workspace">Back to workspace</Link></div></header>
-    <section className="panel settings-panel"><h2>Profile information</h2><form className="auth-form" onSubmit={saveProfile}>
-      <label htmlFor="profile-name">Full name</label><input id="profile-name" autoComplete="name" maxLength={100} value={fullName} onChange={event => setFullName(event.target.value)} placeholder="Enter your name" />
-      <label htmlFor="profile-email">Account email</label><input id="profile-email" type="email" value={user?.email || ""} readOnly aria-describedby="email-help" /><small id="email-help">Your sign-in email is managed by your authentication account. Contact an administrator if it needs to change.</small>
+    <header className="workspace-heading"><div><span className="eyebrow">ACCOUNT</span><h1>Profile settings</h1><p>Manage your personal and organization details, security and subscription.</p></div><div className="workspace-actions"><Link className="button button-secondary" href="/billing">Billing and subscription</Link><Link className="button button-secondary" href="/workspace">Back to workspace</Link></div></header>
+    <section className="panel settings-panel"><h2>Profile and company information</h2><p className="settings-description">These details help identify your role and the organization using CompatFlow. Your sign-in email is managed by your authentication account.</p><form className="auth-form" onSubmit={saveProfile}>
+      <label htmlFor="profile-name">Full name</label><input id="profile-name" autoComplete="name" minLength={2} maxLength={100} required value={fullName} onChange={event => setFullName(event.target.value)} />
+      <label htmlFor="profile-email">Account email</label><input id="profile-email" type="email" value={user?.email || ""} readOnly />
+      <label htmlFor="profile-job-title">Job title</label><input id="profile-job-title" minLength={2} maxLength={100} required value={jobTitle} onChange={event => setJobTitle(event.target.value)} />
+      <label htmlFor="profile-phone">Phone number</label><input id="profile-phone" type="tel" autoComplete="tel" maxLength={20} pattern="\\+?[0-9() .-]{7,20}" value={phone} onChange={event => setPhone(event.target.value)} />
+      <label htmlFor="profile-website">Company website</label><input id="profile-website" type="url" maxLength={255} value={companyWebsite} onChange={event => setCompanyWebsite(event.target.value)} placeholder="https://example.com" />
+      <label htmlFor="profile-industry">Industry</label><select id="profile-industry" required value={industry} onChange={event => setIndustry(event.target.value)}><option value="">Select industry</option><option value="ecommerce">Ecommerce / D2C</option><option value="retail">Retail</option><option value="automotive">Automotive / Parts</option><option value="manufacturing">Manufacturing</option><option value="distribution">Wholesale / Distribution</option><option value="technology">Technology / Software</option><option value="other">Other</option></select>
+      <label htmlFor="profile-team-size">Team size</label><select id="profile-team-size" required value={teamSize} onChange={event => setTeamSize(event.target.value)}><option value="">Select team size</option><option value="1">Just me</option><option value="2-5">2–5</option><option value="6-20">6–20</option><option value="21-50">21–50</option><option value="51-200">51–200</option><option value="201+">201+</option></select>
       {profileError && <p className="auth-error" role="alert">{profileError}</p>}{profileMessage && <p className="auth-success" role="status">{profileMessage}</p>}
       <button className="button auth-submit" disabled={busyProfile}>{busyProfile ? "Saving…" : "Save profile"}</button>
     </form></section>
