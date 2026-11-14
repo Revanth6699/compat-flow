@@ -91,7 +91,7 @@ export default function PricingPage() {
             const href = plan.code
               ? (user ? `/workspace?plan=${plan.code}` : `/sign-up?plan=${plan.code}`)
               : plan.href;
-            const action = plan.code && user ? "Manage subscription" : plan.action;
+            const action = plan.code && user ? "View billing" : plan.action;
             return (
               <article className={`pricing-card${plan.featured ? " pricing-card-featured" : ""}`} key={plan.name}>
                 <div className="pricing-card-top">
