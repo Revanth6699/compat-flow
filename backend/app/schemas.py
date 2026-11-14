@@ -218,3 +218,25 @@ class InventorySnapshotResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProductIdentifierCreateRequest(BaseModel):
+    product_id: uuid.UUID
+    identifier_type: str = Field(pattern="^(upc|ean|gtin|asin|marketplace_id|manufacturer_code|source_product_id|other)$")
+    namespace: str = Field(default="global", min_length=1, max_length=80)
+    value: str = Field(min_length=1, max_length=160)
+    source_reference: str | None = Field(default=None, max_length=255)
+    is_primary: bool = False
+
+
+class ProductIdentifierResponse(BaseModel):
+    id: uuid.UUID
+    product_id: uuid.UUID
+    identifier_type: str
+    namespace: str
+    value: str
+    source_reference: str | None
+    is_primary: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
