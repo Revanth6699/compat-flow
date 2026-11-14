@@ -123,6 +123,7 @@ async def _load_source(payload: ConnectorImportRequest) -> tuple[bytes, str]:
     rows = fetch_sql_server_rows(
         payload.sql_server_url, schema=payload.sql_schema, table=payload.sql_table,
         columns=payload.sql_columns, limit=payload.sql_row_limit,
+        max_bytes=settings.import_max_upload_bytes,
     )
     return json.dumps(rows, ensure_ascii=False, default=str).encode("utf-8"), "connector.json"
 
