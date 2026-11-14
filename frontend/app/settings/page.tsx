@@ -27,8 +27,8 @@ function SettingsContent() {
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setProfileMessage(""); setProfileError("");
     if (fullName.trim().length < 2 || jobTitle.trim().length < 2) { setProfileError("Enter a valid name and job title."); return; }
-    if (phone && !/^\\+?[0-9() .-]{7,20}$/.test(phone)) { setProfileError("Enter a valid phone number."); return; }
-    if (companyWebsite && !/^https?:\\/\\//i.test(companyWebsite)) { setProfileError("Enter a valid company website URL."); return; }
+    if (phone && !/^\+?[0-9() .-]{7,20}$/.test(phone)) { setProfileError("Enter a valid phone number."); return; }
+    if (companyWebsite && !/^https?:\/\//i.test(companyWebsite)) { setProfileError("Enter a valid company website URL."); return; }
     if (!industry || !teamSize) { setProfileError("Select your industry and team size."); return; }
     setBusyProfile(true);
     try {
@@ -54,7 +54,7 @@ function SettingsContent() {
       <label htmlFor="profile-name">Full name</label><input id="profile-name" autoComplete="name" minLength={2} maxLength={100} required value={fullName} onChange={event => setFullName(event.target.value)} />
       <label htmlFor="profile-email">Account email</label><input id="profile-email" type="email" value={user?.email || ""} readOnly />
       <label htmlFor="profile-job-title">Job title</label><input id="profile-job-title" minLength={2} maxLength={100} required value={jobTitle} onChange={event => setJobTitle(event.target.value)} />
-      <label htmlFor="profile-phone">Phone number</label><input id="profile-phone" type="tel" autoComplete="tel" maxLength={20} pattern="\\+?[0-9() .-]{7,20}" value={phone} onChange={event => setPhone(event.target.value)} />
+      <label htmlFor="signup-phone">Phone number</label><input id="signup-phone" type="tel" autoComplete="tel" maxLength={20} pattern="^\+?[0-9() .-]{7,20}$" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="+91 98765 43210" />
       <label htmlFor="profile-website">Company website</label><input id="profile-website" type="url" maxLength={255} value={companyWebsite} onChange={event => setCompanyWebsite(event.target.value)} placeholder="https://example.com" />
       <label htmlFor="profile-industry">Industry</label><select id="profile-industry" required value={industry} onChange={event => setIndustry(event.target.value)}><option value="">Select industry</option><option value="ecommerce">Ecommerce / D2C</option><option value="retail">Retail</option><option value="automotive">Automotive / Parts</option><option value="manufacturing">Manufacturing</option><option value="distribution">Wholesale / Distribution</option><option value="technology">Technology / Software</option><option value="other">Other</option></select>
       <label htmlFor="profile-team-size">Team size</label><select id="profile-team-size" required value={teamSize} onChange={event => setTeamSize(event.target.value)}><option value="">Select team size</option><option value="1">Just me</option><option value="2-5">2–5</option><option value="6-20">6–20</option><option value="21-50">21–50</option><option value="51-200">51–200</option><option value="201+">201+</option></select>
