@@ -25,7 +25,7 @@ const capabilities = [
 ];
 
 const steps = [
-  ["01", "Connect or upload", "Start with a CSV demo or use an authenticated workspace to access the input methods included in your plan."],
+  ["01", "Connect or upload", "Request demo access or use an authenticated workspace to access the input methods included in your plan."],
   ["02", "Validate and inspect", "Review field completeness, duplicate identifiers, rejected records and actionable validation issues."],
   ["03", "Decide what moves forward", "Use the validation output to correct supplier data before it is committed to your catalog workflow."],
 ];
@@ -45,10 +45,10 @@ export default function HomePage() {
               manage catalog inputs across teams and source systems.
             </p>
             <div className="home-hero-actions">
-              {user ? <Link className="button" href="/workspace">Open workspace</Link> : <Link className="button" href="/catalog/import">Try the CSV demo</Link>}
+              {user ? <Link className="button" href="/workspace">Open workspace</Link> : <Link className="button" href="/contact?intent=demo">Request demo access</Link>}
               {user ? <Link className="button button-secondary" href="/catalog/import">Validate catalog</Link> : <Link className="button button-secondary" href="/pricing">Explore plans</Link>}
             </div>
-            <p className="home-hero-note">{user ? "You are signed in. Open your workspace to manage your organization and catalog operations." : "Explore the public demo without an account. Subscription features require an authorized workspace."}</p>
+            <p className="home-hero-note">{user ? "You are signed in. Open your workspace to manage your organization and catalog operations." : "Request demo access. Demo access is reviewed and granted individually."}</p>
           </div>
           <div className="home-visual" aria-label="CompatFlow workflow overview">
             <div className="home-visual-top">
@@ -117,10 +117,10 @@ export default function HomePage() {
           <div className="home-demo-cta">
             <div>
               <div className="eyebrow">Start with a real workflow</div>
-              <h2>Try supplier CSV validation before you sign up.</h2>
-              <p>Upload a non-confidential CSV sample, review validation results on screen and see whether CompatFlow fits your workflow. Demo uploads are not saved.</p>
+              <h2>Request access to supplier CSV validation.</h2>
+              <p>Submit a demo request. If approved, you will receive access to the limited CSV validation workflow.</p>
             </div>
-            <Link className="button home-cta-button" href="/catalog/import">Open the CSV demo</Link>
+            <Link className="button home-cta-button" href="/contact?intent=demo">Request demo access</Link>
           </div>
         </div>
       </section>
