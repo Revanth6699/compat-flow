@@ -1,5 +1,6 @@
 import csv
 import json
+from collections import Counter
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
@@ -142,6 +143,92 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
             for error in result.row_errors[:50]
         ],
     )
+
+
+@router.post("/catalog/import/profile")
+async def profile_public_dataset(file: UploadFile = File(...)):
+    """Profile a bounded public-demo dataset without assuming it is a product catalog."""
+    filename = (file.filename or "").strip()
+    if not filename or len(filename) > 255:
+        await file.close()
+        raise HTTPException(status_code=400, detail="A valid filename is required.")
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if extension not in {"csv", "xls", "xlsx"}:
+        await file.close()
+        raise HTTPException(status_code=415, detail="The public dataset demo accepts CSV, XLS and XLSX files.")
+    limit = min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
+    try:
+        raw = await file.read(limit + 1)
+    finally:
+        await file.close()
+    if len(raw) > limit:
+        raise HTTPException(status_code=413, detail="Public demo uploads cannot exceed 5 MB.")
+    if not raw:
+        raise HTTPException(status_code=400, detail="Uploaded dataset is empty.")
+    try:
+        parsed = parse_source(raw, filename, max_records=10_000)
+    except IngestionParseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+
+    rows = [record.values for record in parsed.records]
+    total = len(rows)
+    columns = []
+    total_cells = total * len(parsed.headers)
+    populated_cells = 0
+    duplicate_keys = Counter()
+    for row in rows:
+        key = json.dumps(row, sort_keys=True, default=str, separators=(",", ":"))
+        duplicate_keys[key] += 1
+    duplicate_rows = sum(count - 1 for count in duplicate_keys.values() if count > 1)
+
+    for header in parsed.headers:
+        values = [row.get(header) for row in rows]
+        present = [value for value in values if value is not None and str(value).strip() != ""]
+        populated_cells += len(present)
+        numeric = []
+        for value in present:
+            try:
+                numeric.append(float(str(value).replace(",", "")))
+            except (TypeError, ValueError):
+                numeric = []
+                break
+        if not present:
+            inferred = "empty"
+        elif numeric and len(numeric) == len(present):
+            inferred = "numeric"
+        elif all(isinstance(value, bool) for value in present):
+            inferred = "boolean"
+        else:
+            inferred = "text / mixed"
+        columns.append({
+            "name": header,
+            "populated": len(present),
+            "missing": total - len(present),
+            "completeness_pct": round((len(present) / total * 100) if total else 0, 2),
+            "distinct_values": len({str(value) for value in present}),
+            "inferred_type": inferred,
+            "minimum": min(numeric) if numeric else None,
+            "maximum": max(numeric) if numeric else None,
+            "average": round(sum(numeric) / len(numeric), 4) if numeric else None,
+        })
+    normalized = {re.sub(r"[^a-z0-9]+", "_", header.casefold()).strip("_") for header in parsed.headers}
+    product_headers = {"sku", "product_sku", "item_sku", "product_code", "name", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category"}
+    return {
+        "filename": filename,
+        "format": parsed.format,
+        "total_records": total,
+        "total_columns": len(parsed.headers),
+        "total_cells": total_cells,
+        "populated_cells": populated_cells,
+        "missing_cells": total_cells - populated_cells,
+        "completeness_pct": round((populated_cells / total_cells * 100) if total_cells else 0, 2),
+        "duplicate_rows": duplicate_rows,
+        "columns": columns,
+        "preview": rows[:10],
+        "is_product_catalog": bool(normalized & product_headers),
+        "persisted": False,
+        "profile_scope": "file_structure_completeness_duplicates_and_basic_types",
+    }
 
 
 @router.post("/catalog/import/validate", response_model=ImportPreviewResponse)
