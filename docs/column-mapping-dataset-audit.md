@@ -357,3 +357,104 @@ Continue inspecting datasets individually and append each verified file here. Af
 - Added regression tests for CamelCase MPN detection and for keeping `model_number` unmapped by default.
 - The first CI run after the product_mpn test addition failed because the new test fixture contained literal backslash-n text instead of line breaks (67 passed, 1 failed). The fixture was corrected and the stricter alias tests were pushed afterward. The newest CI run is still in progress; do not treat it as green until it completes.
 - No ML model is trained or active. The next useful ML/AI step is a candidate ranker that combines header semantics, sample-value patterns, related columns, and source context; deterministic validation and metric computation stay outside the model.
+
+
+### 31. GTCatalog product/variant export
+
+- Source: https://github.com/kukulis/gtcatalog/blob/d53601aaecf3bf6e448ef5401b55bb667f1a8fda/data/products.csv
+- Type: multi-attribute product and variant export
+- Delimiter: comma
+- Header includes: `sku,brand,line,parent_sku,origin_country_code,vendor,manufacturer,type,purpose,measure,color,...,name,description,label,label_size,variant_name,tags,categories`
+- Mapping observations: SKU, name, and manufacturer are separate. Brand and vendor are also present and must not be collapsed into manufacturer. `parent_sku` groups variants; it is not the row SKU. `line`, `type`, and `categories` carry different taxonomy meanings. Sample values appear placeholder-like, so this is stronger evidence for schema shape than for real-world value distributions.
+- Current mapper gap: parent/variant relationships, vendor, line, origin, product attributes, labels, tags, and category hierarchies are not represented.
+
+### 32. Shopify Online Store 2.0 export
+
+- Source: https://github.com/mykola-havrylov/shopify-os2-sections-case/blob/1d4ea741328d4da750aa33c91b084bf8710aeabe/data/products.csv
+- Type: Shopify product and variant export
+- Delimiter: comma
+- Header includes: `Title,URL handle,Description,Vendor,Product category,Type,Tags,Published on online store,Status,SKU,Variant Barcodes,Option1 name,Option1 value,...,Price,Compare-at price,Cost per item,...,Inventory quantity,...,Google Shopping / Manufacturer part number (MPN),...`
+- Mapping observations: SKU is explicit. Product rows and variant rows share a handle; continuation rows can have a blank Title while retaining a distinct SKU and option value. This means row-level required-name validation without parent/variant context can incorrectly reject valid variant records. Vendor is not manufacturer. The MPN field is explicitly prefixed by Google Shopping and should be suggested as MPN only when that exact source header is present. Variant barcode, option names/values, and product-level metadata must remain distinct.
+- Current mapper gap: parent-child inheritance, variants, option attributes, barcodes, vendor, multiple price bases, stock, publication state, and source-specific MPN headers are not modeled.
+
+### 33. SmartHome device catalog
+
+- Source: https://github.com/NationalAssociationOfRealtors/SmartHomeChecklist/blob/d1734e69c3b7853c2768e9f0a75f33123cd19518/sample-products.csv
+- Type: smart-home device reference catalog
+- Delimiter: comma
+- Header: `device_class,device_name,hash,image,last_modified,manufacturer,support,website`
+- Mapping observations: `device_name` is a clear product-name candidate; `manufacturer` is explicit. `hash` is a source record key, not a SKU. `device_class` is a taxonomy label, not necessarily the product category used by a supplier. There is no SKU or MPN.
+- Current mapper gap: device_name alias, source record hash, device class, image, support URL, website, and update timestamp are not represented.
+
+### 34. Mediescare legacy medicine catalog
+
+- Source: https://github.com/ThemedEdits/mediescare-new/blob/90a894c43151f4a490ef0e12415195333abdf21f/docs/legacy-sample/products.csv
+- Type: pharmacy medicine catalog
+- Delimiter: comma
+- Header: `Brand name,Generic name,Strength,Dosage form,Category,Manufacturer,Smallest unit,Pack unit,Units in one pack,MRP per pack,Trade price per pack,Barcode,SKU`
+- Mapping observations: Brand name, Manufacturer, Category, and SKU are separate fields. Generic name and strength describe the active medicine; barcode is distinct from SKU. MRP and trade price are different commercial values. One row has a missing strength.
+- Current mapper gap: generic name, dosage, pack hierarchy, MRP/trade price, and barcode require domain-specific fields. Brand name should not be treated as manufacturer.
+
+### 35. PharmacyCentral medicine import sample
+
+- Source: https://github.com/nielpattin/PharmacyCentral/blob/80a0c08628882fb834681520119cc15fbaf57ad1/data/import-samples/products.csv
+- Type: pharmacy product import with regulatory and clinical metadata
+- Delimiter: comma
+- Header: `sku,name,category,manufacturer,genericName,activeIngredient,strength,dosageForm,packageDescription,unitName,unitPrice,barcode,registrationNumber,prescriptionRequired,imageUrl,status,effectiveFrom,indications`
+- Mapping observations: SKU, name, category, and manufacturer are explicit. Generic name, active ingredient, strength, dosage form, registration number, prescription flag, and indications are distinct fields. Barcode is not SKU. The sample contains multilingual product names/descriptions and long quoted indications.
+- Current mapper gap: medicine-specific identifiers and attributes, regulatory state, pricing, image, and effective dates are outside the current product schema.
+
+### 36. BrightSky scraped medical supply catalog
+
+- Source: https://github.com/Aaron199191/brightsky-scraper/blob/1bfbb538782ae7dfae6fc9ea2b90c0fd2ac88600/products.csv
+- Type: scraped medical supplies catalog with embedded JSON attributes
+- Delimiter: comma
+- Header: `sku,name,url,price,regular_price,sale_price,availability,categories,short_description,description,image_url,gallery_images,attributes`
+- Mapping observations: many top-level SKU and name cells are blank. The `attributes` column contains a quoted JSON object with nested `Product Number`, `Manufacturer Number`, `Manufacturer`, `Brand`, `Category`, and `title` values. Product Number and Manufacturer Number are distinct identifiers. The actual product name/manufacturer/MPN are not reliably available as top-level columns. This is a strong example for structured-cell extraction and AI-assisted mapping suggestions, but values must be parsed and reviewed before mapping.
+- Current mapper gap: JSON-in-cell parsing, nested attribute selection, source URL, multiple price fields, stock status, image galleries, and distinct product/manufacturer identifiers are unsupported.
+
+### 37. Snapdragon development-board parts catalog
+
+- Source: https://github.com/ThyFriendlyFox/via/blob/b14e84c4825c93fe2f7b3dd0b4dd0a7b13667c43/examples/snapdragon-dev-board/parts/catalog.csv
+- Type: electronics component BOM/parts sourcing catalog
+- Delimiter: comma
+- Header: `Value,Footprint,Qty,Manufacturer,MPN,Supplier,SKU,Pack,Breaks,Stock,Checked,URL,Note`
+- Mapping observations: Manufacturer, MPN, Supplier, and SKU are explicitly separate. MPN is the manufacturer's identifier; SKU is the distributor-specific ordering code; Supplier is the source. `Value` is an electrical component value (e.g. 10k, 0.33), not product name. `Footprint` describes the PCB package, not category. `Qty`, pack breaks, stock, and pricing notes are procurement data.
+- Current mapper gap: a distinct supplier SKU, BOM quantity, footprint, electrical value, pack pricing, stock, checked date, and sourcing URL are needed for this domain.
+
+### 38. ShelfReady Seiko watch catalog fixture
+
+- Source: https://github.com/jplogix/shelfReady/blob/41c8435cb34a836d1c9fd7eb752f3d3b9d892f8c/fixtures/seiko_demo_catalog.csv
+- Type: watch product master and validation fixture
+- Delimiter: comma
+- Header: `sku,title,description,brand,color,category,product_type,price,currency,stock,image_filename,model,mpn,case_diameter,case_thickness,lug_to_lug,lug_width,caliber,movement_type,power_reserve,case_material,crystal,bracelet_material,water_resistance,weight,collection,demo_scenario`
+- Mapping observations: SKU, title, category, model, and MPN are distinct. MPN is explicitly named, but some rows have no MPN. Brand casing varies (`Seiko` vs `SEIKO`); title is missing on a row; image files are missing or mismatched to variants; one row has conflicting case-diameter data; one row is explicitly marked ambiguous. This is a valuable row-level data quality fixture.
+- Current mapper gap: currency, image, stock, model, MPN, watch specifications, collection, and variant-specific media are not in the canonical schema.
+
+### 39. TS-System apparel inventory export
+
+- Source: https://github.com/hp2025-final/TS-System/blob/46961d86ed448d6eb7571a28bd03bac8fe249f0e/080825-Inventory.csv
+- Type: apparel collection/size inventory
+- Delimiter: comma
+- Header: `BarCode,Product Name,SKU,Collection,SIZE,Sale Price,Cost Price,Collection Description,Collection Discount,Tax Percentage,STATUS`
+- Mapping observations: Barcode, Product Name, and SKU are separate. Collection groups styles; SIZE is a variant attribute. The same SKU is repeated across multiple sizes and some rows are repeated exactly, so SKU uniqueness cannot be assumed at variant-row level. Sale Price and Cost Price are separate; values include quoted thousands separators and whitespace.
+- Current mapper gap: variant groups, size, collection, barcode, sale/cost prices, discounts, tax, and status require an apparel/inventory profile.
+
+### 40. Cosmic-Mart inventory and performance feed
+
+- Source: https://github.com/btbferguson/Cosmic-Mart/blob/f18b84ac90011cc35d2af4362f2022670e655b0e/src/data/cosmic_mart_inventory.csv
+- Type: inventory, sales velocity, and listing-risk feed
+- Delimiter: comma
+- Header: `sku_id,product_name,product_category,current_stock,sales_velocity_weekly,days_of_supply,season_relevance,our_price,competitor_price,return_rate_pct,notes`
+- Mapping observations: Product name and category are explicit. `sku_id` contains SKU-shaped values but remains source-specific until its contract is confirmed. Current stock, weekly velocity, days of supply, season, our price, competitor price, return rate, and free-text notes are operational/analytical fields, not product master attributes. The notes contain qualitative assertions that must not be converted into validated metrics without evidence.
+- Current mapper gap: stock, velocity, seasonality, competitive pricing, return metrics, and issue notes belong to an inventory/performance layer separate from catalog identity.
+
+## Findings after 40 individually inspected files
+
+1. Product variants are now a major confirmed gap. Shopify and apparel exports legitimately have multiple rows per parent product, blank repeated parent-level titles, and repeated SKUs across size/variant rows. Product-master duplicate rules must not be applied blindly to variant or inventory feeds.
+2. Structured data can be hidden inside JSON-valued cells. BrightSky stores product number, manufacturer number, manufacturer, brand, category, and title inside an `attributes` cell while top-level fields are blank. AI-assisted extraction can help propose nested mappings, but extraction must be deterministic and reviewable.
+3. Explicit `Manufacturer Number`, `Manufacturer Part Number`, `MPN`, and integration-qualified MPN fields are strong MPN candidates. `Product Number`, `model`, `SKU`, and `Supplier SKU` remain distinct identifiers.
+4. Supplier, vendor, brand, and manufacturer appear together in multiple exports and are not synonyms. Preserve their source semantics.
+5. Domain-specific feeds (medicine, electronic components, watches, apparel, smart-home devices) contain required attributes that do not fit the current generic product schema. Add profiles/extensions rather than forcing them into unrelated canonical fields.
+6. Source values can be more informative than names: blank top-level values, placeholder manufacturers, missing titles, invalid or absent barcodes, and mismatched variant images all require value-aware checks.
+7. AI should propose candidate mappings and explain evidence; deterministic parsing, schema checks, duplicate rules, and metrics should remain authoritative. The current 40 inspected files are a discovery corpus, not enough to claim model training quality.
