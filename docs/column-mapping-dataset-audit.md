@@ -458,3 +458,12 @@ Continue inspecting datasets individually and append each verified file here. Af
 5. Domain-specific feeds (medicine, electronic components, watches, apparel, smart-home devices) contain required attributes that do not fit the current generic product schema. Add profiles/extensions rather than forcing them into unrelated canonical fields.
 6. Source values can be more informative than names: blank top-level values, placeholder manufacturers, missing titles, invalid or absent barcodes, and mismatched variant images all require value-aware checks.
 7. AI should propose candidate mappings and explain evidence; deterministic parsing, schema checks, duplicate rules, and metrics should remain authoritative. The current 40 inspected files are a discovery corpus, not enough to claim model training quality.
+
+
+## Implementation update after the first 40 samples
+
+- Added `device_name` as a high-confidence product-name alias based on the smart-home catalog's explicit field.
+- Added `manufacturer_number` and the exact normalized Shopify field `google_shopping_manufacturer_part_number_mpn` as MPN candidates because the source labels explicitly identify manufacturer part numbers.
+- Added regression tests for all three aliases.
+- CI run 43558312383 completed successfully after the newline fixture correction: backend and frontend jobs passed. The newer alias changes are in CI run 43558661844 and have not completed yet.
+- The ML/AI direction remains a mapping assistant, not an automated validator: inspect header meaning, value shapes, related columns, and source context; rank suggestions with evidence; require confirmation for ambiguous mappings. Deterministic validation and metric computation remain authoritative.
