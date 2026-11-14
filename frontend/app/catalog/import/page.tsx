@@ -13,7 +13,7 @@ type RowIssue = {
   severity: "critical" | "warning"; category: string; recommendation: string;
 };
 type PreviewResponse = {
-  filename: string; total_rows: number; valid_rows: number; invalid_rows: number;
+  filename: string; profile_id: string; records_with_issues: number; duplicate_sku_count: number; duplicate_rate: number; issue_density: number; critical_record_rate: number; total_rows: number; valid_rows: number; invalid_rows: number;
   validation_pass_rate: number; data_quality_score: number; total_issues: number;
   critical_issues: number; warning_issues: number; errors: string[];
   issue_categories: { category: string; count: number }[];
@@ -29,6 +29,9 @@ export default function CatalogImportPage() {
   const [result, setResult] = useState<PreviewResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [profileId, setProfileId] = useState("general");
+  const [manualMapping, setManualMapping] = useState<Record<string, string>>({});
+  const canonicalFields = ["sku", "name", "manufacturer", "part_number", "category", "compatibility", "replacement_sku"];
 
   function handleFileChange(selectedFile: File | null) {
     setFile(selectedFile); setResult(null); setError("");
@@ -46,14 +49,19 @@ export default function CatalogImportPage() {
     setLoading(true); setError(""); setResult(null);
     try {
       const formData = new FormData(); formData.append("file", file);
+      formData.append("profile_id", profileId);
+      if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
       if (user) {
         const data = await apiRequest<PreviewResponse>("/api/v1/catalog/import/validate", { method: "POST", body: formData });
         setResult(data);
+        setManualMapping(Object.fromEntries(data.column_mappings.map((item) => [item.field, item.source_header])));
       } else {
         const response = await fetch("/api/catalog/import/preview", { method: "POST", body: formData });
         const data = await response.json();
         if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The backend could not validate this CSV.");
-        setResult(data as PreviewResponse);
+        const parsed = data as PreviewResponse;
+        setResult(parsed);
+        setManualMapping(Object.fromEntries(parsed.column_mappings.map((item) => [item.field, item.source_header])));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong while validating the file.");
@@ -103,7 +111,9 @@ export default function CatalogImportPage() {
 
         <section className="panel import-panel">
           <h2>Try the CSV validator</h2>
-          <p className="import-description">CSV only · Maximum 5 MB · Maximum 10,000 data rows.</p>
+          <p className="import-description">CSV only · Maximum 5 MB · Maximum 10,000 data rows (current validator limits).</p>
+          <label className="column-hint" htmlFor="catalog-profile">Catalog profile</label>
+          <select id="catalog-profile" value={profileId} onChange={(event) => { setProfileId(event.target.value); setResult(null); setManualMapping({}); }}><option value="general">General product catalog</option><option value="automotive">Automotive parts</option><option value="electronics">Electronics</option><option value="industrial">Industrial components</option></select>
           <p className="import-description">Files are validated in memory. This public demo does not save files or modify a catalog.</p>
           <p className="column-hint">CompatFlow detects common supplier header variants and maps them to the product catalog fields.</p>
           <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>
@@ -146,12 +156,15 @@ export default function CatalogImportPage() {
             </div>
 
             <div className="panel result-section">
-              <h3>Detected column mapping</h3>
+              <h3>Column mapping</h3>
               <p className="import-description">Confidence indicates how closely a source header matches a known alias. It is not a measure of data accuracy. Unrecognized columns are preserved in the source file but are not used by this product-catalog profile.</p>
               <div className="table-scroll"><table className="preview-table"><thead><tr><th>Product field</th><th>Source column</th><th>Mapping confidence</th></tr></thead>
                 <tbody>{result.column_mappings.map((mapping) => <tr key={mapping.field}>
                   <td>{mapping.field.replaceAll("_", " ")}</td><td>{mapping.source_header}</td><td>{(mapping.confidence * 100).toFixed(0)}%</td>
                 </tr>)}</tbody></table></div>
+              <p className="import-description">Adjust source columns below and revalidate. Each source column can map to only one canonical field.</p>
+              <div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical field</th><th>Source column</th></tr></thead><tbody>{canonicalFields.map((field) => <tr key={field}><td>{field.replaceAll("_", " ")}</td><td><select aria-label={"Source column for " + field} value={manualMapping[field] ?? ""} onChange={(event) => setManualMapping((current) => ({ ...current, [field]: event.target.value }))}><option value="">Not mapped</option>{[...new Set([...result.column_mappings.map((item) => item.source_header), ...result.unmapped_headers])].map((header) => <option key={header} value={header}>{header}</option>)}</select></td></tr>)}</tbody></table></div>
+              <button className="button button-secondary" type="button" onClick={handleValidate} disabled={loading || !file}>Revalidate with selected mapping</button>
               {result.unmapped_headers.length > 0 && <p className="import-description">Unmapped columns: {result.unmapped_headers.join(", ")}</p>}
             </div>
 
@@ -160,6 +173,10 @@ export default function CatalogImportPage() {
                 <button className="button button-secondary" type="button" onClick={downloadReport}>Download report</button>
               </div>
               <div className="result-stats">
+                <div className="stat-card"><span>Records with issues</span><strong>{result.records_with_issues}</strong></div>
+                <div className="stat-card"><span>Duplicate SKU rate</span><strong>{result.duplicate_rate.toFixed(2)}%</strong></div>
+                <div className="stat-card"><span>Issue density</span><strong>{result.issue_density.toFixed(3)}</strong></div>
+                <div className="stat-card"><span>Critical record rate</span><strong>{result.critical_record_rate.toFixed(2)}%</strong></div>
                 <div className="stat-card"><span>Critical issues</span><strong>{result.critical_issues}</strong></div>
                 <div className="stat-card"><span>Warnings</span><strong>{result.warning_issues}</strong></div>
               </div>
