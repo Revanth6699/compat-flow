@@ -242,3 +242,104 @@ def test_cannot_revoke_invitation_from_another_organization():
         assert db.committed is False
     finally:
         clear_overrides()
+
+
+def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
+    """Exercise invitation creation, listing, revocation, acceptance and reuse in PostgreSQL."""
+    from app.core.database import SessionLocal
+    from app.models import Organization, User, UserInvitation
+
+    db = SessionLocal()
+    organization_a = Organization(name=f"Invite tenant A {uuid4().hex[:8]}")
+    organization_b = Organization(name=f"Invite tenant B {uuid4().hex[:8]}")
+    owner_a = User(
+        organization_id=None,
+        auth_user_id=uuid4(),
+        email=f"invite-owner-a-{uuid4().hex[:8]}@example.test",
+        role="owner",
+        is_active=True,
+        account_type="demo",
+    )
+    owner_b = User(
+        organization_id=None,
+        auth_user_id=uuid4(),
+        email=f"invite-owner-b-{uuid4().hex[:8]}@example.test",
+        role="owner",
+        is_active=True,
+        account_type="demo",
+    )
+    try:
+        db.add_all([organization_a, organization_b])
+        db.flush()
+        owner_a.organization_id = organization_a.id
+        owner_b.organization_id = organization_b.id
+        db.add_all([owner_a, owner_b])
+        db.commit()
+
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            identity=SupabaseIdentity(owner_a.auth_user_id, owner_a.email, "owner-a-token"),
+            profile=owner_a,
+        )
+        app.dependency_overrides[get_db] = lambda: db
+        client = TestClient(app)
+
+        created_a = client.post("/api/v1/invitations", json={
+            "email": f"new-member-a-{uuid4().hex[:8]}@example.test",
+            "role": "member",
+        })
+        assert created_a.status_code == 201, created_a.text
+        invitation_a = created_a.json()
+
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            identity=SupabaseIdentity(owner_b.auth_user_id, owner_b.email, "owner-b-token"),
+            profile=owner_b,
+        )
+        created_b = client.post("/api/v1/invitations", json={
+            "email": f"new-member-b-{uuid4().hex[:8]}@example.test",
+            "role": "viewer",
+        })
+        assert created_b.status_code == 201, created_b.text
+        invitation_b = created_b.json()
+
+        app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
+            identity=SupabaseIdentity(owner_a.auth_user_id, owner_a.email, "owner-a-token"),
+            profile=owner_a,
+        )
+        listed_a = client.get("/api/v1/invitations")
+        assert listed_a.status_code == 200, listed_a.text
+        assert {row["id"] for row in listed_a.json()} == {invitation_a["id"]}
+        foreign_revoke = client.delete(f"/api/v1/invitations/{invitation_b['id']}")
+        assert foreign_revoke.status_code == 404
+
+        invitee_identity = SupabaseIdentity(
+            uuid4(), invitation_a["email"], "verified-invitee-token"
+        )
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides[get_supabase_identity] = lambda: invitee_identity
+        monkeypatch.setattr(auth_routes, "require_verified_supabase_email", lambda _: None)
+
+        accepted = client.post("/api/v1/invitations/accept", json={
+            "token": invitation_a["invitation_token"],
+        })
+        assert accepted.status_code == 200, accepted.text
+        assert accepted.json()["organization_id"] == str(organization_a.id)
+        assert accepted.json()["role"] == "member"
+
+        reused = client.post("/api/v1/invitations/accept", json={
+            "token": invitation_a["invitation_token"],
+        })
+        assert reused.status_code == 400
+
+        stored_a = db.get(UserInvitation, invitation_a["id"])
+        stored_b = db.get(UserInvitation, invitation_b["id"])
+        assert stored_a is not None and stored_a.accepted_at is not None
+        assert stored_b is not None and stored_b.revoked_at is None
+    finally:
+        clear_overrides()
+        try:
+            db.rollback()
+            db.delete(organization_a)
+            db.delete(organization_b)
+            db.commit()
+        finally:
+            db.close()
