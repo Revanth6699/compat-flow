@@ -226,10 +226,16 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
     }
   }
   if (!accessToken) throw new Error("Sign in is required to access this resource.");
-  const response = await fetch(`${API_BASE.replace(/\/$/, "")}${path}`, {
-    ...init,
-    headers: { ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init.headers, Authorization: `Bearer ${accessToken}` },
-  });
+  let response: Response;
+  const apiUrl = `${API_BASE.replace(/\/$/, "")}${path}`;
+  try {
+    response = await fetch(apiUrl, {
+      ...init,
+      headers: { ...(init.body instanceof FormData ? {} : { "Content-Type": "application/json" }), ...init.headers, Authorization: `Bearer ${accessToken}` },
+    });
+  } catch {
+    throw new Error(`CompatFlow could not reach its backend API (${API_BASE || "API base URL is empty"}). Check the backend deployment, NEXT_PUBLIC_API_BASE_URL and CORS configuration.`);
+  }
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new ApiRequestError(response.status, data.detail || data.message || "The request could not be completed.");
