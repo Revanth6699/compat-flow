@@ -1,4 +1,4 @@
-import Link from "next/link";
+"use client";\n\nimport Link from "next/link";\nimport { useAuth } from "@/components/auth-provider";
 
 const capabilities = [
   {
