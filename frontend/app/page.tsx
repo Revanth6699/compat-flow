@@ -31,8 +31,7 @@ const steps = [
 ];
 
 export default function HomePage() {
-  const { user, loading } = useAuth();
-  if (loading) return <main id="main" className="page"><div className="container">Loading your CompatFlow experience…</div></main>;
+  const { user } = useAuth();
   return (
     <main id="main" className="home-page">
       <section className="home-hero">
