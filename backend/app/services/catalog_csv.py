@@ -130,6 +130,18 @@ def _normalize_header(value: str) -> str:
     return value.strip("_")
 
 
+def _detect_delimiter(content: str) -> str:
+    """Detect common supplier-feed delimiters without splitting quoted values."""
+    sample = content[:65_536]
+    try:
+        return csv.Sniffer().sniff(sample, delimiters=",;\\t|").delimiter
+    except csv.Error:
+        first_line = next((line for line in sample.splitlines() if line.strip()), "")
+        counts = {delimiter: first_line.count(delimiter) for delimiter in (",", ";", "\\t", "|")}
+        delimiter, count = max(counts.items(), key=lambda item: item[1])
+        return delimiter if count else ","
+
+
 def _detect_columns(headers: list[str], required_fields=REQUIRED_FIELDS, column_mapping=None, allow_incomplete_mapping=False):
     normalized = [_normalize_header(header or "") for header in headers]
     if any(not header for header in normalized):
@@ -208,7 +220,8 @@ def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS, profile_id: str = 
         raise CatalogCSVValidationError(f"Unknown catalog profile '{profile_id}'.")
     required_fields = CATALOG_PROFILES[profile_id]
     stream = io.StringIO(content, newline="")
-    reader = csv.reader(stream, strict=True)
+    delimiter = _detect_delimiter(content)
+    reader = csv.reader(stream, delimiter=delimiter, strict=True)
     headers = next(reader, None)
     if not headers:
         raise CatalogCSVValidationError("CSV header row is missing.")
