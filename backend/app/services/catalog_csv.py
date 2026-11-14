@@ -130,7 +130,7 @@ def _normalize_header(value: str) -> str:
     return value.strip("_")
 
 
-def _detect_columns(headers: list[str], required_fields=REQUIRED_FIELDS, column_mapping=None):
+def _detect_columns(headers: list[str], required_fields=REQUIRED_FIELDS, column_mapping=None, allow_incomplete_mapping=False):
     normalized = [_normalize_header(header or "") for header in headers]
     if any(not header for header in normalized):
         raise CatalogCSVValidationError("CSV contains an empty column header.")
@@ -178,7 +178,7 @@ def _detect_columns(headers: list[str], required_fields=REQUIRED_FIELDS, column_
         unmapped = [header for index, header in enumerate(headers) if index not in target_indexes]
 
     missing = [field for field in required_fields if field not in detected]
-    if missing:
+    if missing and not allow_incomplete_mapping:
         raise CatalogCSVValidationError(
             "Could not map required product fields: "
             + ", ".join(missing)
@@ -194,7 +194,7 @@ def _detect_columns(headers: list[str], required_fields=REQUIRED_FIELDS, column_
     return normalized, detected, mappings, unmapped
 
 
-def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS, profile_id: str = "general", column_mapping: dict[str, str] | None = None) -> CatalogCSVResult:
+def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS, profile_id: str = "general", column_mapping: dict[str, str] | None = None, allow_incomplete_mapping: bool = False) -> CatalogCSVResult:
     if profile_id not in CATALOG_PROFILES:
         raise CatalogCSVValidationError(f"Unknown catalog profile '{profile_id}'.")
     required_fields = CATALOG_PROFILES[profile_id]
@@ -204,7 +204,7 @@ def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS, profile_id: str = 
     if not headers:
         raise CatalogCSVValidationError("CSV header row is missing.")
 
-    normalized_headers, detected, mappings, unmapped_headers = _detect_columns(headers, required_fields, column_mapping)
+    normalized_headers, detected, mappings, unmapped_headers = _detect_columns(headers, required_fields, column_mapping, allow_incomplete_mapping)
     valid_rows = []
     valid_row_numbers = []
     errors = []
