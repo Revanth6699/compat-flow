@@ -1,7 +1,5 @@
-import pytest
-
 from app.services.ingestion_adapters import parse_json
-from app.services.record_import import RecordMappingError, validate_parsed_records
+from app.services.record_import import validate_parsed_records
 
 
 def test_validate_product_records_with_exact_header_mapping():
