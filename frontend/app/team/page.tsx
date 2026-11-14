@@ -100,6 +100,7 @@ function TeamContent() {
 
   const canManage = role === "owner" || role === "admin";
   const canInviteAdmin = role === "owner";
+  const canInviteWithCurrentPlan = seats?.available_seats === null || (seats?.available_seats !== undefined && seats.available_seats > 0);
 
   return (
     <main id="main" className="page">
@@ -125,7 +126,8 @@ function TeamContent() {
             </section>}
             {canManage && <section className="panel settings-panel">
               <h2>Invite an employee</h2>
-              <p className="settings-description">Invitations reserve a seat for 72 hours. The employee must register or sign in with the invited email address and verify it before joining.</p>
+              <p className="settings-description">Invitations reserve a seat for 72 hours. Seat limits include the organization owner: Starter 3, Growth 10, Business 25; Enterprise limits are configured by contract.</p>
+              {!canInviteWithCurrentPlan && <p className="notice">Your organization has no available seats. Choose or upgrade a subscription before inviting employees.</p>}
               <form className="auth-form" onSubmit={createInvitation}>
                 <label htmlFor="team-email">Work email</label>
                 <input id="team-email" type="email" required value={email} onChange={event => setEmail(event.target.value)} placeholder="employee@company.com" />
@@ -135,7 +137,7 @@ function TeamContent() {
                   <option value="viewer">Viewer — read only</option>
                   {canInviteAdmin && <option value="admin">Admin — manage members and catalog</option>}
                 </select>
-                <button className="button auth-submit" disabled={busy}>{busy ? "Creating invitation…" : "Create invitation link"}</button>
+                <button className="button auth-submit" disabled={busy || !canInviteWithCurrentPlan}>{busy ? "Creating invitation…" : "Create invitation link"}</button>
               </form>
               {createdLink && <div className="notice"><strong>Invitation link</strong><p>Share this link only with the invited employee.</p><textarea readOnly rows={3} value={createdLink} aria-label="Invitation link" /><button className="button button-secondary" type="button" onClick={() => void copyInviteLink()}>Copy invitation link</button></div>}
             </section>}
