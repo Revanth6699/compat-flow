@@ -9,7 +9,7 @@ from app.core.config import settings
 
 
 class UploadBodyLimitMiddleware:
-    """Cap CSV request bodies before Starlette parses multipart uploads."""
+    """Cap import request bodies before Starlette parses multipart uploads."""
 
     def __init__(self, app, max_bytes: int):
         self.app = app
@@ -18,7 +18,7 @@ class UploadBodyLimitMiddleware:
     async def __call__(self, scope, receive, send):
         protected_paths = {
             "/api/v1/catalog/import/preview",
-            "/api/v1/catalog/import/validate",
+            "/api/v1/catalog/import/validate",\n            "/api/v1/catalog/import/parse-preview",
         }
         if (
             scope["type"] != "http"
@@ -33,7 +33,7 @@ class UploadBodyLimitMiddleware:
             try:
                 if int(content_length) > self.max_bytes:
                     response = JSONResponse(
-                        {"detail": "Request body exceeds the configured CSV upload limit."},
+                        {"detail": "Request body exceeds the configured import upload limit."},
                         status_code=413,
                     )
                     await response(scope, receive, send)
