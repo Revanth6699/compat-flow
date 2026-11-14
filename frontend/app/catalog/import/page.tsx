@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/auth-client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 type DatasetProfile = { filename: string; format: string; total_records: number; total_columns: number; total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number; duplicate_rows: number; is_product_catalog: boolean; persisted: false; columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string; minimum: number | null; maximum: number | null; average: number | null }[]; preview: Record<string, unknown>[] };
 type PreviewRow = {
@@ -49,7 +48,16 @@ type PreviewResponse = {
 };
 
 export default function CatalogImportPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [demoApproved, setDemoApproved] = useState(false);
+  useEffect(() => {
+    if (!user) { setDemoApproved(false); return; }
+    let active = true;
+    apiRequest<{ approved: boolean }>("/api/v1/demo-requests/mine")
+      .then((data) => { if (active) setDemoApproved(data.approved); })
+      .catch(() => { if (active) setDemoApproved(false); });
+    return () => { active = false; };
+  }, [user]);
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<PreviewResponse | null>(null);
   const [datasetResult, setDatasetResult] = useState<DatasetProfile | null>(null);
@@ -76,50 +84,41 @@ export default function CatalogImportPage() {
   }
 
   async function handleValidate() {
-    if (!file || loading) return;
+    if (!file || loading || !user) return;
     setLoading(true); setError(""); setResult(null); setDatasetResult(null); setMultiResult(null);
     try {
-      const formData = new FormData(); formData.append("file", file);
+      const formData = new FormData();
+      formData.append("file", file);
       const extension = file.name.split(".").pop()?.toLowerCase();
-      if (!user) {
-        const profileResponse = await fetch(`${API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE}/api/v1/catalog/import/profile`, { method: "POST", body: formData });
-        const profileData = await profileResponse.json();
-        if (!profileResponse.ok) throw new Error(typeof profileData.detail === "string" ? profileData.detail : "The dataset could not be profiled.");
-        const profile = profileData as DatasetProfile;
-        if (!profile.is_product_catalog) {
-          setDatasetResult(profile);
-          return;
+
+      if (demoApproved) {
+        const profile = await apiRequest<DatasetProfile>("/api/v1/catalog/import/profile", { method: "POST", body: formData });
+        if (!profile.is_product_catalog) { setDatasetResult(profile); return; }
+        if (extension === "csv") {
+          formData.append("profile_id", profileId);
+          if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
+          const data = await apiRequest<PreviewResponse>("/api/v1/catalog/import/preview", { method: "POST", body: formData });
+          setResult(data);
+          setManualMapping(Object.fromEntries(data.column_mappings.map((item) => [item.field, item.source_header])));
+        } else {
+          const data = await apiRequest<MultiResult>("/api/v1/catalog/import/preview-records", { method: "POST", body: formData });
+          setMultiResult(data);
         }
+        return;
       }
-      if (extension !== "csv" || recordType !== "products" || Object.keys(manualMapping).some((field) => !canonicalFields.includes(field))) {
-        if (!user && ["xlsx", "xls"].includes(extension ?? "") && recordType === "products") {
-          const response = await fetch(`${API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE}/api/v1/catalog/import/preview-records`, { method: "POST", body: formData });
-          const data = await response.json();
-          if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The backend could not validate this spreadsheet.");
-          setMultiResult(data as MultiResult);
-          return;
-        }
-        if (!user) throw new Error("Sign in and choose a plan to validate JSON, XML or other catalog inputs.");
+
+      if (extension === "csv" && recordType === "products") {
+        formData.append("profile_id", profileId);
+        if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
+        const data = await apiRequest<PreviewResponse>("/api/v1/catalog/import/validate", { method: "POST", body: formData });
+        setResult(data);
+        setManualMapping(Object.fromEntries(data.column_mappings.map((item) => [item.field, item.source_header])));
+      } else {
         formData.append("record_type", recordType);
         if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
         const data = await apiRequest<MultiResult>("/api/v1/catalog/import/validate-records", { method: "POST", body: formData });
         setMultiResult(data);
         setManualMapping(Object.fromEntries(data.mappings.map((item) => [item.field, item.source_header])));
-        return;
-      }
-      formData.append("profile_id", profileId);
-      if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
-      if (user) {
-        const data = await apiRequest<PreviewResponse>("/api/v1/catalog/import/validate", { method: "POST", body: formData });
-        setResult(data);
-        setManualMapping(Object.fromEntries(data.column_mappings.map((item) => [item.field, item.source_header])));
-      } else {
-        const response = await fetch(`${API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE}/api/v1/catalog/import/preview`, { method: "POST", body: formData });
-        const data = await response.json();
-        if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The backend could not validate this CSV.");
-        const parsed = data as PreviewResponse;
-        setResult(parsed);
-        setManualMapping(Object.fromEntries(parsed.column_mappings.map((item) => [item.field, item.source_header])));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong while validating the file.");
@@ -185,31 +184,42 @@ export default function CatalogImportPage() {
     URL.revokeObjectURL(url);
   }
 
+  if (authLoading) return <main id="main" className="page"><div className="container"><p>Checking your account...</p></div></main>;
+  if (!user) return (
+    <main id="main" className="page"><div className="container">
+      <section className="panel import-panel">
+        <div className="eyebrow">RESTRICTED WORKSPACE</div>
+        <h1>Demo access is not public</h1>
+        <p>Submit a demo request. If approved, create an account or sign in with the same email address to use the upload workflow. Subscribed customers can sign in to access their plan features.</p>
+        <div className="import-actions"><a className="button" href="/contact?intent=demo">Request demo access</a><a className="button button-secondary" href="/sign-in">Sign in</a></div>
+      </section>
+    </div></main>
+  );
   return (
     <main id="main" className="page">
       <div className="container">
         <div className="import-heading">
-          <div className="eyebrow">{user ? "CUSTOMER CATALOG WORKSPACE" : "PUBLIC DATASET DEMO"}</div>
-          <h1>{user ? "Validate your catalog data" : "Explore your dataset quality"}</h1>
-          <p>{user ? "Validate product data using the file formats and limits available to your organization. Review field completeness, duplicates and actionable issues." : "Upload a dataset to inspect its structure, completeness, duplicates and field statistics. Product catalogs also receive CompatFlow catalog validation."}</p>
+          <div className="eyebrow">{demoApproved ? "APPROVED DEMO WORKSPACE" : "CUSTOMER CATALOG WORKSPACE"}</div>
+          <h1>{demoApproved ? "Explore your approved demo" : "Validate your catalog data"}</h1>
+          <p>{demoApproved ? "Use the limited, stateless demo workflow. Access is checked by the backend on every upload." : "Validate product data using the file formats and limits available to your organization. Review field completeness, duplicates and actionable issues."}</p>
           {user && <p className="import-description"><a href="/catalog/sources">Connect a REST API, SFTP server or SQL Server source →</a></p>}
         </div>
 
         <section className="panel import-panel">
           <h2>Catalog file validation</h2>
-          <p className="import-description">{user ? "Subscribed validation: up to 25 MB per file, subject to plan entitlements and configured backend limits." : "Public demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file."}</p>
+          <p className="import-description">{demoApproved ? "Approved demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file." : "Subscribed validation: file limits and formats are controlled by your active plan."}</p>
           <div className="import-description">
-            {user ? "CompatFlow detects common supplier product fields and applies the validation features available on your plan. JSON, XML and connected data sources require the corresponding plan entitlement." : "Public demo accepts CSV, XLS and XLSX. Product catalogs receive catalog validation; other datasets receive structural profiling."}
+            {demoApproved ? "Approved demo access is stateless and does not save uploaded files." : "CompatFlow detects common supplier product fields and applies the validation features available on your plan."}
           </div>
-          <p className="import-description">{user ? "Files are validated in memory. This preview does not save files or commit records to your organization catalog." : "Files are validated in memory. This public demo does not save files or modify a catalog."}</p>
-          {!user && <p className="column-hint">Non-product datasets are profiled using their actual columns; CompatFlow will not label them as invalid product catalogs or invent a product quality score.</p>}
-          {!user && <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>}
+          <p className="import-description">Files are validated in memory. This preview does not save files or commit records to your organization catalog.</p>
+          {demoApproved && <p className="column-hint">Non-product datasets are profiled using their actual columns; CompatFlow will not label them as invalid product catalogs or invent a product quality score.</p>}
+          {demoApproved && <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>}
           <label className="file-picker" htmlFor="catalog-file">
             <span className="file-picker-icon" aria-hidden="true">↥</span>
             <strong>{file ? file.name : "Choose a catalog file"}</strong>
             <span>{file ? `${(file.size / 1024).toFixed(1)} KB` : "Select a file from your computer"}</span>
           </label>
-          <input id="catalog-file" className="visually-hidden" type="file" accept={user ? ".csv,.xlsx,.xls,.json,.xml,text/csv,application/json,application/xml" : ".csv,.xlsx,.xls,text/csv"}
+          <input id="catalog-file" className="visually-hidden" type="file" accept={demoApproved ? ".csv,.xlsx,.xls,text/csv" : ".csv,.xlsx,.xls,.json,.xml,text/csv,application/json,application/xml"}
             onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)} />
           <div className="import-actions">
             <button className="button" type="button" onClick={handleValidate} disabled={!file || loading}>
