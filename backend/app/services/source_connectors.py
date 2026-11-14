@@ -6,6 +6,7 @@ This module deliberately does not expose arbitrary write SQL or persist credenti
 from __future__ import annotations
 
 import ipaddress
+import json
 import re
 import socket
 from urllib.parse import unquote_plus
@@ -30,7 +31,10 @@ def _validate_https_url(url: str, allowed_hosts: set[str]) -> None:
     if host not in {item.casefold().rstrip(".") for item in allowed_hosts}:
         raise SourceConnectorError("Connector host is not in the configured allowlist.")
     try:
-        resolved = {item[4][0] for item in socket.getaddrinfo(host, parsed.port or 443, type=socket.SOCK_STREAM)}
+        port = parsed.port or 443
+        resolved = {item[4][0] for item in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)}
+    except ValueError:
+        raise SourceConnectorError("Connector URL contains an invalid port.") from None
     except OSError:
         raise SourceConnectorError("Connector host could not be resolved.") from None
     for value in resolved:
@@ -110,7 +114,8 @@ def fetch_sftp_file(*, host: str, port: int, username: str, password: str | None
 
 
 def fetch_sql_server_rows(connection_url: str, *, schema: str, table: str,
-                          columns: list[str], limit: int = 10_000) -> list[dict[str, Any]]:
+                          columns: list[str], limit: int = 10_000,
+                          max_bytes: int = 10 * 1024 * 1024) -> list[dict[str, Any]]:
     """Read a bounded projection from SQL Server; arbitrary SQL is intentionally unsupported."""
     if not connection_url.startswith("mssql+pyodbc://"):
         raise SourceConnectorError("SQL Server requires a mssql+pyodbc connection URL and configured ODBC driver.")
@@ -143,8 +148,13 @@ def fetch_sql_server_rows(connection_url: str, *, schema: str, table: str,
                 source_table = Table(table, MetaData(), schema=schema, autoload_with=connection)
                 selected_columns = [source_table.c[column] for column in columns]
                 statement = select(*selected_columns).limit(limit)
-                rows = connection.execute(statement).mappings().all()
-                return [dict(row) for row in rows]
+                rows = [dict(row) for row in connection.execute(statement).mappings().all()]
+                # A row-count limit alone does not bound memory or response size when
+                # selected columns contain large text/blob values. Apply the same
+                # byte budget used by file and REST ingestion before serialization.
+                if len(json.dumps(rows, ensure_ascii=False, default=str).encode("utf-8")) > max_bytes:
+                    raise SourceConnectorError("SQL Server result exceeds the configured size limit.")
+                return rows
         finally:
             engine.dispose()
     except Exception:
