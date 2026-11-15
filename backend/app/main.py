@@ -22,6 +22,8 @@ class UploadBodyLimitMiddleware:
     async def __call__(self, scope, receive, send):
         protected_paths = {
             "/api/v1/catalog/import/preview",
+            "/api/v1/catalog/import/preview-industry",
+            "/api/v1/catalog/import/validate-industry",
             "/api/v1/catalog/import/profile",
             "/api/v1/catalog/import/preview-records",
             "/api/v1/catalog/import/validate",
