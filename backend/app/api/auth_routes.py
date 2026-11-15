@@ -133,7 +133,7 @@ def delete_account(
             ) from None
 
         # Delete other members first and the admin last. If a provider call fails,
-        # the owner can still sign in and retry the organization deletion.
+        # the admin can still sign in and retry the organization deletion.
         members.sort(key=lambda member: member.role == "admin")
         for member in members:
             if member.auth_user_id:
