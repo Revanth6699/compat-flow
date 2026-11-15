@@ -60,8 +60,9 @@ jobs:
           mkdir -p backend/tests/connector-simulator/runtime
           docker compose -f backend/tests/connector-simulator/compose.yaml cp rest-supplier:/run/tls/server.crt backend/tests/connector-simulator/runtime/rest-ca.crt
           docker compose -f backend/tests/connector-simulator/compose.yaml cp sql-supplier:/tls/sql-server.crt backend/tests/connector-simulator/runtime/sql-server.crt
-          sudo cp backend/tests/connector-simulator/runtime/sql-server.crt /usr/local/share/ca-certificates/compatflow-sql-simulator.crt
-          sudo update-ca-certificates
+          sudo cp backend/tests/connector-simulator/runtime/sql-server.crt /usr/share/ca-certificates/compatflow-sql-simulator.crt
+          sudo DEBIAN_FRONTEND=noninteractive dpkg-reconfigure ca-certificates
+          sudo update-ca-certificates --fresh
           openssl x509 -in backend/tests/connector-simulator/runtime/sql-server.crt -noout -subject -issuer -ext subjectKeyIdentifier
           openssl x509 -in backend/tests/connector-simulator/runtime/sql-server.crt -noout -ext authorityKeyIdentifier
           openssl verify -verbose -show_chain -purpose sslserver -verify_hostname sql-supplier -CAfile /etc/ssl/certs/ca-certificates.crt backend/tests/connector-simulator/runtime/sql-server.crt
