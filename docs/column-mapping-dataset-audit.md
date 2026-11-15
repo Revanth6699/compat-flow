@@ -1,4 +1,11 @@
-# Column-Mapping Dataset Audit
+# Column Mapping Dataset Audit
+
+## Document status and use
+
+> **Document type:** Historical dataset evidence log  
+> **Purpose:** Record inspected source files, observed headers, and evidence-based mapping decisions.  
+> **Provenance:** The inspection work originated on `feature/backend-auth-authorization`; that historical provenance is retained below.  
+> **Maintenance:** Findings describe the state at the time each sample was inspected. They are not a statement of current runtime capability. For current implementation boundaries, see [Multi-Source Ingestion](multi-source-ingestion.md), [Catalog Record Model](catalog-record-model.md), and [AI-Assisted Column Mapping](column-mapping-ai-design.md).
 
 Status: in progress  
 Branch: `feature/backend-auth-authorization`  
