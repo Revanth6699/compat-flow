@@ -8,14 +8,12 @@ import { useEffect, useState } from "react";
 export function SiteHeader() {
   const { user, loading, signOut } = useAuth();
   const [platformAdminForUser, setPlatformAdminForUser] = useState<{ userId: string; isAdmin: boolean } | null>(null);
-  const [organizationRoleForUser, setOrganizationRoleForUser] = useState<{ userId: string; role: string } | null>(null);
   const isPlatformAdmin = !!user && platformAdminForUser?.userId === user.id && platformAdminForUser.isAdmin;
-  const isOrganizationAdmin = !!user && organizationRoleForUser?.userId === user.id && organizationRoleForUser.role === "admin";
   useEffect(() => {
     if (!user) return;
     let active = true;
     apiRequest<{ is_platform_admin?: boolean; role: string }>("/api/v1/auth/me")
-      .then((profile) => { if (active) { setPlatformAdminForUser({ userId: user.id, isAdmin: profile.is_platform_admin === true }); setOrganizationRoleForUser({ userId: user.id, role: profile.role }); } })
+      .then((profile) => { if (active) { setPlatformAdminForUser({ userId: user.id, isAdmin: profile.is_platform_admin === true }); } })
       .catch(() => { if (active) setPlatformAdminForUser({ userId: user.id, isAdmin: false }); });
     return () => { active = false; };
   }, [user]);
