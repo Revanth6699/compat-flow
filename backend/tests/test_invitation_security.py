@@ -152,7 +152,7 @@ def test_valid_invitation_is_consumed_once_and_creates_membership(monkeypatch):
         clear_overrides()
 
 
-def test_admin_cannot_revoke_an_administrator_invitation():
+def test_admin_can_revoke_a_legacy_administrator_invitation():
     profile = SimpleNamespace(
         id=uuid4(),
         organization_id=uuid4(),
@@ -170,9 +170,9 @@ def test_admin_cannot_revoke_an_administrator_invitation():
     app.dependency_overrides[get_db] = lambda: db
     try:
         response = TestClient(app).delete(f"/api/v1/invitations/{invitation.id}")
-        assert response.status_code == 403
-        assert not db.committed
-        assert invitation.revoked_at is None
+        assert response.status_code == 204
+        assert db.committed
+        assert invitation.revoked_at is not None
     finally:
         clear_overrides()
 
