@@ -198,7 +198,7 @@ def make_current(role="admin"):
     profile = SimpleNamespace(
         id=uuid4(),
         organization_id=uuid4(),
-        email="owner@example.com",
+        email="admin@example.com",
         role=role,
         is_active=True,
     )
@@ -254,19 +254,19 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
     db = SessionLocal()
     organization_a = Organization(name=f"Invite tenant A {uuid4().hex[:8]}")
     organization_b = Organization(name=f"Invite tenant B {uuid4().hex[:8]}")
-    owner_a = User(
+    admin_a = User(
         organization_id=None,
         auth_user_id=uuid4(),
-        email=f"invite-owner-a-{uuid4().hex[:8]}@example.test",
-        role="owner",
+        email=f"invite-admin-a-{uuid4().hex[:8]}@example.test",
+        role="admin",
         is_active=True,
         account_type="demo",
     )
-    owner_b = User(
+    admin_b = User(
         organization_id=None,
         auth_user_id=uuid4(),
-        email=f"invite-owner-b-{uuid4().hex[:8]}@example.test",
-        role="owner",
+        email=f"invite-admin-b-{uuid4().hex[:8]}@example.test",
+        role="admin",
         is_active=True,
         account_type="demo",
     )
@@ -274,9 +274,9 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
     try:
         db.add_all([organization_a, organization_b])
         db.flush()
-        owner_a.organization_id = organization_a.id
-        owner_b.organization_id = organization_b.id
-        db.add_all([owner_a, owner_b])
+        admin_a.organization_id = organization_a.id
+        admin_b.organization_id = organization_b.id
+        db.add_all([admin_a, admin_b])
         seat_plan = SubscriptionPlan(
             code=f"seat-{uuid4().hex[:8]}",
             name=f"Seat Test Plan {uuid4().hex[:8]}",
@@ -288,14 +288,14 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         db.add_all([
             Subscription(
                 organization_id=organization_a.id,
-                user_id=owner_a.id,
+                user_id=admin_a.id,
                 plan_code=seat_plan.code,
                 status="active",
                 current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
             ),
             Subscription(
                 organization_id=organization_b.id,
-                user_id=owner_b.id,
+                user_id=admin_b.id,
                 plan_code=seat_plan.code,
                 status="active",
                 current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
@@ -304,8 +304,8 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         db.commit()
 
         app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
-            identity=SupabaseIdentity(owner_a.auth_user_id, owner_a.email, "owner-a-token"),
-            profile=owner_a,
+            identity=SupabaseIdentity(admin_a.auth_user_id, admin_a.email, "admin-a-token"),
+            profile=admin_a,
         )
         app.dependency_overrides[get_db] = lambda: db
         client = TestClient(app)
@@ -325,8 +325,8 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         assert "member-seat limit" in over_limit.text
 
         app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
-            identity=SupabaseIdentity(owner_b.auth_user_id, owner_b.email, "owner-b-token"),
-            profile=owner_b,
+            identity=SupabaseIdentity(admin_b.auth_user_id, admin_b.email, "admin-b-token"),
+            profile=admin_b,
         )
         created_b = client.post("/api/v1/invitations", json={
             "email": f"new-member-b-{uuid4().hex[:8]}@example.com",
@@ -336,8 +336,8 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         invitation_b = created_b.json()
 
         app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
-            identity=SupabaseIdentity(owner_a.auth_user_id, owner_a.email, "owner-a-token"),
-            profile=owner_a,
+            identity=SupabaseIdentity(admin_a.auth_user_id, admin_a.email, "admin-a-token"),
+            profile=admin_a,
         )
         listed_a = client.get("/api/v1/invitations")
         assert listed_a.status_code == 200, listed_a.text
@@ -365,12 +365,12 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         assert reused.status_code == 400
 
         app.dependency_overrides[get_current_user] = lambda: AuthenticatedUser(
-            identity=SupabaseIdentity(owner_a.auth_user_id, owner_a.email, "owner-a-token"),
-            profile=owner_a,
+            identity=SupabaseIdentity(admin_a.auth_user_id, admin_a.email, "admin-a-token"),
+            profile=admin_a,
         )
         members = client.get("/api/v1/invitations/members")
         assert members.status_code == 200, members.text
-        assert {row["id"] for row in members.json()} == {str(owner_a.id), accepted.json()["id"]}
+        assert {row["id"] for row in members.json()} == {str(admin_a.id), accepted.json()["id"]}
 
         changed_role = client.patch(
             f"/api/v1/invitations/members/{accepted.json()['id']}",
@@ -386,14 +386,14 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         assert deactivated.status_code == 200, deactivated.text
         assert deactivated.json()["is_active"] is False
 
-        owner_change = client.patch(
-            f"/api/v1/invitations/members/{owner_a.id}",
+        admin_change = client.patch(
+            f"/api/v1/invitations/members/{admin_a.id}",
             json={"role": "viewer"},
         )
-        assert owner_change.status_code == 403
+        assert admin_change.status_code == 403
 
         foreign_member = client.patch(
-            f"/api/v1/invitations/members/{owner_b.id}",
+            f"/api/v1/invitations/members/{admin_b.id}",
             json={"role": "viewer"},
         )
         assert foreign_member.status_code == 404
@@ -436,19 +436,19 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
     try:
         db.add_all([organization_a, organization_b])
         db.flush()
-        owner_a = User(
+        admin_a = User(
             organization_id=organization_a.id,
             auth_user_id=uuid4(),
             email=f"integrity-a-{uuid4().hex[:8]}@example.com",
-            role="owner",
+            role="admin",
             is_active=True,
             account_type="demo",
         )
-        owner_b = User(
+        admin_b = User(
             organization_id=organization_b.id,
             auth_user_id=uuid4(),
             email=f"integrity-b-{uuid4().hex[:8]}@example.com",
-            role="owner",
+            role="admin",
             is_active=True,
             account_type="demo",
         )
@@ -458,7 +458,7 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
             entitlements={},
             is_active=True,
         )
-        db.add_all([owner_a, owner_b, plan])
+        db.add_all([admin_a, admin_b, plan])
         db.commit()
 
         # Persist the valid tenant fixtures before each expected constraint
@@ -468,7 +468,7 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
             email=f"cross-inviter-{uuid4().hex[:8]}@example.com",
             role="viewer",
             token_hash=uuid4().hex + uuid4().hex,
-            invited_by_user_id=owner_b.id,
+            invited_by_user_id=admin_b.id,
             expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )
         db.add(bad_invitation)
@@ -478,7 +478,7 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
 
         bad_subscription = Subscription(
             organization_id=organization_a.id,
-            user_id=owner_b.id,
+            user_id=admin_b.id,
             plan_code=plan.code,
             status="active",
         )
@@ -489,7 +489,7 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
 
         valid_subscription = Subscription(
             organization_id=organization_a.id,
-            user_id=owner_a.id,
+            user_id=admin_a.id,
             plan_code=plan.code,
             status="active",
         )
@@ -498,7 +498,7 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
 
         bad_payment = Payment(
             organization_id=organization_a.id,
-            user_id=owner_b.id,
+            user_id=admin_b.id,
             subscription_id=valid_subscription.id,
             provider="test",
             amount_minor=100,
@@ -552,18 +552,18 @@ def test_postgres_downgrade_retains_existing_members_and_blocks_new_seats(monkey
         entitlements={"member_seats": 3},
         is_active=True,
     )
-    owner = None
+    admin = None
     member = None
     invitation = None
     raw_token = "downgrade-test-token-" + uuid4().hex
     try:
         db.add_all([organization, plan])
         db.flush()
-        owner = User(
+        admin = User(
             organization_id=organization.id,
             auth_user_id=uuid4(),
-            email=f"downgrade-owner-{uuid4().hex[:8]}@example.com",
-            role="owner",
+            email=f"downgrade-admin-{uuid4().hex[:8]}@example.com",
+            role="admin",
             is_active=True,
             account_type="subscriber",
         )
@@ -575,11 +575,11 @@ def test_postgres_downgrade_retains_existing_members_and_blocks_new_seats(monkey
             is_active=True,
             account_type="subscriber",
         )
-        db.add_all([owner, member])
+        db.add_all([admin, member])
         db.flush()
         db.add(Subscription(
             organization_id=organization.id,
-            user_id=owner.id,
+            user_id=admin.id,
             plan_code=plan.code,
             status="active",
             current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
@@ -589,17 +589,17 @@ def test_postgres_downgrade_retains_existing_members_and_blocks_new_seats(monkey
             email=f"downgrade-invitee-{uuid4().hex[:8]}@example.com",
             role="viewer",
             token_hash=sha256(raw_token.encode("utf-8")).hexdigest(),
-            invited_by_user_id=owner.id,
+            invited_by_user_id=admin.id,
             expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
         )
         db.add(invitation)
         db.commit()
 
-        owner_auth = AuthenticatedUser(
-            identity=SupabaseIdentity(owner.auth_user_id, owner.email, "owner-token"),
-            profile=owner,
+        admin_auth = AuthenticatedUser(
+            identity=SupabaseIdentity(admin.auth_user_id, admin.email, "admin-token"),
+            profile=admin,
         )
-        app.dependency_overrides[get_current_user] = lambda: owner_auth
+        app.dependency_overrides[get_current_user] = lambda: admin_auth
         app.dependency_overrides[get_db] = lambda: db
         client = TestClient(app)
 
@@ -623,9 +623,9 @@ def test_postgres_downgrade_retains_existing_members_and_blocks_new_seats(monkey
         assert usage["available_seats"] == 0
         assert usage["existing_members_retained"] is True
 
-        db.refresh(owner)
+        db.refresh(admin)
         db.refresh(member)
-        assert owner.is_active is True
+        assert admin.is_active is True
         assert member.is_active is True
 
         new_invitation = client.post("/api/v1/invitations", json={
@@ -644,9 +644,9 @@ def test_postgres_downgrade_retains_existing_members_and_blocks_new_seats(monkey
 
         db.refresh(invitation)
         assert invitation.accepted_at is None
-        db.refresh(owner)
+        db.refresh(admin)
         db.refresh(member)
-        assert owner.is_active is True
+        assert admin.is_active is True
         assert member.is_active is True
     finally:
         clear_overrides()
