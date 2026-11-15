@@ -1,39 +1,42 @@
 # Product Scope
 
-**Status:** Initial V1 scope; discovery assumptions are not validated market claims.
+**Status:** Initial product scope. The assumptions below have not been validated through customer research.
 
-## Product purpose
+## Purpose
 
-CompatFlow is intended to support supplier-catalog change operations. The workflow receives supplier product data, standardizes records, compares incoming data with an existing catalog, supports human review, and prepares approved changes for publishing.
+CompatFlow is being developed to help teams review and manage changes in supplier product catalogs. The intended workflow is to receive supplier data, standardize it, compare it with an existing catalog, review proposed changes, and prepare approved records for export or publishing.
 
-## Initial discovery vertical
+## Initial market focus
 
-Automotive aftermarket parts is the current discovery vertical. This is a working focus, not evidence that market demand, willingness to pay, or a competitor gap has been validated.
+The first discovery focus is the automotive aftermarket. This is a working choice for product research, not a claim that demand, willingness to pay, or an unmet market need has been established.
 
-## Target V1 workflow
+## Proposed V1 workflow
 
 1. Create a supplier profile.
 2. Upload supplier catalog data.
-3. Validate file structure, required fields, and values.
-4. Map supplier fields to the CompatFlow catalog model.
-5. Compare incoming records with existing catalog records.
+3. Check the file structure, required fields, and values.
+4. Map supplier columns to the CompatFlow catalog model.
+5. Compare incoming records with the current catalog.
 6. Classify records as new, changed, unchanged, removed, or invalid.
-7. Present proposed changes for human review.
-8. Approve or reject each proposed change.
-9. Export approved changes in a normalized format.
+7. Review proposed changes.
+8. Approve or reject each change.
+9. Export approved records in a normalized format.
 
-## Explicit exclusions
+## Out of scope
 
-- No proprietary vehicle-fitment database.
-- No automatic safety-critical compatibility decisions.
-- No unverified fuzzy match treated as proof of fitment.
-- No Shopify write access until reconciliation and approval workflows are tested.
-- No production-scale claims until load, recovery, and operational tests pass.
+- A proprietary vehicle-fitment database.
+- Automatic safety-critical compatibility decisions.
+- Treating an unverified fuzzy match as proof of fitment.
+- Writing to Shopify before reconciliation and approval have been tested.
+- Production-scale performance or availability claims without load and recovery testing.
 
-## Validation required before expanding scope
+## Questions to resolve
 
-- Confirm the target buyer and the supplier-data workflows they currently use.
-- Validate data availability, field consistency, and source-system constraints.
-- Test reconciliation accuracy against independently reviewed examples.
-- Define approval, rollback, and audit requirements before enabling publishing.
-- Validate operating cost and support requirements with real users.
+- Who is the buyer, and which supplier-data tasks do they handle today?
+- Which data formats and source systems are used in practice?
+- How consistent are supplier fields and identifiers?
+- How accurately can incoming records be reconciled against reviewed examples?
+- What approval, rollback, and audit history do customers require?
+- What operating and support costs follow from real usage?
+
+The scope should change only when these questions are answered with evidence from prospective users and tested workflows.
