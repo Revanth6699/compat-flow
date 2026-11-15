@@ -181,7 +181,11 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
     total = 0
     valid = 0
 
+    row_invalid = False
+
     def add_issue(row_number: int, field: str | None, code: str, message: str, severity: str = "critical"):
+        nonlocal row_invalid
+        row_invalid = True
         if len(issues) < ERROR_LIMIT:
             issues.append({"row_number": row_number, "field": field, "error_code": code, "message": message, "severity": severity})
 
@@ -200,7 +204,7 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
             row[field] = None if raw.casefold() in {"", "n/a", "null", "none", "-", "--"} else raw
             if row[field] is not None:
                 populated[field] += 1
-        row_issue_count = len(issues)
+        row_invalid = False
         for field in required:
             if row.get(field) in (None, ""):
                 add_issue(line_number, field, "PROFILE_REQUIRED_FIELD_MISSING", f"Required field '{field}' is missing for profile '{selected_profile}'.")
@@ -244,7 +248,7 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
                 add_issue(line_number, unique_field, "DUPLICATE_IDENTIFIER", f"Identifier duplicates row {seen[key]['row']}.")
             else:
                 seen[key] = {"row": line_number}
-        if len(issues) == row_issue_count:
+        if not row_invalid:
             valid += 1
         if len(rows) < PREVIEW_LIMIT:
             rows.append(row)
