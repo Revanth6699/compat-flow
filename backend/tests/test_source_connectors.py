@@ -1,6 +1,7 @@
 import sys
 
 import pytest
+from sqlalchemy import Column, Integer, MetaData, String, Table as SQLTable
 
 from app.services import source_connectors as connectors
 from app.services.source_connectors import (
@@ -287,7 +288,7 @@ def test_sql_server_connector_reads_only_selected_bounded_columns(monkeypatch):
     assert rows == [{"sku": "001", "name": "Widget"}]
     assert calls["table"] == ("dbo", "Products")
     assert calls["selected"] == ["sku", "name"]
-    assert calls["limit"] == 25
+    assert calls["limit"] == 26
     assert calls["executed"] is True
     assert calls["disposed"] is True
 
@@ -779,4 +780,163 @@ async def test_api_connector_rejects_full_page_when_only_one_page_is_allowed(mon
             page_size_param="limit",
             page_size=1,
             max_pages=1,
+        )
+
+
+
+def test_sql_server_watermark_rejects_a_column_from_a_composite_primary_key(monkeypatch):
+    metadata = MetaData()
+    source_table = SQLTable(
+        "Products",
+        metadata,
+        Column("tenant_id", Integer, primary_key=True),
+        Column("modified_id", Integer, primary_key=True),
+        Column("sku", String),
+    )
+    calls = {"executed": False, "disposed": False}
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def execute(self, statement):
+            calls["executed"] = True
+            raise AssertionError("A non-unique watermark must be rejected before execution.")
+
+    class Engine:
+        def connect(self):
+            return Connection()
+
+        def dispose(self):
+            calls["disposed"] = True
+
+    monkeypatch.setattr(
+        connectors.pyodbc, "drivers", lambda: ["ODBC Driver 18 for SQL Server"]
+    )
+    monkeypatch.setattr(connectors, "create_engine", lambda *args, **kwargs: Engine())
+    monkeypatch.setattr(connectors, "Table", lambda *args, **kwargs: source_table)
+
+    with pytest.raises(SourceConnectorError, match="unique or primary-key column"):
+        fetch_sql_server_rows(
+            "mssql+pyodbc://user:pass@host/db?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&ApplicationIntent=ReadOnly",
+            schema="dbo",
+            table="Products",
+            columns=["tenant_id", "modified_id", "sku"],
+            watermark_column="modified_id",
+            watermark_after="10",
+        )
+
+    assert calls == {"executed": False, "disposed": True}
+
+
+def test_sql_server_connector_rejects_potentially_truncated_row_limit(monkeypatch):
+    calls = {"limit": None, "yielded": 0}
+
+    class ColumnCollection:
+        def __getitem__(self, name):
+            return name
+
+    class FakeTable:
+        c = ColumnCollection()
+
+    class Statement:
+        def limit(self, value):
+            calls["limit"] = value
+            return self
+
+    class MappingResult:
+        def yield_per(self, size):
+            return self
+
+        def __iter__(self):
+            for sku in ("001", "002"):
+                calls["yielded"] += 1
+                yield {"sku": sku}
+
+    class ExecutionResult:
+        def mappings(self):
+            return MappingResult()
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def execute(self, statement):
+            return ExecutionResult()
+
+    class Engine:
+        def connect(self):
+            return Connection()
+
+        def dispose(self):
+            pass
+
+    monkeypatch.setattr(
+        connectors.pyodbc, "drivers", lambda: ["ODBC Driver 18 for SQL Server"]
+    )
+    monkeypatch.setattr(connectors, "create_engine", lambda *args, **kwargs: Engine())
+    monkeypatch.setattr(connectors, "Table", lambda *args, **kwargs: FakeTable())
+    monkeypatch.setattr(connectors, "MetaData", lambda: object())
+    monkeypatch.setattr(connectors, "select", lambda *columns: Statement())
+
+    with pytest.raises(SourceConnectorError, match="row limit"):
+        fetch_sql_server_rows(
+            "mssql+pyodbc://user:pass@host/db?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&ApplicationIntent=ReadOnly",
+            schema="dbo",
+            table="Products",
+            columns=["sku"],
+            limit=1,
+        )
+
+    assert calls == {"limit": 2, "yielded": 2}
+
+
+@pytest.mark.anyio
+async def test_api_connector_converts_json_recursion_errors_to_safe_connector_errors(monkeypatch):
+    class Response:
+        status_code = 200
+        headers = {}
+
+        def raise_for_status(self):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def aiter_bytes(self):
+            yield b"{}"
+
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        def stream(self, *args, **kwargs):
+            return Response()
+
+    def reject_deep_json(*args, **kwargs):
+        raise RecursionError("deeply nested JSON")
+
+    monkeypatch.setattr(connectors, "_validate_https_url", lambda *args: None)
+    monkeypatch.setattr(connectors.httpx, "AsyncClient", Client)
+    monkeypatch.setattr(connectors.json, "loads", reject_deep_json)
+
+    with pytest.raises(SourceConnectorError, match="nesting depth"):
+        await fetch_api_records(
+            "https://supplier.example/catalog",
+            allowed_hosts={"supplier.example"},
         )
