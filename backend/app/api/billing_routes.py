@@ -12,6 +12,7 @@ from app.core.auth import AuthenticatedUser, get_current_user, is_platform_admin
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import Payment, PaymentWebhookEvent, Subscription, SubscriptionPlan
+from app.services.subscription_period import subscription_period_end
 from app.services.razorpay_client import (
     configured_plan_id,
     razorpay_request,
@@ -317,24 +318,50 @@ async def razorpay_webhook(
             ).with_for_update()
         )
 
+    payment_entity = ((payload.get("payment") or {}).get("entity") or {})
+    if not isinstance(payment_entity, dict):
+        raise HTTPException(status_code=400, detail="Razorpay payment entity is invalid.")
+    provider_payment_id = payment_entity.get("id")
+    payment_status = {
+        "captured": "succeeded",
+        "authorized": "pending",
+        "failed": "failed",
+        "refunded": "refunded",
+    }.get(payment_entity.get("status"), "pending")
+    paid_at = (
+        _unix_datetime(payment_entity.get("captured_at") or payment_entity.get("created_at"))
+        if payment_status == "succeeded"
+        else None
+    )
+
     new_status = _subscription_status(event_type)
     if subscription is not None and new_status is not None:
         terminal_status = subscription.status in {"canceled", "expired"}
         stale_pending_event = new_status == "pending" and subscription.status in {"active", "past_due"}
         if not terminal_status and not stale_pending_event:
-            subscription.status = new_status
-            subscription.current_period_start = _unix_datetime(subscription_entity.get("current_start"))
-            subscription.current_period_end = _unix_datetime(subscription_entity.get("current_end"))
+            # Provider activation alone is not sufficient: paid access requires a
+            # captured payment, recorded independently below.
+            if new_status == "active" and paid_at is None:
+                if subscription.status not in {"active", "past_due"}:
+                    subscription.status = "pending"
+            else:
+                subscription.status = new_status
             subscription.cancel_at_period_end = bool(
                 subscription_entity.get("cancel_at_cycle_end", subscription.cancel_at_period_end)
             )
             if new_status == "canceled":
                 subscription.canceled_at = datetime.now(timezone.utc)
 
-    payment_entity = ((payload.get("payment") or {}).get("entity") or {})
-    if not isinstance(payment_entity, dict):
-        raise HTTPException(status_code=400, detail="Razorpay payment entity is invalid.")
-    provider_payment_id = payment_entity.get("id")
+    # A captured payment is the sole source of truth for the paid period.
+    # Do not trust browser timestamps or Razorpay's scheduled cycle boundaries.
+    if subscription is not None and payment_status == "succeeded" and paid_at is not None:
+        if subscription.status not in {"canceled", "expired"}:
+            subscription.status = "active"
+            subscription.current_period_start = paid_at
+            subscription.current_period_end = subscription_period_end(
+                paid_at, subscription.billing_interval
+            )
+
     if subscription is not None and isinstance(provider_payment_id, str):
         payment = db.scalar(
             select(Payment).where(
@@ -342,12 +369,6 @@ async def razorpay_webhook(
                 Payment.provider_payment_id == provider_payment_id,
             )
         )
-        payment_status = {
-            "captured": "succeeded",
-            "authorized": "pending",
-            "failed": "failed",
-            "refunded": "refunded",
-        }.get(payment_entity.get("status"), "pending")
         if payment is None:
             payment = Payment(
                 id=uuid4(),
@@ -362,13 +383,13 @@ async def razorpay_webhook(
                 payment_method_type=payment_entity.get("method"),
                 failure_code=payment_entity.get("error_code"),
                 failure_message=payment_entity.get("error_description"),
-                paid_at=_unix_datetime(payment_entity.get("created_at")) if payment_status == "succeeded" else None,
+                paid_at=paid_at,
             )
             db.add(payment)
         else:
             payment.status = payment_status
-            if payment_status == "succeeded":
-                payment.paid_at = _unix_datetime(payment_entity.get("created_at"))
+            if paid_at is not None:
+                payment.paid_at = paid_at
 
     webhook_event.processing_status = "processed"
     webhook_event.processed_at = datetime.now(timezone.utc)
