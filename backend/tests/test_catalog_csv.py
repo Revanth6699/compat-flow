@@ -456,7 +456,7 @@ def test_pipe_delimited_feed_is_detected():
     assert result.valid_count == 1
 
 
-def test_olist_product_export_maps_product_id_and_category_without_guessing_missing_fields():
+def test_olist_product_id_is_not_misclassified_as_sku():
     content = (
         "product_id,product_category_name,product_name_lenght,"
         "product_description_lenght,product_photos_qty,product_weight_g,"
@@ -465,7 +465,8 @@ def test_olist_product_export_maps_product_id_and_category_without_guessing_miss
     )
     result = parse_catalog_csv(content, allow_incomplete_mapping=True)
     mapped = {item.field: item.source_header for item in result.column_mappings}
-    assert mapped["sku"] == "product_id"
+    assert "sku" not in mapped
+    assert "product_id" in result.unmapped_headers
     assert mapped["category"] == "product_category_name"
     assert "product_name_lenght" in result.unmapped_headers
     assert "product_description_lenght" in result.unmapped_headers
