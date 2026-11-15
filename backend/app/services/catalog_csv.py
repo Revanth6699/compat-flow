@@ -19,7 +19,7 @@ ERROR_LIMIT = 500
 # not a claim about the correctness of the underlying product data.
 HEADER_ALIASES = {
     "sku": {
-        "sku": 1.0, "product_sku": 0.98, "product_id": 0.98, "item_sku": 0.98,
+        "sku": 1.0, "product_sku": 0.98, "item_sku": 0.98,
         "product_code": 0.96, "sku_number": 0.98,
         "sku_id": 0.98, "sku_code": 0.98,
         "sku_pioneer_part_number": 0.95,
