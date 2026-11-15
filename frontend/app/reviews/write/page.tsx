@@ -16,6 +16,7 @@ function WriteReviewContent() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [publicConsent, setPublicConsent] = useState(false);
 
   useEffect(() => {
     void apiRequest<Review>("/api/v1/reviews/mine").then(review => {
@@ -24,8 +25,12 @@ function WriteReviewContent() {
   }, []);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault(); setError(""); setMessage(""); setLoading(true);
+    event.preventDefault(); setError(""); setMessage("");
+    if (!publicConsent) { setError("Please confirm that you want this review and display name published publicly."); return; }
+    if (!user?.email) { setError("Your account email could not be verified. Sign in again."); return; }
+    setLoading(true);
     try {
+      await apiRequest("/api/v1/privacy/consents", { method: "POST", body: JSON.stringify({ email: user.email, purposes: { service_processing: true, public_review: true }, source: "public_review" }) });
       await apiRequest<Review>("/api/v1/reviews/mine", {
         method: "POST",
         body: JSON.stringify({ display_name: displayName, rating: Number(rating), comment }),
@@ -44,6 +49,7 @@ function WriteReviewContent() {
         <label htmlFor="review-rating">Star rating</label><select id="review-rating" value={rating} onChange={event => setRating(event.target.value)}><option value="5">★★★★★ — Excellent</option><option value="4">★★★★☆ — Good</option><option value="3">★★★☆☆ — Average</option><option value="2">★★☆☆☆ — Poor</option><option value="1">★☆☆☆☆ — Very poor</option></select>
         <label htmlFor="review-comment">Your review</label><textarea id="review-comment" required minLength={15} maxLength={2000} rows={7} value={comment} onChange={event => setComment(event.target.value)} placeholder="What worked well? What should we improve?" />
         <p className="settings-description">Your display name, star rating and comment will be published publicly. Do not include confidential company information or personal data.</p>
+        <label className="privacy-consent-field"><span><input type="checkbox" required checked={publicConsent} onChange={event => setPublicConsent(event.target.checked)} /> I explicitly agree to publish this review, display name and rating publicly. *</span></label>
         {error && <p className="auth-error" role="alert">{error}</p>}
         {message && <p className="auth-success" role="status">{message}</p>}
         <button className="button auth-submit" disabled={loading}>{loading ? "Publishing…" : "Publish review"}</button>
