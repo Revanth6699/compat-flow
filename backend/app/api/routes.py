@@ -37,7 +37,7 @@ from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.mapping_assistant import suggest_field_mappings
-from app.services.industry_catalog import IndustryCSVError, PROFILES as INDUSTRY_PROFILES, validate_industry_csv
+from app.services.industry_catalog import IndustryCSVError, validate_industry_records
 from app.services.catalog_csv import (
     CatalogCSVValidationError,
     CATALOG_PROFILES,
@@ -235,35 +235,42 @@ async def profile_public_dataset(file: UploadFile = File(...), _access: Authenti
 
 
 
+async def _validate_industry_upload(file: UploadFile, profile_id: str | None, max_bytes: int):
+    filename = (file.filename or "").strip()
+    if not filename or len(filename) > 255:
+        await file.close()
+        raise HTTPException(status_code=400, detail="A valid filename is required.")
+    try:
+        raw = await file.read(max_bytes + 1)
+    finally:
+        await file.close()
+    if len(raw) > max_bytes:
+        raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
+    if not raw:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    try:
+        parsed = parse_source(raw, filename, max_records=10_000)
+        if not parsed.records:
+            raise HTTPException(status_code=422, detail="No data rows were found in the uploaded file.")
+        result = validate_industry_records(
+            parsed.headers, [record.values for record in parsed.records], profile_id=profile_id
+        )
+    except IngestionParseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    except (IndustryCSVError, csv.Error) as exc:
+        message = str(exc)
+        raise HTTPException(status_code=413 if "row limit" in message else 422, detail=message) from None
+    return {"filename": filename, "format": parsed.format, **result}
+
+
 @router.post("/catalog/import/validate-industry")
 async def validate_industry_catalog_import(
     file: UploadFile = File(...),
     profile_id: str | None = Form(None),
     _plan: AuthenticatedUser = Depends(require_plan_feature("csv_validation")),
 ):
-    """Validate a flexible industry catalog without coercing it into the legacy Product schema."""
-    filename = (file.filename or "").strip()
-    if not filename or len(filename) > 255 or not filename.lower().endswith(".csv"):
-        await file.close()
-        raise HTTPException(status_code=415, detail="A valid CSV filename is required.")
-    limit = settings.import_max_upload_bytes
-    try:
-        raw = await file.read(limit + 1)
-    finally:
-        await file.close()
-    if len(raw) > limit:
-        raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
-    if not raw:
-        raise HTTPException(status_code=400, detail="Uploaded CSV is empty.")
-    try:
-        content = raw.decode("utf-8-sig")
-        result = validate_industry_csv(content, profile_id=profile_id)
-    except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded.") from None
-    except (IndustryCSVError, csv.Error) as exc:
-        message = str(exc)
-        raise HTTPException(status_code=413 if "row limit" in message else 422, detail=message) from None
-    return {"filename": filename, **result}
+    """Authenticated industry-aware validation for every supported tabular input format."""
+    return await _validate_industry_upload(file, profile_id, settings.import_max_upload_bytes)
 
 
 @router.post("/catalog/import/preview-industry")
@@ -272,28 +279,10 @@ async def preview_industry_catalog_import(
     profile_id: str | None = Form(None),
     _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
 ):
-    """Stateless industry-aware preview using the bounded public demo upload limit."""
-    filename = (file.filename or "").strip()
-    if not filename or len(filename) > 255 or not filename.lower().endswith(".csv"):
-        await file.close()
-        raise HTTPException(status_code=415, detail="A valid CSV filename is required.")
-    limit = min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
-    try:
-        raw = await file.read(limit + 1)
-    finally:
-        await file.close()
-    if len(raw) > limit:
-        raise HTTPException(status_code=413, detail="Public demo uploads cannot exceed 5 MB.")
-    if not raw:
-        raise HTTPException(status_code=400, detail="Uploaded CSV is empty.")
-    try:
-        result = validate_industry_csv(raw.decode("utf-8-sig"), profile_id=profile_id)
-    except UnicodeDecodeError:
-        raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded.") from None
-    except (IndustryCSVError, csv.Error) as exc:
-        message = str(exc)
-        raise HTTPException(status_code=413 if "row limit" in message else 422, detail=message) from None
-    return {"filename": filename, **result}
+    """Stateless industry-aware preview with the bounded public demo upload limit."""
+    return await _validate_industry_upload(
+        file, profile_id, min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
+    )
 
 
 @router.post("/catalog/import/validate", response_model=ImportPreviewResponse)
