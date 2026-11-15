@@ -82,17 +82,6 @@ def provision_first_admin(
     if existing_profile is not None:
         raise RuntimeError("This Supabase account is already linked to a CompatFlow user.")
 
-    existing_admin = db.scalar(
-        select(User.id)
-        .where(User.role == "admin", User.is_active.is_(True))
-        .limit(1)
-    )
-    if existing_admin is not None:
-        raise RuntimeError(
-            "An active organization admin already exists. "
-            "First-admin provisioning is disabled after initial setup."
-        )
-
     organization = Organization(id=uuid4(), name=normalized_name)
     profile = User(
         id=uuid4(),
