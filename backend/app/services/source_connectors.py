@@ -247,6 +247,10 @@ async def fetch_api_records(
                 raise SourceConnectorError(
                     "API source exceeds the configured record limit."
                 )
+            if page_param and max_pages == 1 and len(page_records) >= page_size:
+                raise SourceConnectorError(
+                    "API page is full; configure a larger max_pages value to avoid an incomplete import."
+                )
             if max_pages == 1 or len(page_records) < page_size:
                 break
             if page_index == max_pages - 1:
