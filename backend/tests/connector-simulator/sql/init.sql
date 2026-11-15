@@ -14,7 +14,6 @@ INSERT INTO dbo.SupplierProducts (sku, title, unit_price, currency, quantity) VA
 ('SIM-SQL-001', 'Hydraulic Filter', 14.25, 'USD', 55),
 ('SIM-SQL-002', 'Pressure Gauge', 31.00, 'USD', 18);
 GO
-GO
 USE CompatFlowSupplier;
 GO
 CREATE USER compatflow_reader FOR LOGIN compatflow_reader;
