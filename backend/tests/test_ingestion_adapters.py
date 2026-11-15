@@ -1,5 +1,6 @@
 import io
 import json
+import zipfile
 
 import pytest
 
@@ -135,3 +136,54 @@ def test_parse_source_dispatches_xml_and_rejects_missing_extension():
     assert parsed.format == "xml"
     with pytest.raises(IngestionParseError, match="extension is required"):
         parse_source(b"sku,name", "catalog")
+
+
+
+def test_xlsx_rejects_excessive_uncompressed_archive_size(monkeypatch):
+    openpyxl = pytest.importorskip("openpyxl")
+    output = io.BytesIO()
+    workbook = openpyxl.Workbook()
+    workbook.active.append(["sku", "name"])
+    workbook.active.append(["001", "Widget"])
+    workbook.save(output)
+    output.seek(0)
+    with zipfile.ZipFile(output, "a", compression=zipfile.ZIP_STORED) as archive:
+        archive.writestr("xl/uncompressed-overflow.bin", b"x" * 200)
+    monkeypatch.setattr(
+        "app.services.ingestion_adapters.MAX_XLSX_UNCOMPRESSED_BYTES", 100
+    )
+    with pytest.raises(IngestionParseError, match="uncompressed size limit"):
+        parse_excel(output.getvalue(), ".xlsx")
+
+
+def test_xlsx_trims_trailing_empty_header_cells():
+    openpyxl = pytest.importorskip("openpyxl")
+    output = io.BytesIO()
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["sku", "name", None, ""])
+    sheet.append(["001", "Widget", None, ""])
+    workbook.save(output)
+    parsed = parse_excel(output.getvalue(), ".xlsx")
+    assert parsed.headers == ["sku", "name"]
+    assert parsed.records[0].values == {"sku": "001", "name": "Widget"}
+
+
+def test_json_rejects_duplicate_flattened_paths():
+    with pytest.raises(IngestionParseError, match="duplicate flattened field paths"):
+        parse_json(b'{"a":{"b":"nested"},"a.b":"flat"}')
+
+
+def test_xml_rejects_repeated_nested_child_values():
+    payload = (
+        b"<Records><Record><attributes><color>red</color>"
+        b"<color>blue</color></attributes></Record></Records>"
+    )
+    with pytest.raises(IngestionParseError, match="repeated nested field"):
+        parse_xml(payload)
+
+
+def test_parse_source_rejects_input_over_source_byte_limit(monkeypatch):
+    monkeypatch.setattr("app.services.ingestion_adapters.MAX_SOURCE_BYTES", 4)
+    with pytest.raises(IngestionParseError, match="maximum source byte limit"):
+        parse_source(b"12345", "catalog.csv")
