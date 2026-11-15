@@ -340,18 +340,20 @@ def parse_xml(data: bytes, *, record_tag: str | None = None,
                 if wrapper_name in record_names:
                     selected_tag, elements = _local_name(wrapper.tag), children
                 elif wrapper_children and (
-                    wrapper_name in container_names
-                    or (
-                        len(wrapper_children) == 1
-                        and _local_name(wrapper_children[0].tag).casefold() in record_names
-                    )
+                    len(wrapper_children) == 1
+                    and _local_name(wrapper_children[0].tag).casefold() in record_names
                 ):
+                    selected_tag, elements = _local_name(wrapper_children[0].tag), wrapper_children
+                elif wrapper_children and wrapper_name in container_names:
                     child_names = {_local_name(item.tag) for item in wrapper_children}
-                    if len(child_names) != 1:
+                    if len(child_names) == 1 and next(iter(child_names)).casefold() in record_names:
+                        selected_tag, elements = next(iter(child_names)), wrapper_children
+                    elif len(child_names) > 1 and all(name.casefold() in record_names for name in child_names):
                         raise IngestionParseError(
                             "XML wrapper contains mixed child record types; supply record_tag."
                         )
-                    selected_tag, elements = next(iter(child_names)), wrapper_children
+                    else:
+                        selected_tag, elements = _local_name(wrapper.tag), children
                 else:
                     selected_tag, elements = _local_name(wrapper.tag), children
             else:
@@ -360,6 +362,8 @@ def parse_xml(data: bytes, *, record_tag: str | None = None,
         raise IngestionParseError("Could not identify XML record elements; supply record_tag.")
     if len(elements) > max_records:
         raise IngestionParseError(f"Input exceeds the {max_records:,}-record limit.")
+    if any(not list(element) and not element.attrib for element in elements):
+        raise IngestionParseError("XML record elements contain no fields.")
     records = []
     for index, element in enumerate(elements, start=1):
         values = {f"@{_local_name(key)}": value for key, value in element.attrib.items()}
