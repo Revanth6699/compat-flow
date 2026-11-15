@@ -33,9 +33,12 @@ jobs:
           python-version: "3.12"
       - name: Generate disposable SQL reader credential
         run: |
-          password="$(python -c 'import secrets,string; print("Aa7" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(25)))')"
-          echo "::add-mask::$password"
-          echo "SIMULATOR_READER_PASSWORD=$password" >> "$GITHUB_ENV"
+          reader_password="$(python -c 'import secrets,string; print("Aa7" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(25)))')"
+          sa_password="$(python -c 'import secrets,string; print("Aa7" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(25)))')"
+          echo "::add-mask::$reader_password"
+          echo "::add-mask::$sa_password"
+          echo "SIMULATOR_READER_PASSWORD=$reader_password" >> "$GITHUB_ENV"
+          echo "SIMULATOR_SA_PASSWORD=$sa_password" >> "$GITHUB_ENV"
       - name: Install Microsoft ODBC Driver 18
         run: |
           . /etc/os-release
