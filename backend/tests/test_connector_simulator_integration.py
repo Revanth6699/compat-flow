@@ -56,7 +56,7 @@ def test_sftp_supplier_host_key_auth_and_file_read():
 def test_sql_server_supplier_read_only_projection():
     url = os.getenv("SIMULATOR_SQLSERVER_URL")
     if not url:
-        pytest.skip("SIMULATOR_SQLSERVER_URL is not configured with a trusted SQL Server certificate")
+        pytest.skip("SIMULATOR_SQLSERVER_URL is not configured for the SQL Server simulator")
     rows = fetch_sql_server_rows(
         url,
         schema="dbo",
