@@ -669,8 +669,12 @@ def test_sql_server_incremental_watermark_uses_unique_numeric_key_and_ordered_se
             return self
 
     class MappingResult:
-        def all(self):
-            return [{"modified_id": 11, "sku": "001"}]
+        def yield_per(self, size):
+            calls["yield_per"] = size
+            return self
+
+        def __iter__(self):
+            return iter([{"modified_id": 11, "sku": "001"}])
 
     class ExecutionResult:
         def mappings(self):
