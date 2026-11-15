@@ -74,9 +74,45 @@ def get_supabase_identity(
         email_claim = claims.get("email")
         if not isinstance(email_claim, str) or not email_claim.strip():
             raise _unauthorized()
+        auth_user_id = UUID(claims["sub"])
+        normalized_email = email_claim.strip().lower()
+
+        # A valid JWT can outlive a deleted Supabase user until exp. Confirm the
+        # identity still exists so deleted users cannot reuse old access tokens
+        # to create a new organization or call another identity-only endpoint.
+        if not settings.supabase_anon_key:
+            raise HTTPException(status_code=503, detail="Authentication status checks are not configured.")
+        try:
+            user_response = httpx.get(
+                f"{settings.supabase_url.rstrip('/')}/auth/v1/user",
+                headers={
+                    "apikey": settings.supabase_anon_key,
+                    "Authorization": f"Bearer {token}",
+                },
+                timeout=5.0,
+            )
+        except httpx.HTTPError:
+            raise HTTPException(status_code=503, detail="Could not verify the current Supabase account status.") from None
+
+        if user_response.status_code in {401, 403, 404}:
+            raise _unauthorized()
+        if user_response.status_code >= 500:
+            raise HTTPException(status_code=503, detail="Supabase authentication is temporarily unavailable.")
+        if user_response.status_code != 200:
+            raise _unauthorized()
+        try:
+            current_user = user_response.json()
+        except ValueError:
+            raise HTTPException(status_code=503, detail="Supabase returned an invalid account status response.") from None
+        if (
+            str(current_user.get("id", "")) != str(auth_user_id)
+            or str(current_user.get("email", "")).strip().lower() != normalized_email
+        ):
+            raise _unauthorized()
+
         return SupabaseIdentity(
-            auth_user_id=UUID(claims["sub"]),
-            email=email_claim.strip().lower(),
+            auth_user_id=auth_user_id,
+            email=normalized_email,
             access_token=token,
         )
     except (PyJWTError, ValueError, KeyError, RuntimeError):
