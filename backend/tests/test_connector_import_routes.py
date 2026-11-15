@@ -142,6 +142,9 @@ def test_authenticated_connector_commit_persists_for_authenticated_tenant(monkey
         assert response.status_code == 201, response.text
         assert response.json()["status"] == "completed"
         assert calls["organization_id"] == organization_id
+        assert calls["source_type"] == "rest_api"
+        assert calls["source_descriptor"] == "https://supplier.example"
+        assert calls["source_metadata"]["pagination"]["mode"] == "single_page"
     finally:
         clear_connector_auth()
 
@@ -246,3 +249,30 @@ async def test_connector_rate_limit_fails_closed_when_redis_is_unavailable(monke
     with pytest.raises(Exception) as exc:
         await routes._enforce_connector_rate_limit(uuid4())
     assert getattr(exc.value, "status_code", None) == 503
+
+
+
+def test_sql_watermark_checkpoint_is_recorded_without_connection_secrets():
+    payload = ConnectorImportRequest(
+        source_type="sql_server",
+        record_type="products",
+        sql_server_url="mssql+pyodbc://reader:secret@sql.example/catalog?password=hidden",
+        sql_schema="dbo",
+        sql_table="Products",
+        sql_columns=["modified_id", "sku"],
+        sql_watermark_column="modified_id",
+        sql_watermark_after="10",
+    )
+    parsed = routes.parse_source(
+        b'[{"modified_id":11,"sku":"001"}]',
+        "connector.json",
+    )
+    metadata = routes._source_metadata(payload, parsed)
+    watermark = metadata["sql_server"]["watermark"]
+    assert watermark == {
+        "column": "modified_id",
+        "after": "10",
+        "next": "11",
+        "strategy": "strictly_greater_than_unique_monotonic_key",
+    }
+    assert "secret" not in str(metadata) and "hidden" not in str(metadata)
