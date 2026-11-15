@@ -69,19 +69,19 @@ def test_provision_first_admin_rejects_already_linked_account():
     assert db.committed is False
 
 
-def test_provision_first_admin_rejects_when_an_active_admin_exists():
-    db = FakeSession([None, uuid4()])
+def test_each_organization_can_have_its_own_initial_admin():
+    db = FakeSession([None])
 
-    with pytest.raises(RuntimeError, match="active organization admin already exists"):
-        provision_first_admin(
-            db,
-            auth_user_id=uuid4(),
-            email="admin@example.com",
-            organization_name="Example Organization",
-        )
+    profile = provision_first_admin(
+        db,
+        auth_user_id=uuid4(),
+        email="admin@example.com",
+        organization_name="Another Organization",
+    )
 
-    assert db.added == []
-    assert db.committed is False
+    assert profile.role == "admin"
+    assert profile.organization_id is not None
+    assert db.committed is True
 
 
 @pytest.mark.parametrize("organization_name", ["", "x", "x" * 161])
