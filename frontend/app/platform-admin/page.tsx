@@ -26,8 +26,9 @@ const metricCards = (data: Overview) => [
 
 export default function PlatformAdminPage() {
   const { user, loading } = useAuth();
-  const [authorizationChecked, setAuthorizationChecked] = useState(false);
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [authorization, setAuthorization] = useState<{ userId: string; checked: boolean; isPlatformAdmin: boolean }>({ userId: "", checked: false, isPlatformAdmin: false });
+  const authorizationChecked = !user || (authorization.userId === user.id && authorization.checked);
+  const isPlatformAdmin = !!user && authorization.userId === user.id && authorization.isPlatformAdmin;
   const [overview, setOverview] = useState<Overview | null>(null);
   const [requests, setRequests] = useState<DemoRequest[]>([]);
   const [error, setError] = useState("");
@@ -48,19 +49,29 @@ export default function PlatformAdminPage() {
   }, []);
 
   useEffect(() => {
-    if (!user) { setAuthorizationChecked(true); setIsPlatformAdmin(false); return; }
+    if (!user) return;
     let active = true;
     apiRequest<{ is_platform_admin?: boolean }>("/api/v1/auth/me")
-      .then((profile) => { if (active) { setIsPlatformAdmin(profile.is_platform_admin === true); setAuthorizationChecked(true); } })
-      .catch((err) => { if (active) { setError(err instanceof Error ? err.message : "Could not verify platform-owner access."); setAuthorizationChecked(true); } });
-    Promise.all([
-      apiRequest<Overview>("/api/v1/platform-admin/overview"),
-      apiRequest<DemoRequest[]>("/api/v1/platform-admin/demo-requests"),
-    ]).then(([summary, items]) => {
-      if (active) { setOverview(summary); setRequests(items); }
-    }).catch((err) => {
-      if (active) setError(err instanceof Error ? err.message : "Platform administrator access denied.");
-    });
+      .then((profile) => {
+        if (!active) return;
+        const allowed = profile.is_platform_admin === true;
+        setAuthorization({ userId: user.id, checked: true, isPlatformAdmin: allowed });
+        if (!allowed) return;
+        Promise.all([
+          apiRequest<Overview>("/api/v1/platform-admin/overview"),
+          apiRequest<DemoRequest[]>("/api/v1/platform-admin/demo-requests"),
+        ]).then(([summary, items]) => {
+          if (active) { setOverview(summary); setRequests(items); }
+        }).catch((err) => {
+          if (active) setError(err instanceof Error ? err.message : "Platform administrator access denied.");
+        });
+      })
+      .catch((err) => {
+        if (active) {
+          setAuthorization({ userId: user.id, checked: true, isPlatformAdmin: false });
+          setError(err instanceof Error ? err.message : "Could not verify platform-owner access.");
+        }
+      });
     return () => { active = false; };
   }, [user]);
 

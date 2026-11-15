@@ -7,13 +7,14 @@ import { useEffect, useState } from "react";
 
 export function SiteHeader() {
   const { user, loading, signOut } = useAuth();
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [platformAdminForUser, setPlatformAdminForUser] = useState<{ userId: string; isAdmin: boolean } | null>(null);
+  const isPlatformAdmin = !!user && platformAdminForUser?.userId === user.id && platformAdminForUser.isAdmin;
   useEffect(() => {
+    if (!user) return;
     let active = true;
-    setIsPlatformAdmin(false);
-    if (user) apiRequest<{ is_platform_admin?: boolean }>("/api/v1/auth/me")
-      .then((profile) => { if (active) setIsPlatformAdmin(profile.is_platform_admin === true); })
-      .catch(() => { if (active) setIsPlatformAdmin(false); });
+    apiRequest<{ is_platform_admin?: boolean }>("/api/v1/auth/me")
+      .then((profile) => { if (active) setPlatformAdminForUser({ userId: user.id, isAdmin: profile.is_platform_admin === true }); })
+      .catch(() => { if (active) setPlatformAdminForUser({ userId: user.id, isAdmin: false }); });
     return () => { active = false; };
   }, [user]);
 
