@@ -24,7 +24,8 @@ from app.core.auth import (
 from app.core.database import get_db
 from app.core.config import settings
 from app.services.razorpay_client import razorpay_request
-from app.models import Organization, Payment, PaymentWebhookEvent, Subscription, SubscriptionPlan, User, UserInvitation
+from app.models import ImportJob, Organization, Payment, PaymentWebhookEvent, Subscription, SubscriptionPlan, User, UserInvitation
+from app.services.file_storage import FileStorageError, get_storage_path
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 invitation_router = APIRouter(prefix="/invitations", tags=["invitations"])
@@ -114,7 +115,26 @@ def delete_account(
                     raise HTTPException(status_code=502, detail="The payment provider could not confirm immediate cancellation. Your organization data has not been deleted.") from None
             elif subscription.status in {"active", "trialing", "pending", "past_due"}:
                 raise HTTPException(status_code=409, detail="An active external subscription cannot be safely canceled automatically. Contact support before deleting this organization.")
-        # Delete every Supabase identity belonging to this organization before removing tenant data.
+        # Remove stored import files while the owner can still retry if cleanup
+        # or a later identity deletion fails. Missing files are safe on retry.
+        storage_keys = list(db.scalars(
+            select(ImportJob.storage_key).where(
+                ImportJob.organization_id == profile.organization_id,
+                ImportJob.storage_key.is_not(None),
+            )
+        ).all())
+        try:
+            for storage_key in storage_keys:
+                get_storage_path(storage_key).unlink(missing_ok=True)
+        except (OSError, FileStorageError):
+            raise HTTPException(
+                status_code=503,
+                detail="Organization files could not all be removed. No authentication identities or organization records were deleted.",
+            ) from None
+
+        # Delete other members first and the owner last. If a provider call fails,
+        # the owner can still sign in and retry the organization deletion.
+        members.sort(key=lambda member: member.role == "owner")
         for member in members:
             if member.auth_user_id:
                 _delete_supabase_user(member.auth_user_id)
