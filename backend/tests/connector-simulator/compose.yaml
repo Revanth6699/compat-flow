@@ -91,7 +91,7 @@ services:
           fi
           sleep 2
         done
-        /opt/mssql-tools/bin/sqlcmd -S sql-supplier -U sa -P 'Simulator-SA-Only-2026!' -C -b -v SIMULATOR_READER_PASSWORD="$$SIMULATOR_READER_PASSWORD" -i /seed/init.sql
+        /opt/mssql-tools/bin/sqlcmd -S sql-supplier -U sa -P 'Simulator-SA-Only-2026!' -C -b -v SIMULATOR_READER_PASSWORD = "$SIMULATOR_READER_PASSWORD" -i /seed/init.sql
 
 volumes:
   rest-tls:
