@@ -1,61 +1,48 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 
-type Consent = "accepted" | "rejected";
-const STORAGE_KEY = "compatflow-cookie-consent";
-
-function subscribe(callback: () => void) {
-  window.addEventListener("storage", callback);
-  return () => window.removeEventListener("storage", callback);
-}
-
-function getSnapshot() {
+type Preferences = { essential: true; analytics: boolean; marketing: boolean; savedAt: string };
+const STORAGE_KEY = "compatflow-privacy-preferences";
+const defaults: Preferences = { essential: true, analytics: false, marketing: false, savedAt: "" };
+function readPreferences(): Preferences | null {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === null;
-  } catch {
-    return false;
-  }
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<Preferences>;
+    return { essential: true, analytics: parsed.analytics === true, marketing: parsed.marketing === true, savedAt: String(parsed.savedAt || "") };
+  } catch { return null; }
 }
-
-function getServerSnapshot() {
-  return false;
-}
-
 export function CookieConsent() {
-  const visible = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  function choose(value: Consent) {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, value);
-    } catch {
-      // Keep the page usable when browser storage is unavailable.
-    }
-    window.dispatchEvent(new Event("storage"));
+  const [preferences, setPreferences] = useState<Preferences | null>(null);
+  const [customizing, setCustomizing] = useState(false);
+  const [analytics, setAnalytics] = useState(false);
+  const [marketing, setMarketing] = useState(false);
+  useEffect(() => {
+    const current = readPreferences();
+    setPreferences(current);
+    setAnalytics(current?.analytics ?? false);
+    setMarketing(current?.marketing ?? false);
+  }, []);
+  function save(next: Preferences) {
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* Essential app use remains available. */ }
+    setPreferences(next);
+    setCustomizing(false);
+    window.dispatchEvent(new CustomEvent("compatflow:consent-changed", { detail: next }));
   }
-
-  if (!visible) return null;
-
-  return (
-    <aside
-      className="cookie-banner"
-      aria-label="Cookie preferences"
-      role="dialog"
-      aria-live="polite"
-    >
-      <strong>Privacy preferences</strong>
-      <p style={{ margin: "8px 0 0", color: "#686B70", fontSize: 14 }}>
-        This demo uses essential browser storage to remember your preference.
-        It does not currently load advertising or analytics cookies.
-      </p>
-      <div className="cookie-actions">
-        <button className="accept" onClick={() => choose("accepted")}>
-          Accept
-        </button>
-        <button onClick={() => choose("rejected")}>
-          Reject optional cookies
-        </button>
-      </div>
-    </aside>
-  );
+  if (preferences) return null;
+  return <aside className="cookie-banner" aria-label="Privacy preferences" role="dialog" aria-modal="false">
+    <strong>Privacy preferences</strong>
+    <p style={{ margin: "8px 0 0", color: "#686B70", fontSize: 14 }}>Essential storage is always active for sign-in and security. Optional analytics and marketing technologies are off unless you choose them. No non-essential tracker is currently configured by this application.</p>
+    {customizing && <div className="privacy-preference-options">
+      <label><input type="checkbox" checked disabled /> Essential storage (always active)</label>
+      <label><input type="checkbox" checked={analytics} onChange={e=>setAnalytics(e.target.checked)} /> Analytics (optional)</label>
+      <label><input type="checkbox" checked={marketing} onChange={e=>setMarketing(e.target.checked)} /> Marketing (optional)</label>
+    </div>}
+    <div className="cookie-actions">
+      <button onClick={() => save({ ...defaults, savedAt: new Date().toISOString() })}>Reject optional</button>
+      <button onClick={() => save({ essential: true, analytics: true, marketing: true, savedAt: new Date().toISOString() })}>Accept all</button>
+      {customizing ? <button className="accept" onClick={() => save({ essential: true, analytics, marketing, savedAt: new Date().toISOString() })}>Save choices</button> : <button className="accept" onClick={() => setCustomizing(true)}>Customize</button>}
+    </div>
+  </aside>;
 }
