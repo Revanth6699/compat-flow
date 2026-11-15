@@ -329,6 +329,9 @@ class ImportJob(Base):
     import_type: Mapped[str] = mapped_column(
             String(20), nullable=False, default="baseline", server_default="baseline"
     )
+    source_type: Mapped[str] = mapped_column(String(20), nullable=False, default="file", server_default="file")
+    source_descriptor: Mapped[str | None] = mapped_column(String(512))
+    source_metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, default="received", server_default="received"
     )
