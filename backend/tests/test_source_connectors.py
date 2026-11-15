@@ -735,3 +735,48 @@ def test_sql_server_requires_read_only_application_intent():
             table="Products",
             columns=["sku"],
         )
+
+
+
+@pytest.mark.anyio
+async def test_api_connector_rejects_full_page_when_only_one_page_is_allowed(monkeypatch):
+    class Response:
+        status_code = 200
+        headers = {}
+
+        def raise_for_status(self):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        async def aiter_bytes(self):
+            yield b'[{"sku":"001"}]'
+
+    class Client:
+        def __init__(self, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            pass
+
+        def stream(self, *args, **kwargs):
+            return Response()
+
+    monkeypatch.setattr(connectors, "_validate_https_url", lambda *args: None)
+    monkeypatch.setattr(connectors.httpx, "AsyncClient", Client)
+    with pytest.raises(SourceConnectorError, match="configure a larger max_pages"):
+        await fetch_api_records(
+            "https://supplier.example/catalog",
+            allowed_hosts={"supplier.example"},
+            page_param="page",
+            page_size_param="limit",
+            page_size=1,
+            max_pages=1,
+        )
