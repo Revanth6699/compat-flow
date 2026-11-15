@@ -217,31 +217,38 @@ function BillingContent() {
             ) : <p>No subscription record is currently associated with this organization.</p>}
           </section>
 
-          <section className="panel settings-panel">
-            <h2>Choose a monthly plan</h2>
-            <p className="settings-description">Checkout is available to the organization admin only. Prices below are the current reference prices in USD; payment availability and final currency depend on your Razorpay merchant account and configured plan IDs.</p>
-            {!isAdmin && <p className="notice">Only the organization admin can create or cancel a subscription. Contact your organization admin to manage billing.</p>}
-            {subscriptionLocked && <p className="notice">Your organization already has a subscription in progress. Self-service upgrades and downgrades are not enabled yet; plan selection is locked until the current subscription is resolved.</p>}
-            <div className="pricing-grid">
-              {plans.map((plan) => (
-                <button
-                  type="button"
-                  key={plan.code}
-                  className={selectedPlan === plan.code ? "pricing-card billing-plan selected" : "pricing-card billing-plan"}
-                  aria-pressed={selectedPlan === plan.code}
-                  onClick={() => setSelectedPlan(plan.code)}
-                  disabled={!isAdmin || busy}
-                >
-                  <strong>{plan.name}</strong><span className="pricing-amount">{plan.price}<small> / month</small></span><span>{plan.description}</span>
-                </button>
-              ))}
-            </div>
-            <p className="settings-description">Enterprise remains a custom commercial plan and is not available through self-service checkout. Annual billing is not enabled until annual prices and provider plans are explicitly configured.</p>
-            <button className="button auth-submit" disabled={!isAdmin || busy || loading || subscriptionLocked} onClick={() => void startCheckout()}>
-              {busy ? "Please wait…" : "Continue to secure checkout"}
-            </button>
-            <p className="settings-description">A successful checkout signature does not activate access by itself. CompatFlow waits for a verified Razorpay subscription webhook before treating the subscription as active.</p>
-          </section>
+          {isAdmin ? (
+            <section className="panel settings-panel">
+              <h2>Manage organization subscription</h2>
+              <p className="settings-description">The organization admin manages the subscription shared by all members.</p>
+              {subscriptionLocked && <p className="notice">Your organization already has a subscription in progress. Self-service upgrades and downgrades are not enabled yet; plan selection is locked until the current subscription is resolved.</p>}
+              <div className="pricing-grid">
+                {plans.map((plan) => (
+                  <button
+                    type="button"
+                    key={plan.code}
+                    className={selectedPlan === plan.code ? "pricing-card billing-plan selected" : "pricing-card billing-plan"}
+                    aria-pressed={selectedPlan === plan.code}
+                    onClick={() => setSelectedPlan(plan.code)}
+                    disabled={busy}
+                  >
+                    <strong>{plan.name}</strong><span className="pricing-amount">{plan.price}<small> / month</small></span><span>{plan.description}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="settings-description">Enterprise remains a custom commercial plan and is not available through self-service checkout. Annual billing is not enabled until annual prices and provider plans are explicitly configured.</p>
+              <button className="button auth-submit" disabled={busy || loading || subscriptionLocked} onClick={() => void startCheckout()}>
+                {busy ? "Please wait…" : "Continue to secure checkout"}
+              </button>
+              <p className="settings-description">A successful checkout signature does not activate access by itself. CompatFlow waits for a verified Razorpay subscription webhook before treating the subscription as active.</p>
+            </section>
+          ) : (
+            <section className="panel settings-panel">
+              <h2>Organization plan</h2>
+              <p className="settings-description">Your account uses the organization&apos;s shared subscription. You do not need to select or purchase a separate plan.</p>
+              <p className="settings-description">Contact your organization admin if the organization needs a new subscription or billing changes.</p>
+            </section>
+          )}
         </div>
       </main>
     </>
