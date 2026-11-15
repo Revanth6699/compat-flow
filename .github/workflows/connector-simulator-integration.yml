@@ -35,13 +35,15 @@ jobs:
         working-directory: backend
         run: python -m pip install -r requirements.txt
       - name: Start disposable supplier simulators
-        run: docker compose -f backend/tests/connector-simulator/compose.yaml up -d --wait
+        run: docker compose -f backend/tests/connector-simulator/compose.yaml up -d --wait rest-supplier sftp-supplier sql-supplier
+      - name: Initialize synthetic SQL Server catalog
+        run: docker compose -f backend/tests/connector-simulator/compose.yaml run --rm sql-init
       - name: Prepare local test trust and SFTP host key
         run: |
           mkdir -p backend/tests/connector-simulator/runtime
           docker compose -f backend/tests/connector-simulator/compose.yaml cp rest-supplier:/run/tls/server.crt backend/tests/connector-simulator/runtime/rest-ca.crt
           ssh-keyscan -p 2222 localhost > backend/tests/connector-simulator/runtime/known_hosts 2>/dev/null
-      - name: Run protocol integration tests
+      - name: Run REST and SFTP protocol integration tests
         working-directory: backend
         env:
           PYTHONPATH: .
