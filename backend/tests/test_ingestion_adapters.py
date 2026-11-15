@@ -273,6 +273,7 @@ def test_xls_feeds_the_same_industry_pipeline(monkeypatch):
     class Sheet:
         name = "Catalog"
         nrows = 3
+        ncols = 4
 
         def row_values(self, index):
             return [
