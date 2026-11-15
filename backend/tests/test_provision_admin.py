@@ -39,7 +39,7 @@ def test_provision_first_admin_creates_organization_and_admin():
     profile = provision_first_admin(
         db,
         auth_user_id=auth_user_id,
-        email="  OWNER@EXAMPLE.COM ",
+        email="  ADMIN@EXAMPLE.COM ",
         organization_name="  Example Organization  ",
     )
 
