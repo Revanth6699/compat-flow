@@ -79,3 +79,10 @@ The backend account deletion endpoint requires a server-only `SUPABASE_SERVICE_R
 - If the payment provider cannot confirm cancellation, deletion is stopped before local organization data is removed.
 - Supabase Auth and PostgreSQL cannot participate in one distributed transaction. If Supabase deletes some linked identities and then returns an error, retry deletion; already-absent identities are treated as deleted.
 - Verify a recoverable backup and understand that this operation is irreversible before enabling the feature in a production environment.
+
+
+## Temporary billing pause
+
+Billing is disabled by default for demo validation. The backend rejects every billing API route, including subscription creation, checkout verification, cancellation, subscription reads and Razorpay webhooks, unless `BILLING_ENABLED=true`. The frontend hides paid plan actions and does not load Razorpay Checkout unless `NEXT_PUBLIC_BILLING_ENABLED=true`.
+
+Keep both flags false while collecting validation screenshots and running demos. To re-enable billing later, set both flags to true in the backend and frontend deployment environments, then redeploy both services. Do not delete subscription, payment or webhook records when pausing billing.
