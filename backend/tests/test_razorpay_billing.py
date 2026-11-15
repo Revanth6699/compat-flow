@@ -6,17 +6,17 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
+from app.main import app
+from app.services.razorpay_client import (
+    verify_checkout_signature,
+    verify_webhook_signature,
+)
 
 
 @pytest.fixture(autouse=True)
 def enable_billing_for_provider_tests(monkeypatch):
     # Provider tests explicitly opt in; application billing defaults to disabled.
     monkeypatch.setattr(settings, "billing_enabled", True)
-from app.main import app
-from app.services.razorpay_client import (
-    verify_checkout_signature,
-    verify_webhook_signature,
-)
 
 
 def test_razorpay_checkout_signature_uses_payment_and_subscription_ids(monkeypatch):
