@@ -75,7 +75,7 @@ export default function CatalogImportPage() {
   const canonicalFields = ["sku", "name", "manufacturer", "part_number", "category", "compatibility", "replacement_sku"];
 
   function handleFileChange(selectedFile: File | null) {
-    setFile(selectedFile); setResult(null); setDatasetResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setError("");
+    setFile(selectedFile); setResult(null); setDatasetResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setManualMapping({}); setError("");
     if (!selectedFile) return;
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
     const allowed = demoApproved ? ["csv", "xlsx", "xls"] : ["csv", "xlsx", "xls", "json", "xml"];
