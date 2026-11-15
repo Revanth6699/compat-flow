@@ -110,7 +110,7 @@ def _record(values: dict[str, Any], location: str, key: Any = None) -> SourceRec
     )
 
 
-def parse_csv(data: bytes, *, max_records: int = MAX_RECORDS) -> ParsedSource:
+def parse_csv(data: bytes, *, max_records: int | None = MAX_RECORDS) -> ParsedSource:
     _check_source_size(data)
     try:
         text = data.decode("utf-8-sig")
@@ -137,7 +137,7 @@ def parse_csv(data: bytes, *, max_records: int = MAX_RECORDS) -> ParsedSource:
                 raise IngestionParseError(
                     f"CSV row {row_number} has {len(row)} cells; expected {len(headers)}."
                 )
-            if len(records) >= max_records:
+            if max_records is not None and len(records) >= max_records:
                 raise IngestionParseError(f"Input exceeds the {max_records:,}-record limit.")
             records.append(_record(dict(zip(headers, row)), f"row:{row_number}"))
     except csv.Error as exc:
@@ -146,7 +146,7 @@ def parse_csv(data: bytes, *, max_records: int = MAX_RECORDS) -> ParsedSource:
 
 
 def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
-                header_row: int = 1, max_records: int = MAX_RECORDS) -> ParsedSource:
+                header_row: int = 1, max_records: int | None = MAX_RECORDS) -> ParsedSource:
     _check_source_size(data)
     ext = extension.lower().lstrip(".")
     if ext not in {"xlsx", "xls"}:
@@ -166,7 +166,7 @@ def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
                 raise IngestionParseError("Requested worksheet does not exist.")
             sheet = workbook[sheet_name] if sheet_name else workbook[workbook.sheetnames[0]]
             if (
-                (sheet.max_row is not None and sheet.max_row > max_records + header_row)
+                (max_records is not None and sheet.max_row is not None and sheet.max_row > max_records + header_row)
                 or (sheet.max_column is not None and sheet.max_column > MAX_COLUMNS)
             ):
                 raise IngestionParseError("Worksheet dimensions exceed the configured row or column limits.")
@@ -185,7 +185,7 @@ def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
                     values.extend([None] * (len(headers) - len(values)))
                 if all(value is None or str(value).strip() == "" for value in values):
                     continue
-                if len(records) >= max_records:
+                if max_records is not None and len(records) >= max_records:
                     raise IngestionParseError(f"Input exceeds the {max_records:,}-record limit.")
                 records.append(_record(dict(zip(headers, values)),
                                        f"sheet:{sheet.title}!row:{row_number}"))
@@ -208,7 +208,7 @@ def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
                 sheet = workbook.sheet_by_index(0)
             if sheet.nrows < header_row:
                 raise IngestionParseError("Worksheet header row is missing.")
-            if sheet.nrows > max_records + header_row or sheet.ncols > MAX_COLUMNS:
+            if (max_records is not None and sheet.nrows > max_records + header_row) or sheet.ncols > MAX_COLUMNS:
                 raise IngestionParseError("Worksheet dimensions exceed the configured row or column limits.")
             headers = _clean_headers(_trim_trailing_empty(sheet.row_values(header_row - 1)))
             for index in range(header_row, sheet.nrows):
@@ -248,7 +248,7 @@ def _flatten_json_object(value: dict[str, Any]) -> dict[str, Any]:
 
 
 def parse_json(data: bytes, *, record_path: str | None = None,
-               max_records: int = MAX_RECORDS) -> ParsedSource:
+               max_records: int | None = MAX_RECORDS) -> ParsedSource:
     _check_source_size(data)
     try:
         payload = json.loads(data.decode("utf-8-sig"))
@@ -272,7 +272,7 @@ def parse_json(data: bytes, *, record_path: str | None = None,
             payload = [payload]
     if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
         raise IngestionParseError("JSON must contain an object or an array of objects; configure record_path for nested arrays.")
-    if len(payload) > max_records:
+    if max_records is not None and len(payload) > max_records:
         raise IngestionParseError(f"Input exceeds the {max_records:,}-record limit.")
     try:
         records = [
@@ -360,7 +360,7 @@ def parse_xml(data: bytes, *, record_tag: str | None = None,
                 selected_tag, elements = _local_name(root.tag), [root]
     if not elements:
         raise IngestionParseError("Could not identify XML record elements; supply record_tag.")
-    if len(elements) > max_records:
+    if max_records is not None and len(elements) > max_records:
         raise IngestionParseError(f"Input exceeds the {max_records:,}-record limit.")
     if any(not list(element) and not element.attrib for element in elements):
         raise IngestionParseError("XML record elements contain no fields.")
