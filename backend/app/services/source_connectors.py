@@ -402,11 +402,6 @@ def fetch_sql_server_rows(
         raise SourceConnectorError(
             "SQL Server connections must declare ApplicationIntent=ReadOnly."
         )
-    if "ODBC Driver 18 for SQL Server" not in pyodbc.drivers():
-        raise SourceConnectorError(
-            "Microsoft ODBC Driver 18 for SQL Server is not installed in this runtime."
-        )
-
     identifier = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
     if not identifier.fullmatch(schema) or not identifier.fullmatch(table):
         raise SourceConnectorError("Invalid SQL Server schema or table identifier.")
@@ -432,6 +427,11 @@ def fetch_sql_server_rows(
     ):
         raise SourceConnectorError(
             "The SQL Server watermark column must be a valid selected column."
+        )
+
+    if "ODBC Driver 18 for SQL Server" not in pyodbc.drivers():
+        raise SourceConnectorError(
+            "Microsoft ODBC Driver 18 for SQL Server is not installed in this runtime."
         )
 
     try:
