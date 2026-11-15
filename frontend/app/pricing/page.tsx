@@ -77,7 +77,7 @@ const plans: Plan[] = [
 ];
 
 export default function PricingPage() {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
   return (
     <main id="main" className="page pricing-page">
       <div className="container">
