@@ -241,8 +241,12 @@ def test_sql_server_connector_reads_only_selected_bounded_columns(monkeypatch):
             return self
 
     class MappingResult:
-        def all(self):
-            return [{"sku": "001", "name": "Widget"}]
+        def yield_per(self, size):
+            calls["yield_per"] = size
+            return self
+
+        def __iter__(self):
+            return iter([{"sku": "001", "name": "Widget"}])
 
     class ExecutionResult:
         def mappings(self):
@@ -316,8 +320,11 @@ def test_sql_server_connector_enforces_serialized_result_byte_limit(monkeypatch)
             return self
 
     class MappingResult:
-        def all(self):
-            return [{"sku": "001", "description": "x" * 100}]
+        def yield_per(self, size):
+            return self
+
+        def __iter__(self):
+            return iter([{"sku": "001", "description": "x" * 100}])
 
     class ExecutionResult:
         def mappings(self):
@@ -565,8 +572,12 @@ def test_sql_server_incremental_watermark_requires_selected_unique_column(monkey
     calls = {}
 
     class MappingResult:
-        def all(self):
-            return [{"modified_id": 11, "sku": "001"}]
+        def yield_per(self, size):
+            calls["yield_per"] = size
+            return self
+
+        def __iter__(self):
+            return iter([{"modified_id": 11, "sku": "001"}])
 
     class ExecutionResult:
         def mappings(self):
