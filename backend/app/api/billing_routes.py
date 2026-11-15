@@ -334,6 +334,18 @@ async def razorpay_webhook(
         else None
     )
 
+    # payment.captured webhooks may carry subscription_id on the payment entity
+    # without including a subscription entity in the event payload.
+    if subscription is None:
+        payment_subscription_id = payment_entity.get("subscription_id")
+        if isinstance(payment_subscription_id, str):
+            subscription = db.scalar(
+                select(Subscription).where(
+                    Subscription.provider == "razorpay",
+                    Subscription.provider_subscription_id == payment_subscription_id,
+                ).with_for_update()
+            )
+
     new_status = _subscription_status(event_type)
     if subscription is not None and new_status is not None:
         terminal_status = subscription.status in {"canceled", "expired"}
