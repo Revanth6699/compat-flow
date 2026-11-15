@@ -23,6 +23,9 @@ export function CookieConsent() {
     setPreferences(current);
     setAnalytics(current?.analytics ?? false);
     setMarketing(current?.marketing ?? false);
+    const manage = () => { const saved = readPreferences(); setAnalytics(saved?.analytics ?? false); setMarketing(saved?.marketing ?? false); setPreferences(null); setCustomizing(true); };
+    window.addEventListener("compatflow:manage-privacy", manage);
+    return () => window.removeEventListener("compatflow:manage-privacy", manage);
   }, []);
   function save(next: Preferences) {
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* Essential app use remains available. */ }
