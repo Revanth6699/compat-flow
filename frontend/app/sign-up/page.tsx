@@ -19,9 +19,11 @@ function SignUpForm() {
   const isInvitationFlow = next.split("?")[0] === "/invitations/accept";
   const [fullName,setFullName] = useState(""); const [organizationName,setOrganizationName] = useState(""); const [jobTitle,setJobTitle] = useState(""); const [phone,setPhone] = useState(""); const [companyWebsite,setCompanyWebsite] = useState(""); const [industry,setIndustry] = useState(""); const [teamSize,setTeamSize] = useState(""); const [email,setEmail] = useState(""); const [password,setPassword] = useState(""); const [confirm,setConfirm] = useState("");
   const [message,setMessage] = useState(""); const [error,setError] = useState(""); const [busy,setBusy] = useState(false);
+  const [serviceConsent,setServiceConsent] = useState(false); const [productUpdates,setProductUpdates] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setError(""); setMessage("");
+    if(!serviceConsent){setError("Please acknowledge the Privacy Notice and required service-processing purpose.");return;}
     if(password.length<10){setError("Use a password with at least 10 characters.");return;}
     if(password!==confirm){setError("The passwords do not match.");return;}
     if(!isInvitationFlow && organizationName.trim().length<2){setError("Enter an organization name with at least 2 characters.");return;}
@@ -32,6 +34,10 @@ function SignUpForm() {
     if(companyWebsite && !/^https?:\/\//i.test(companyWebsite)){setError("Enter a company website beginning with https:// or http://.");return;}
     setBusy(true);
     try {
+      const apiBase=(process.env.NEXT_PUBLIC_API_BASE_URL||"").replace(/\\/$/,"");
+      if(!apiBase.startsWith("https://") && !apiBase.startsWith("http://localhost")) throw new Error("Privacy processing is not configured over HTTPS.");
+      const consentResponse=await fetch(`${apiBase}/api/v1/privacy/consents`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,purposes:{service_processing:true,product_updates:productUpdates},source:"registration"})});
+      if(!consentResponse.ok) throw new Error("We could not record your privacy choices. Please try again.");
       const result=await signUp(email,password,fullName,isInvitationFlow ? "" : organizationName,next,{job_title:jobTitle.trim(),phone:phone.trim(),company_website:companyWebsite.trim(),industry,team_size:teamSize});
       if (result.access_token) {
         if (isInvitationFlow) {
@@ -63,6 +69,7 @@ function SignUpForm() {
       <label htmlFor="signup-password">Password</label><input id="signup-password" type="password" autoComplete="new-password" minLength={10} required value={password} onChange={e=>setPassword(e.target.value)} />
       <label htmlFor="signup-confirm">Confirm password</label><input id="signup-confirm" type="password" autoComplete="new-password" minLength={10} required value={confirm} onChange={e=>setConfirm(e.target.value)} />
       {error && <p className="auth-error" role="alert">{error}</p>}{message && <p className="auth-success" role="status">{message}</p>}
+      <div className="privacy-consent-field"><label><input type="checkbox" required checked={serviceConsent} onChange={e=>setServiceConsent(e.target.checked)} /> I acknowledge the <Link href="/privacy">Privacy Notice</Link> and agree to processing necessary to create and operate my account. *</label><label><input type="checkbox" checked={productUpdates} onChange={e=>setProductUpdates(e.target.checked)} /> I want optional product updates and announcements. I can withdraw this choice later.</label></div>
       <button className="button auth-submit" disabled={busy}>{busy?"Creating account…":"Create account"}</button>
     </form>
     <p className="auth-switch">Already registered? <Link href={`/sign-in?next=${encodeURIComponent(next)}`}>Sign in</Link></p>
