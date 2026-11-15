@@ -103,5 +103,5 @@ Official sources: [G.S.R. 843(E), Act commencement](https://egazette.gov.in/Writ
 
 - Source review was performed against the organization-onboarding branch at the baseline commit above.
 - CI at source commit `56ec34024f0d28f68fc41b685c5cbbdcd97c41b3`: backend 242 passed / 4 skipped; Ruff and Bandit passed; Alembic upgrade passed; frontend lint and build passed; backend runtime image build passed; industry-ingestion suite 242 passed / 4 skipped.
-- Focused privacy endpoint tests were added after that CI run and are awaiting the latest CI result.
+- Latest CI at `99f280ef4bbed1a49cfac891e02867d980748195`: backend regression tests (including focused privacy endpoint tests), Alembic upgrade, Ruff, Bandit, backend runtime image build, frontend lint/build and industry-ingestion suite all passed.
 - No staging or production migration/deployment has been run; no production or staging database has been changed.
