@@ -12,7 +12,7 @@ export async function POST(request:Request){
   }
   const apiBase=process.env.NEXT_PUBLIC_API_BASE_URL;
   if(!apiBase?.startsWith("https://"))return NextResponse.json({error:"Privacy processing is not configured. Please try again later."},{status:503});
-  const consent=await fetch(`${apiBase.replace(/\\/$/,"")}/api/v1/privacy/consents`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,purposes:{service_processing:true,product_updates:body.marketing_consent},source:"contact_form"})});
+  const consent=await fetch(`${apiBase.replace(/\/$/,"")}/api/v1/privacy/consents`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,purposes:{service_processing:true,product_updates:body.marketing_consent},source:"contact_form"})});
   if(!consent.ok)return NextResponse.json({error:"We could not record your privacy choices. Please try again."},{status:502});
   if(intent==="demo"){
    const apiBase=process.env.NEXT_PUBLIC_API_BASE_URL;
