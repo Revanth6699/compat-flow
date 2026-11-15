@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 
 import pytest
+import pyodbc
+from sqlalchemy.engine import make_url
 
 from app.services import source_connectors as connectors
 from app.services.source_connectors import (
@@ -57,6 +59,24 @@ def test_sql_server_supplier_read_only_projection():
     url = os.getenv("SIMULATOR_SQLSERVER_URL")
     if not url:
         pytest.skip("SIMULATOR_SQLSERVER_URL is not configured for the SQL Server simulator")
+
+    # Probe the exact trusted ODBC connection separately so failures retain
+    # the driver diagnostic while the production connector keeps errors generic.
+    parsed = make_url(url)
+    query = parsed.query
+    odbc_connection = (
+        f"DRIVER={{{query['driver']}}};"
+        f"SERVER={parsed.host},{parsed.port or 1433};"
+        f"DATABASE={parsed.database};UID={parsed.username};PWD={parsed.password};"
+        f"Encrypt={query.get('Encrypt', 'yes')};"
+        f"TrustServerCertificate={query.get('TrustServerCertificate', 'no')}"
+    )
+    with pyodbc.connect(odbc_connection, timeout=8) as direct_connection:
+        direct_rows = direct_connection.cursor().execute(
+            "SELECT sku FROM dbo.SupplierProducts ORDER BY sku"
+        ).fetchall()
+    assert [row[0] for row in direct_rows] == ["SIM-SQL-001", "SIM-SQL-002"]
+
     rows = fetch_sql_server_rows(
         url,
         schema="dbo",
