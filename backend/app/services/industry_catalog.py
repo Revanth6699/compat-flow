@@ -220,10 +220,16 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
             row["currency"] = str(row["currency"]).upper()
         if row.get("unit_price") is not None and row.get("currency") is None:
             add_issue(line_number, "currency", "PRICE_CURRENCY_MISSING", "A price cannot be interpreted without its currency.")
-        if row.get("moq") is not None and Decimal(str(row["moq"])) == 0:
-            add_issue(line_number, "moq", "MOQ_MUST_BE_POSITIVE", "Minimum order quantity must be greater than zero.")
-        if row.get("order_multiple") is not None and Decimal(str(row["order_multiple"])) == 0:
-            add_issue(line_number, "order_multiple", "ORDER_MULTIPLE_MUST_BE_POSITIVE", "Order multiple must be greater than zero.")
+        for positive_field, code, message in (
+            ("moq", "MOQ_MUST_BE_POSITIVE", "Minimum order quantity must be greater than zero."),
+            ("order_multiple", "ORDER_MULTIPLE_MUST_BE_POSITIVE", "Order multiple must be greater than zero."),
+        ):
+            if row.get(positive_field) is not None:
+                try:
+                    if Decimal(str(row[positive_field])) <= 0:
+                        add_issue(line_number, positive_field, code, message)
+                except InvalidOperation:
+                    pass  # The numeric validator above already reports the malformed value.
         if row.get("quantity_on_hand") is not None and row.get("quantity_reserved") is not None and row.get("quantity_available") is not None:
             try:
                 if Decimal(str(row["quantity_available"])) != Decimal(str(row["quantity_on_hand"])) - Decimal(str(row["quantity_reserved"])):
