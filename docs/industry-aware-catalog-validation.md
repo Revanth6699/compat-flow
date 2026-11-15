@@ -1,4 +1,6 @@
-# Industry-Aware Catalog Mapping and Validation
+# Industry-Specific Catalog Mapping and Validation
+
+This specification describes how catalog fields and validation rules should vary by industry and product class. It is a design reference; it does not mean every profile is supported by the current importer.
 
 **Status:** Research-backed implementation specification  
 **Boundary:** This document does not claim that runtime import validation supports every profile described here.
