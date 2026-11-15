@@ -24,7 +24,8 @@ from app.core.auth import (
 from app.core.database import get_db
 from app.core.config import settings
 from app.services.razorpay_client import razorpay_request
-from app.models import Organization, Payment, PaymentWebhookEvent, Subscription, SubscriptionPlan, User, UserInvitation
+from app.models import ImportJob, Organization, Payment, PaymentWebhookEvent, Subscription, SubscriptionPlan, User, UserInvitation
+from app.services.file_storage import FileStorageError, get_storage_path
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 invitation_router = APIRouter(prefix="/invitations", tags=["invitations"])
@@ -50,10 +51,18 @@ class DeleteAccountRequest(BaseModel):
     confirmation: str = Field(min_length=8, max_length=32)
 
 
-def _delete_supabase_user(auth_user_id: UUID) -> None:
+def _require_supabase_admin_configured() -> str:
     service_key = settings.supabase_service_role_key
     if not service_key:
-        raise HTTPException(status_code=503, detail="Account deletion is not configured. The Supabase service-role key is missing.")
+        raise HTTPException(
+            status_code=503,
+            detail="Organization and account deletion are temporarily unavailable. The backend Supabase admin credential is not configured.",
+        )
+    return service_key
+
+
+def _delete_supabase_user(auth_user_id: UUID) -> None:
+    service_key = _require_supabase_admin_configured()
     try:
         response = httpx.delete(
             f"{settings.supabase_url.rstrip('/')}/auth/v1/admin/users/{auth_user_id}",
@@ -75,12 +84,15 @@ def delete_account(
     """Delete the authenticated identity; owners delete their entire organization and its history."""
     profile = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
     if profile is None:
+        _require_supabase_admin_configured()
         if payload.confirmation != "DELETE MY ACCOUNT":
             raise HTTPException(status_code=422, detail="Type DELETE MY ACCOUNT to confirm.")
         _delete_supabase_user(identity.auth_user_id)
         return {"deleted": True, "scope": "account"}
 
     if profile.role == "owner":
+        # Check all required credentials before canceling billing or deleting any identity.
+        _require_supabase_admin_configured()
         if payload.confirmation != "DELETE ORGANIZATION":
             raise HTTPException(status_code=422, detail="As the organization owner, type DELETE ORGANIZATION to remove the company workspace and all associated data.")
         db.scalar(select(Organization.id).where(Organization.id == profile.organization_id).with_for_update())
@@ -103,7 +115,26 @@ def delete_account(
                     raise HTTPException(status_code=502, detail="The payment provider could not confirm immediate cancellation. Your organization data has not been deleted.") from None
             elif subscription.status in {"active", "trialing", "pending", "past_due"}:
                 raise HTTPException(status_code=409, detail="An active external subscription cannot be safely canceled automatically. Contact support before deleting this organization.")
-        # Delete every Supabase identity belonging to this organization before removing tenant data.
+        # Remove stored import files while the owner can still retry if cleanup
+        # or a later identity deletion fails. Missing files are safe on retry.
+        storage_keys = list(db.scalars(
+            select(ImportJob.storage_key).where(
+                ImportJob.organization_id == profile.organization_id,
+                ImportJob.storage_key.is_not(None),
+            )
+        ).all())
+        try:
+            for storage_key in storage_keys:
+                get_storage_path(storage_key).unlink(missing_ok=True)
+        except (OSError, FileStorageError):
+            raise HTTPException(
+                status_code=503,
+                detail="Organization file cleanup stopped before account deletion. Your organization and login remain available; retry deletion. Some import files may already have been removed.",
+            ) from None
+
+        # Delete other members first and the owner last. If a provider call fails,
+        # the owner can still sign in and retry the organization deletion.
+        members.sort(key=lambda member: member.role == "owner")
         for member in members:
             if member.auth_user_id:
                 _delete_supabase_user(member.auth_user_id)
@@ -118,9 +149,15 @@ def delete_account(
         db.commit()
         return {"deleted": True, "scope": "organization", "deleted_accounts": len(members)}
 
+    _require_supabase_admin_configured()
     if payload.confirmation != "DELETE MY ACCOUNT":
         raise HTTPException(status_code=422, detail="Type DELETE MY ACCOUNT to confirm.")
     _delete_supabase_user(identity.auth_user_id)
+    # Remove user-owned payment records that otherwise block deletion through
+    # the payments.user_id RESTRICT constraint. Invitations issued by this user
+    # are removed so no invitation history remains attached to the deleted user.
+    db.execute(delete(Payment).where(Payment.user_id == profile.id))
+    db.execute(delete(UserInvitation).where(UserInvitation.invited_by_user_id == profile.id))
     db.execute(delete(User).where(User.id == profile.id, User.organization_id == profile.organization_id))
     db.commit()
     return {"deleted": True, "scope": "account"}
