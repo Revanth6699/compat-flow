@@ -14,7 +14,7 @@ export function SiteFooter() {
    {!user && <Link href="/contact?intent=demo">Request a demo</Link>}<Link href="/pricing">Pricing</Link><Link href="/about">About Us</Link>{!user && <Link href="/reviews">Customer reviews</Link>}
   </div></div>
   <div className="footer-column"><strong>Information</strong><div className="footer-links">
-   <Link href="/contact">Contact Us</Link><Link href="/privacy">Privacy Policy</Link><Link href="/terms">Terms &amp; Conditions</Link><Link href="/help/account">Account help</Link>
+   <Link href="/contact">Contact Us</Link><Link href="/privacy">Privacy Notice</Link><Link href="/privacy/requests">Data rights request</Link><Link href="/terms">Terms &amp; Conditions</Link><Link href="/help/account">Account help</Link><a href={`mailto:${process.env.NEXT_PUBLIC_GRIEVANCE_EMAIL||process.env.NEXT_PUBLIC_CONTACT_EMAIL||"privacy@compatflow.in"}`}>Grievance contact</a>
   </div></div>
   <span className="footer-copyright">© {new Date().getFullYear()} CompatFlow</span>
  </div></footer>;
