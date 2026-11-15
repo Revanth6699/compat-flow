@@ -129,7 +129,7 @@ def delete_account(
         except (OSError, FileStorageError):
             raise HTTPException(
                 status_code=503,
-                detail="Organization files could not all be removed. No authentication identities or organization records were deleted.",
+                detail="Organization file cleanup stopped before account deletion. Your organization and login remain available; retry deletion. Some import files may already have been removed.",
             ) from None
 
         # Delete other members first and the owner last. If a provider call fails,
