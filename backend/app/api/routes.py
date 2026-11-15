@@ -253,7 +253,8 @@ async def _validate_industry_upload(file: UploadFile, profile_id: str | None, ma
         if not parsed.records:
             raise HTTPException(status_code=422, detail="No data rows were found in the uploaded file.")
         result = validate_industry_records(
-            parsed.headers, [record.values for record in parsed.records], profile_id=profile_id,\n            max_rows=None if max_records is None else max_records
+            parsed.headers, [record.values for record in parsed.records], profile_id=profile_id,
+            max_rows=None if max_records is None else max_records
         )
     except IngestionParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
