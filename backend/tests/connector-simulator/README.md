@@ -9,7 +9,7 @@ a public or production network and never reuse its credentials for a real suppli
 From the repository root:
 
 ```bash
-export SIMULATOR_READER_PASSWORD="$(python -c 'import secrets,string; print("".join(secrets.choice(string.ascii_letters + string.digits + "!@#%") for _ in range(28)))')"
+export SIMULATOR_READER_PASSWORD="$(python -c 'import secrets,string; print("Aa7" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(25)))')"
 docker compose -f backend/tests/connector-simulator/compose.yaml up -d --wait rest-supplier sftp-supplier sql-supplier
 docker compose -f backend/tests/connector-simulator/compose.yaml run --rm sql-init
 mkdir -p backend/tests/connector-simulator/runtime
@@ -38,14 +38,14 @@ certificate-chain and hostname verification.
 
 ## Run REST, SFTP and SQL Server protocol tests
 
-Install backend requirements, then run:
+Install Microsoft ODBC Driver 18 and backend requirements, then run:
 
 ```bash
 cd backend
 PYTHONPATH=. COMPATFLOW_CONNECTOR_SIMULATOR=1 \
-SIMULATOR_REST_CERT=tests/connector-simulator/runtime/rest-ca.crt \\
-SIMULATOR_SFTP_KNOWN_HOSTS=tests/connector-simulator/runtime/known_hosts \\
-SIMULATOR_SQLSERVER_URL="mssql+pyodbc://compatflow_reader:${SIMULATOR_READER_PASSWORD}@localhost:14333/CompatFlowSupplier?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no" \\
+SIMULATOR_REST_CERT=tests/connector-simulator/runtime/rest-ca.crt \
+SIMULATOR_SFTP_KNOWN_HOSTS=tests/connector-simulator/runtime/known_hosts \
+SIMULATOR_SQLSERVER_URL="mssql+pyodbc://compatflow_reader:${SIMULATOR_READER_PASSWORD}@localhost:14333/CompatFlowSupplier?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no" \
 python -m pytest -q tests/test_connector_simulator_integration.py
 ```
 
