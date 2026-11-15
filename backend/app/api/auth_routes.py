@@ -50,10 +50,18 @@ class DeleteAccountRequest(BaseModel):
     confirmation: str = Field(min_length=8, max_length=32)
 
 
-def _delete_supabase_user(auth_user_id: UUID) -> None:
+def _require_supabase_admin_configured() -> str:
     service_key = settings.supabase_service_role_key
     if not service_key:
-        raise HTTPException(status_code=503, detail="Account deletion is not configured. The Supabase service-role key is missing.")
+        raise HTTPException(
+            status_code=503,
+            detail="Organization and account deletion are temporarily unavailable. The backend Supabase admin credential is not configured.",
+        )
+    return service_key
+
+
+def _delete_supabase_user(auth_user_id: UUID) -> None:
+    service_key = _require_supabase_admin_configured()
     try:
         response = httpx.delete(
             f"{settings.supabase_url.rstrip('/')}/auth/v1/admin/users/{auth_user_id}",
@@ -75,12 +83,15 @@ def delete_account(
     """Delete the authenticated identity; owners delete their entire organization and its history."""
     profile = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
     if profile is None:
+        _require_supabase_admin_configured()
         if payload.confirmation != "DELETE MY ACCOUNT":
             raise HTTPException(status_code=422, detail="Type DELETE MY ACCOUNT to confirm.")
         _delete_supabase_user(identity.auth_user_id)
         return {"deleted": True, "scope": "account"}
 
     if profile.role == "owner":
+        # Check all required credentials before canceling billing or deleting any identity.
+        _require_supabase_admin_configured()
         if payload.confirmation != "DELETE ORGANIZATION":
             raise HTTPException(status_code=422, detail="As the organization owner, type DELETE ORGANIZATION to remove the company workspace and all associated data.")
         db.scalar(select(Organization.id).where(Organization.id == profile.organization_id).with_for_update())
@@ -118,6 +129,7 @@ def delete_account(
         db.commit()
         return {"deleted": True, "scope": "organization", "deleted_accounts": len(members)}
 
+    _require_supabase_admin_configured()
     if payload.confirmation != "DELETE MY ACCOUNT":
         raise HTTPException(status_code=422, detail="Type DELETE MY ACCOUNT to confirm.")
     _delete_supabase_user(identity.auth_user_id)
