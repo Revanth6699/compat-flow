@@ -72,7 +72,7 @@ class ConnectorImportRequest(BaseModel):
 
 async def _enforce_connector_rate_limit(organization_id: UUID) -> None:
     """Distributed fixed-window limit; fail closed if Redis cannot enforce it."""
-    redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    redis = None
     bucket = int(time.time() // 60)
     key = f"compatflow:connector-rate:{organization_id}:{bucket}"
     script = (
@@ -81,17 +81,19 @@ async def _enforce_connector_rate_limit(organization_id: UUID) -> None:
         "return count"
     )
     try:
+        redis = Redis.from_url(settings.redis_url, decode_responses=True)
         count = await redis.eval(script, 1, key, 60)
-    except RedisError:
+    except (RedisError, ValueError):
         raise HTTPException(
             status_code=503,
             detail="Connector rate limiting is unavailable; the source was not contacted.",
         ) from None
     finally:
-        try:
-            await redis.aclose()
-        except RedisError:
-            pass
+        if redis is not None:
+            try:
+                await redis.aclose()
+            except RedisError:
+                pass
     if int(count) > settings.connector_rate_limit_per_minute:
         raise HTTPException(
             status_code=429,
@@ -313,8 +315,6 @@ def list_import_history(
         "total": total, "limit": limit, "offset": offset,
         "items": [{
             "id": str(job.id), "filename": job.filename, "record_type": job.import_type,
-        "source_type": job.source_type, "source_descriptor": job.source_descriptor,
-        "source_metadata": job.source_metadata,
             "source_type": job.source_type, "source_descriptor": job.source_descriptor,
             "source_metadata": job.source_metadata,
             "status": job.status, "total_records": job.row_count,
@@ -358,6 +358,8 @@ def get_import_history_item(
     ).all()
     return {
         "id": str(job.id), "filename": job.filename, "record_type": job.import_type,
+        "source_type": job.source_type, "source_descriptor": job.source_descriptor,
+        "source_metadata": job.source_metadata,
         "status": job.status, "total_records": job.row_count,
         "imported_records": job.valid_rows, "rejected_records": job.invalid_rows,
         "processed_records": job.processed_rows, "created_at": job.created_at,
