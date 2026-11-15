@@ -308,29 +308,54 @@ def parse_xml(data: bytes, *, record_tag: str | None = None,
     elif selected_tag is not None:
         elements = candidates.get(selected_tag, [])
     else:
-        repeated_groups = []
-        for parent in root.iter():
-            sibling_groups: dict[str, list[Any]] = {}
-            for child in list(parent):
-                sibling_groups.setdefault(_local_name(child.tag), []).append(child)
-            for name, items in sibling_groups.items():
-                if len(items) > 1 and any(list(item) or item.attrib for item in items):
-                    repeated_groups.append((name, items))
-        if len(repeated_groups) > 1:
-            raise IngestionParseError("XML contains multiple repeated record groups; supply record_tag.")
-        if len(repeated_groups) == 1:
-            selected_tag, elements = repeated_groups[0]
-        elif len(children) == 1 and list(children[0]):
-            wrapper_children = list(children[0])
-            if len(wrapper_children) == 1 and list(wrapper_children[0]):
-                selected_tag = _local_name(wrapper_children[0].tag)
-                elements = wrapper_children
-            else:
-                selected_tag = _local_name(children[0].tag)
-                elements = children
+        record_names = {
+            "record", "item", "product", "variant", "offer",
+            "inventory", "identifier", "row", "entry", "snapshot",
+        }
+        container_names = {
+            "records", "items", "products", "variants", "offers",
+            "inventories", "identifiers", "rows", "entries",
+            "data", "results", "catalog",
+        }
+        root_name = _local_name(root.tag).casefold()
+        if root_name in record_names:
+            selected_tag, elements = _local_name(root.tag), [root]
         else:
-            selected_tag = _local_name(root.tag)
-            elements = [root]
+            repeated_groups = []
+            for parent in root.iter():
+                sibling_groups: dict[str, list[Any]] = {}
+                for child in list(parent):
+                    sibling_groups.setdefault(_local_name(child.tag), []).append(child)
+                for name, items in sibling_groups.items():
+                    if len(items) > 1 and any(list(item) or item.attrib for item in items):
+                        repeated_groups.append((name, items))
+            if len(repeated_groups) > 1:
+                raise IngestionParseError("XML contains multiple repeated record groups; supply record_tag.")
+            if len(repeated_groups) == 1:
+                selected_tag, elements = repeated_groups[0]
+            elif len(children) == 1 and list(children[0]):
+                wrapper = children[0]
+                wrapper_name = _local_name(wrapper.tag).casefold()
+                wrapper_children = list(wrapper)
+                if wrapper_name in record_names:
+                    selected_tag, elements = _local_name(wrapper.tag), children
+                elif wrapper_children and (
+                    wrapper_name in container_names
+                    or (
+                        len(wrapper_children) == 1
+                        and _local_name(wrapper_children[0].tag).casefold() in record_names
+                    )
+                ):
+                    child_names = {_local_name(item.tag) for item in wrapper_children}
+                    if len(child_names) != 1:
+                        raise IngestionParseError(
+                            "XML wrapper contains mixed child record types; supply record_tag."
+                        )
+                    selected_tag, elements = next(iter(child_names)), wrapper_children
+                else:
+                    selected_tag, elements = _local_name(wrapper.tag), children
+            else:
+                selected_tag, elements = _local_name(root.tag), [root]
     if not elements:
         raise IngestionParseError("Could not identify XML record elements; supply record_tag.")
     if len(elements) > max_records:
