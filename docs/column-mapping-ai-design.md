@@ -1,4 +1,6 @@
-# AI-Assisted Column Mapping
+# Column Mapping Suggestions
+
+This document describes the optional provider-backed suggestion step. Parsing, validation, and import decisions remain in application code, and users must confirm every suggestion.
 
 ## 1. Design decision
 
