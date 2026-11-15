@@ -23,6 +23,7 @@ MAX_CELL_CHARS = 1_000_000
 MAX_SOURCE_BYTES = 50 * 1024 * 1024
 MAX_XLSX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 MAX_XLSX_ARCHIVE_ENTRIES = 10_000
+MAX_HEADER_ROW = 1_000
 
 
 class IngestionParseError(ValueError):
@@ -150,8 +151,8 @@ def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
     ext = extension.lower().lstrip(".")
     if ext not in {"xlsx", "xls"}:
         raise IngestionParseError("Excel format must be .xlsx or .xls.")
-    if header_row < 1:
-        raise IngestionParseError("header_row must be 1 or greater.")
+    if header_row < 1 or header_row > MAX_HEADER_ROW:
+        raise IngestionParseError(f"header_row must be between 1 and {MAX_HEADER_ROW}.")
     records: list[SourceRecord] = []
     if ext == "xlsx":
         _validate_xlsx_archive(data)
@@ -251,7 +252,7 @@ def parse_json(data: bytes, *, record_path: str | None = None,
     _check_source_size(data)
     try:
         payload = json.loads(data.decode("utf-8-sig"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
         raise IngestionParseError("JSON must be valid UTF-8 JSON.") from None
     if record_path:
         current: Any = payload
@@ -341,6 +342,10 @@ def parse_xml(data: bytes, *, record_tag: str | None = None,
             name = _local_name(child.tag)
             value = child.text.strip() if child.text else ""
             if list(child):
+                if value:
+                    raise IngestionParseError(
+                        f"XML mixed text and nested elements in field '{name}' are not supported."
+                    )
                 if name in values or any(key.startswith(f"{name}.") for key in values):
                     raise IngestionParseError(
                         f"XML record contains repeated nested field group '{name}'."
@@ -348,6 +353,10 @@ def parse_xml(data: bytes, *, record_tag: str | None = None,
                 nested: dict[str, str] = {}
                 for grand in list(child):
                     nested_name = _local_name(grand.tag)
+                    if list(grand):
+                        raise IngestionParseError(
+                            f"XML nested field '{name}.{nested_name}' exceeds the supported nesting depth."
+                        )
                     if nested_name in nested:
                         raise IngestionParseError(
                             f"XML record contains repeated nested field '{name}.{nested_name}'."
