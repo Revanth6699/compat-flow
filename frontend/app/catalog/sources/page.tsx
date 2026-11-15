@@ -25,6 +25,7 @@ function SourcesContent() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [committed, setCommitted] = useState(false);
+  const [sourceAuthorization, setSourceAuthorization] = useState(false);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm(current => ({ ...current, [key]: value }));
@@ -47,6 +48,7 @@ function SourcesContent() {
 
   async function runPreview() {
     if (busy) return;
+    if (!sourceAuthorization) { setError("Confirm that you are authorized to connect to this supplier source and process its data."); return; }
     setBusy(true); setError(""); setNotice(""); setPreview(null); setCommitted(false);
     try {
       const result = await apiRequest<Preview>("/api/v1/catalog/import/connectors/preview", { method: "POST", body: JSON.stringify(payload()) });
@@ -58,6 +60,7 @@ function SourcesContent() {
 
   async function commitImport() {
     if (!preview || busy || committed || preview.valid_records < 1) return;
+    if (!sourceAuthorization) { setError("Confirm that you are authorized to connect to this supplier source and process its data."); return; }
     setBusy(true); setError(""); setNotice("");
     try {
       const result = await apiRequest<{ id: string; status: string; filename: string }>("/api/v1/catalog/import/connectors/commit", { method: "POST", body: JSON.stringify(payload()) });
@@ -95,6 +98,7 @@ function SourcesContent() {
         <label htmlFor="sql-columns">Columns (comma-separated)</label><input id="sql-columns" required value={form.sql_columns} onChange={e => update("sql_columns", e.target.value)} placeholder="sku, name, manufacturer, part_number, category" />
         <label htmlFor="sql-limit">Maximum rows to read (1–10,000)</label><input id="sql-limit" type="number" min="1" max="10000" required value={form.sql_row_limit} onChange={e => update("sql_row_limit", e.target.value)} />
       </div>}
+      <div className="privacy-consent-field"><label><input type="checkbox" checked={sourceAuthorization} onChange={event => setSourceAuthorization(event.target.checked)} /> I confirm that I am authorized to connect to this supplier system and retrieve/process the selected records for my organization. *</label></div>
       <div className="import-actions"><button className="button" type="button" onClick={runPreview} disabled={busy}>{busy ? "Connecting…" : "Preview source"}</button><button className="button button-secondary" type="button" onClick={() => { setForm(initialForm); setPreview(null); setError(""); setNotice(""); setCommitted(false); }}>Clear credentials</button></div>
       {error && <p className="auth-error" role="alert">{error}</p>}{notice && <p className="auth-success" role="status">{notice}</p>}
     </section>
