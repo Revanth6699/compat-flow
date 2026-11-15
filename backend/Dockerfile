@@ -12,6 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+RUN python -m pytest -q tests/test_industry_catalog.py tests/test_ingestion_adapters.py
 RUN chown -R appuser:appuser /app
 USER appuser
 
