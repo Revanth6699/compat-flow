@@ -109,47 +109,15 @@ export default function CatalogImportPage() {
       const extension = file.name.split(".").pop()?.toLowerCase();
 
       if (demoApproved) {
-        if (extension === "csv") {
-          if (profileId) formData.append("profile_id", profileId);
-          const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/preview-industry", { method: "POST", body: formData });
-          setIndustryResult(data);
-          return;
-        }
-        const profile = await apiRequest<DatasetProfile>("/api/v1/catalog/import/profile", { method: "POST", body: formData });
-        if (!profile.is_product_catalog) { setDatasetResult(profile); return; }
-        if (extension === "csv") {
-          formData.append("profile_id", profileId);
-          if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
-          const data = await apiRequest<PreviewResponse>("/api/v1/catalog/import/preview", { method: "POST", body: formData });
-          setResult(data);
-          setManualMapping(Object.fromEntries(data.column_mappings.map((item) => [item.field, item.source_header])));
-        } else {
-          const data = await apiRequest<MultiResult>("/api/v1/catalog/import/preview-records", { method: "POST", body: formData });
-          setMultiResult(data);
-        }
-        return;
-      }
-
-      if (extension === "csv") {
         if (profileId) formData.append("profile_id", profileId);
-        const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/validate-industry", { method: "POST", body: formData });
+        const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/preview-industry", { method: "POST", body: formData });
         setIndustryResult(data);
         return;
       }
 
-      if (extension === "csv" && recordType === "products") {
-        formData.append("profile_id", profileId);
-        if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
-        const data = await apiRequest<PreviewResponse>("/api/v1/catalog/import/validate", { method: "POST", body: formData });
-        setResult(data);
-        setManualMapping(Object.fromEntries(data.column_mappings.map((item) => [item.field, item.source_header])));
-      } else {
-        formData.append("record_type", recordType);
-        if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
-        const data = await apiRequest<MultiResult>("/api/v1/catalog/import/validate-records", { method: "POST", body: formData });
-        setMultiResult(data);
-        setManualMapping(Object.fromEntries(data.mappings.map((item) => [item.field, item.source_header])));
-      }
+      if (profileId) formData.append("profile_id", profileId);
+      const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/validate-industry", { method: "POST", body: formData });
+      setIndustryResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong while validating the file.");
     } finally { setLoading(false); }
@@ -260,7 +228,7 @@ export default function CatalogImportPage() {
             <option value="automotive">Automotive aftermarket</option><option value="electronics">Electronics</option>
             <option value="industrial">Industrial / MRO</option><option value="wholesale">Wholesale / distribution</option>
           </select>
-          <p className="import-description">CSV files use industry-specific mapping and validation. Select a profile or let CompatFlow infer one from the column evidence.</p>
+          <p className="import-description">CSV, XLS, XLSX, JSON and XML files use the same industry-specific mapping and validation pipeline. Select a profile or let CompatFlow infer one from the extracted column evidence.</p>
           <label className="file-picker" htmlFor="catalog-file">
             <span className="file-picker-icon" aria-hidden="true">↥</span>
             <strong>{file ? file.name : "Choose a catalog file"}</strong>
