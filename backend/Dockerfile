@@ -25,7 +25,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN python -m pytest -q tests
+RUN python -m pytest -q tests -k "not postgres"
 RUN chown -R appuser:appuser /app
 USER appuser
 
