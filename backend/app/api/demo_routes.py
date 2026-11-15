@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.auth import AuthenticatedUser, get_active_plan, get_current_user, require_verified_supabase_email
+from app.core.auth import AuthenticatedUser, get_active_plan, get_current_user, is_platform_admin, require_verified_supabase_email
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import DemoAccessRequest, Organization, Review, Subscription, User
@@ -78,6 +78,8 @@ def resolve_demo_access(
     current: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    if is_platform_admin(current):
+        return {"allowed": True, "access_type": "subscription"}
     subscription, plan = get_active_plan(current, db)
     if subscription is not None and plan is not None and (
         bool((plan.entitlements or {}).get("csv_validation", False))
