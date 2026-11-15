@@ -11,7 +11,7 @@ from uuid import UUID
 
 from app.core.auth import AuthenticatedUser, require_demo_or_paid_access, require_permission, require_plan_feature
 from app.core.database import get_db
-from app.models import InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer
+from app.models import InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer, PrivacyConsentEvent
 from app.core.config import settings
 from app.schemas import (
     HealthResponse,
@@ -446,6 +446,7 @@ async def suggest_multiformat_mappings(
     xml_record_tag: str | None = Form(None),
     _current: AuthenticatedUser = Depends(require_permission("catalog:read")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
 ):
     """Return optional AI mapping suggestions; data leaves CompatFlow only after explicit opt-in."""
     filename = (file.filename or "").strip()
@@ -463,6 +464,12 @@ async def suggest_multiformat_mappings(
             raw, filename, sheet_name=sheet_name, header_row=header_row,
             json_record_path=json_record_path, xml_record_tag=xml_record_tag,
         )
+        db.add(PrivacyConsentEvent(
+            id=__import__("uuid").uuid4(), email=_current.identity.email,
+            purpose="ai_mapping", granted=ai_opt_in, notice_version="2026-11-15-draft",
+            source="ai_mapping_action",
+        ))
+        db.commit()
         result = await suggest_field_mappings(
             record_type=record_type,
             headers=parsed.headers,
