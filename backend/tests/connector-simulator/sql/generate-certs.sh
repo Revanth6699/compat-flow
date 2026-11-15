@@ -10,7 +10,7 @@ openssl req -x509 -newkey rsa:2048 -nodes \
   -subj "/CN=CompatFlow Disposable Simulator CA" \
   -addext "basicConstraints=critical,CA:TRUE" \
   -addext "keyUsage=critical,keyCertSign,cRLSign" \
-  -addext "subjectKeyIdentifier=hash" \\
+  -addext "subjectKeyIdentifier=hash" \
   -addext "authorityKeyIdentifier=keyid:always"
 openssl genrsa -out /tls/sql-server.key 2048
 openssl req -new -key /tls/sql-server.key -out /tmp/sql-server.csr \
