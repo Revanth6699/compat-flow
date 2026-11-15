@@ -33,7 +33,7 @@ function SourcesContent() {
   }
 
   function payload() {
-    const common = { source_type: sourceType, record_type: "products" as const };
+    const common = { source_type: sourceType, record_type: "products" as const, authorized_data_processing: sourceAuthorization };
     if (sourceType === "rest_api") {
       return { ...common, api_url: form.api_url.trim(), api_records_path: form.api_records_path.trim() || null,
         api_headers: form.api_token.trim() ? { Authorization: form.api_token.trim().startsWith("Bearer ") ? form.api_token.trim() : `Bearer ${form.api_token.trim()}` } : {} };
