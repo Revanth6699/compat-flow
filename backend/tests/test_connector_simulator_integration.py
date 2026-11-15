@@ -69,7 +69,8 @@ def test_sql_server_supplier_read_only_projection():
         f"SERVER={parsed.host},{parsed.port or 1433};"
         f"DATABASE={parsed.database};UID={parsed.username};PWD={parsed.password};"
         f"Encrypt={query.get('Encrypt', 'yes')};"
-        f"TrustServerCertificate={query.get('TrustServerCertificate', 'no')}"
+        + (f"ServerCertificate={query['ServerCertificate']};" if query.get("ServerCertificate") else "")
+        + f"TrustServerCertificate={query.get('TrustServerCertificate', 'no')}"
     )
     with pyodbc.connect(odbc_connection, timeout=8) as direct_connection:
         direct_rows = direct_connection.cursor().execute(
