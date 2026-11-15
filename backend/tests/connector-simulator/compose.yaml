@@ -74,10 +74,14 @@ services:
         condition: service_healthy
     volumes:
       - ./sql/init.sql:/seed/init.sql:ro
+    environment:
+      SIMULATOR_READER_PASSWORD: ${SIMULATOR_READER_PASSWORD:?Generate a disposable SIMULATOR_READER_PASSWORD before starting the simulator}
     entrypoint: ["/bin/bash", "-c"]
     command: >
       "/opt/mssql-tools/bin/sqlcmd -S sql-supplier -U sa
-      -P 'Simulator-SA-Only-2026!' -C -b -i /seed/init.sql"
+      -P 'Simulator-SA-Only-2026!' -C -b
+      -v SIMULATOR_READER_PASSWORD="$SIMULATOR_READER_PASSWORD"
+      -i /seed/init.sql"
 
 volumes:
   rest-tls:
