@@ -32,6 +32,7 @@ export function CookieConsent() {
   function save(next: Preferences) {
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* Essential app use remains available. */ }
     window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new CustomEvent("compatflow:consent-changed", { detail: next }));
     setCustomizing(false);
   }
 
