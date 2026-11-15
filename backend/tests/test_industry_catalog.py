@@ -113,3 +113,13 @@ def test_inventory_available_quantity_alias_is_distinct_and_checked():
     )
     assert mapped(result)["quantity_available"] == "quantity_available"
     assert any(issue["error_code"] == "INVENTORY_QUANTITY_MISMATCH" for issue in result["issues"])
+
+
+def test_demo_industry_adapter_accepts_more_than_ten_thousand_rows():
+    headers = ["product_id", "product_category_name", "product_weight_g"]
+    records = [
+        {"product_id": f"p-{index}", "product_category_name": "beleza", "product_weight_g": 100}
+        for index in range(10_001)
+    ]
+    result = validate_industry_records(headers, records, profile_id="ecommerce", max_rows=None)
+    assert result["total_rows"] == 10_001

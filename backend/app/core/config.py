@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     sftp_known_hosts_path: str = ""
     connector_rate_limit_per_minute: int = 20
 
+    # Billing stays disabled until explicitly re-enabled for customer launch.
+    billing_enabled: bool = False
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
     razorpay_webhook_secret: str = ""

@@ -49,6 +49,8 @@ type CreateResponse = {
   short_url?: string | null;
 };
 
+const BILLING_ENABLED = process.env.NEXT_PUBLIC_BILLING_ENABLED === "true";
+
 const plans = [
   { code: "starter", name: "Starter", price: "$27", description: "For small teams validating supplier product data." },
   { code: "growth", name: "Growth", price: "$64", description: "For recurring supplier catalog updates." },
@@ -70,6 +72,10 @@ function BillingContent() {
   const [scriptReady, setScriptReady] = useState(false);
 
   const loadSubscription = useCallback(async () => {
+    if (!BILLING_ENABLED) {
+      setLoading(false);
+      return;
+    }
     setError("");
     try {
       const [result, profile] = await Promise.all([
@@ -87,6 +93,23 @@ function BillingContent() {
   }, []);
 
   useEffect(() => { void Promise.resolve().then(() => loadSubscription()); }, [loadSubscription]);
+
+  if (!BILLING_ENABLED) {
+    return (
+      <main id="main" className="page">
+        <div className="container account-settings">
+          <header className="workspace-heading">
+            <div><span className="eyebrow">DEMO VALIDATION MODE</span><h1>Billing is temporarily paused</h1><p>Subscription purchasing and payment-provider connections are disabled while CompatFlow is being tested.</p></div>
+            <Link className="button button-secondary" href="/workspace">Back to workspace</Link>
+          </header>
+          <section className="panel settings-panel">
+            <h2>No payment action is available</h2>
+            <p>Your organization data and validation workflows remain available. No checkout, subscription creation, cancellation, or payment-provider request will be initiated from this page.</p>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   async function startCheckout() {
     setError("");

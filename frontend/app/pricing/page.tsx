@@ -77,14 +77,15 @@ const plans: Plan[] = [
 ];
 
 export default function PricingPage() {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
   return (
     <main id="main" className="page pricing-page">
       <div className="container">
         <section className="pricing-intro">
           <div className="eyebrow">Plans built around your workflow</div>
           <h1>{user ? "Choose a plan for your organization." : "Start with a demo. Upgrade when your catalog operations need more."}</h1>
-          <p>{user ? "Compare organization plans and select the subscription that matches your catalog operations. Paid checkout is subject to provider configuration and verified payment activation." : "Reference prices are in USD per month. Paid checkout is not enabled until the Razorpay account, plan IDs and webhook are configured. Features marked Planned are not currently available."}</p>
+          <p>Subscription purchasing is temporarily disabled while CompatFlow is in demo validation. Features marked Planned are not currently available.</p>
+          <p className="notice" role="status">Billing is paused. You can still explore the product and request a demo; paid plan selection will return when billing is re-enabled.</p>
         </section>
         <section className="pricing-grid" aria-label="CompatFlow plans">
           {plans.filter(plan => !user || plan.name !== "Demo").map(plan => {
@@ -109,9 +110,15 @@ export default function PricingPage() {
                   ))}
                 </ul>
                 <div className="pricing-card-action">
-                  <Link className={plan.featured ? "button" : "button button-secondary"} href={href} aria-disabled={loading && !!plan.code}>
-                    {loading && plan.code ? "Checking account…" : action}
-                  </Link>
+                  {plan.code ? (
+                    <button className={plan.featured ? "button" : "button button-secondary"} type="button" disabled>
+                      Temporarily unavailable
+                    </button>
+                  ) : (
+                    <Link className={plan.featured ? "button" : "button button-secondary"} href={href}>
+                      {action}
+                    </Link>
+                  )}
                 </div>
               </article>
             );

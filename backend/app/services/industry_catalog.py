@@ -119,7 +119,7 @@ def detect_industry(headers: list[str]) -> dict[str, Any]:
     return {"profile_id": best, "confidence": confidence, "scores": scores, "needs_confirmation": False}
 
 
-def validate_industry_csv(content: str, profile_id: str | None = None, max_rows: int = MAX_ROWS) -> dict[str, Any]:
+def validate_industry_csv(content: str, profile_id: str | None = None, max_rows: int | None = MAX_ROWS) -> dict[str, Any]:
     if profile_id is not None and profile_id not in PROFILES:
         raise IndustryCSVError(f"Unknown industry profile '{profile_id}'.")
     try:
@@ -193,7 +193,7 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
         if not values or all(not str(v).strip() for v in values):
             continue
         total += 1
-        if total > max_rows:
+        if max_rows is not None and total > max_rows:
             raise IndustryCSVError(f"CSV exceeds the {max_rows:,}-row limit.")
         if len(values) != len(headers):
             add_issue(line_number, None, "COLUMN_COUNT_MISMATCH", f"Expected {len(headers)} columns but found {len(values)}.")
@@ -285,7 +285,7 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
 
 
 
-def validate_industry_records(headers: list[str], records: list[dict[str, Any]], profile_id: str | None = None) -> dict[str, Any]:
+def validate_industry_records(headers: list[str], records: list[dict[str, Any]], profile_id: str | None = None, max_rows: int | None = MAX_ROWS) -> dict[str, Any]:
     """Run the shared industry validator against rows extracted from any supported format.
 
     The parser owns format-specific extraction; this adapter preserves source headers and
@@ -299,4 +299,4 @@ def validate_industry_records(headers: list[str], records: list[dict[str, Any]],
             "" if record.get(header) is None else str(record.get(header))
             for header in headers
         ])
-    return validate_industry_csv(output.getvalue(), profile_id=profile_id)
+    return validate_industry_csv(output.getvalue(), profile_id=profile_id, max_rows=max_rows)

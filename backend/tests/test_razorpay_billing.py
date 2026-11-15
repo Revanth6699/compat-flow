@@ -1,6 +1,8 @@
 import hashlib
 import hmac
 
+import pytest
+
 from fastapi.testclient import TestClient
 
 from app.core.config import settings
@@ -9,6 +11,12 @@ from app.services.razorpay_client import (
     verify_checkout_signature,
     verify_webhook_signature,
 )
+
+
+@pytest.fixture(autouse=True)
+def enable_billing_for_provider_tests(monkeypatch):
+    # Provider tests explicitly opt in; application billing defaults to disabled.
+    monkeypatch.setattr(settings, "billing_enabled", True)
 
 
 def test_razorpay_checkout_signature_uses_payment_and_subscription_ids(monkeypatch):
@@ -184,3 +192,14 @@ def test_postgres_razorpay_webhook_activates_once_and_ignores_stale_pending(monk
         db.delete(plan)
         db.commit()
         db.close()
+
+
+def test_billing_routes_are_blocked_when_feature_flag_is_off(monkeypatch):
+    monkeypatch.setattr(settings, "billing_enabled", False)
+    client = TestClient(app)
+    response = client.post(
+        "/api/v1/billing/subscriptions",
+        json={"plan_code": "starter", "billing_interval": "month", "total_count": 12},
+    )
+    assert response.status_code == 503
+    assert "temporarily disabled" in response.json()["detail"].lower()
