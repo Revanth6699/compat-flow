@@ -37,6 +37,8 @@ jobs:
       - run: python -m pytest
       - run: ruff check app tests
       - run: bandit -q -r app
+      - name: Build backend runtime image with Microsoft ODBC Driver 18
+        run: docker build --tag compatflow-backend-ci .
 
   frontend:
     runs-on: ubuntu-latest
