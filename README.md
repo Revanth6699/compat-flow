@@ -1,69 +1,78 @@
 # CompatFlow
 
-CompatFlow is a supplier-catalog workflow project. It provides file parsing, catalog mapping and validation, and connector workflows. The repository contains a public demo path and additional authenticated backend capabilities that are still subject to rollout and verification.
+CompatFlow is a supplier-catalog workflow application. It provides tools for validating product data, mapping supplier fields to a shared catalog structure, and reviewing imports from files and external sources.
 
-## Current release boundary
+This repository contains both a public demo and authenticated workflows. They have different capabilities and release boundaries; code being present does not mean a feature is enabled in a deployed environment.
 
-The public demo is a stateless CSV validation experience.
+## What the public demo does
 
-**Available in the public demo**
-- Download a synthetic supplier catalog.
-- Upload a non-confidential CSV for validation.
-- Check required columns and values, malformed rows, and duplicate SKUs within the uploaded file.
-- Review validation totals, errors, and a preview of up to 10 valid rows.
-- Enforce a 5 MB upload limit and a 10,000 data-row limit.
+The public demo provides stateless CSV validation.
 
-**Not available in the public demo**
-- Persistent file or catalog storage.
-- Persistent import jobs or import-job status.
-- Shared development-catalog writes.
-- Storefront publishing.
-- Production supplier-data processing.
+- Download a sample supplier catalog.
+- Upload a non-confidential CSV file.
+- Check required fields, malformed rows, missing values, and duplicate SKUs within the file.
+- Review validation results and a preview of up to 10 valid rows.
+- Uploads are limited to 5 MB and 10,000 data rows.
 
-The repository also contains authenticated multi-format ingestion and connector code. These paths have separate API, authorization, plan, and rollout boundaries. Their presence in the repository does not mean every format or supplier connector is generally available or live-verified. See [Multi-source ingestion](docs/multi-source-ingestion.md).
+The public demo does not save uploaded files, create persistent import jobs, write to a shared catalog, or publish products to a storefront.
 
-> **Data handling:** Do not submit confidential supplier data, personal information, credentials, or production catalog files to the public demo. Use synthetic or otherwise non-confidential test data.
+**Use synthetic or non-confidential test data.** Do not upload customer information, personal data, credentials, confidential supplier records, or production catalog files.
 
-## Architecture
+## Other workflows in the repository
 
-| Component | Technology | Responsibility |
+The backend also contains authenticated workflows for multi-format file ingestion, catalog records, AI-assisted field mapping, and supplier-source connectors.
+
+Their availability depends on authentication, organization permissions, subscription entitlements, provider configuration, and deployment settings. The current file-upload interface supports validation and preview; it does not expose the backend file-commit endpoint. REST, SFTP, and SQL Server connectors have not been verified against live supplier systems.
+
+See [Multi-source ingestion](docs/multi-source-ingestion.md) for the exact status and limits of each input type.
+
+## Technology
+
+| Area | Technology | Use |
 |---|---|---|
-| Frontend | Next.js | Web application and user workflows |
-| API | FastAPI | Validation, mapping, catalog and connector endpoints |
-| Identity | Supabase Auth | Authentication and email verification |
-| Application database | PostgreSQL | Organization and catalog records |
-| Queue / rate limiting | Redis | Background-work infrastructure and connector rate limiting |
-| Billing | Razorpay | Subscription billing, subject to account configuration |
+| Web application | Next.js | Pages and user workflows |
+| API | FastAPI | Validation, mapping, catalog, and connector endpoints |
+| Authentication | Supabase Auth | User identity and email verification |
+| Application data | PostgreSQL | Organizations, catalog records, and import history |
+| Background work and rate limits | Redis | Queue infrastructure and distributed connector limits |
+| Billing | Razorpay | Subscription billing, subject to account setup |
 
-Actual deployment configuration and provider settings must be verified independently.
+Provider configuration, deployed versions, and service availability must be checked in the target environment.
 
-## Local development
+## Run the public demo locally
 
 ### Requirements
 
 - Docker Desktop
 - Docker Compose
 
-### Start the public demo stack
+### Start the application
+
+From the repository root:
 
 ```powershell
 Copy-Item .env.example .env
 docker compose up --build
 ```
 
-Open:
-- Frontend: http://localhost:3001
-- API health: http://localhost:8001/api/v1/health
+Open the following addresses:
 
-Stop:
+| Service | Address |
+|---|---|
+| Web application | http://localhost:3001 |
+| API health check | http://localhost:8001/api/v1/health |
+
+Stop the containers:
 
 ```powershell
 docker compose down
 ```
 
-The public-demo Compose stack runs the frontend and stateless preview API. PostgreSQL, Redis, and Celery are not required for this demo configuration.
+This Compose configuration starts the frontend and the stateless preview API. PostgreSQL, Redis, and Celery are not required for the public demo.
 
-### Run backend tests
+## Run backend tests
+
+The commands below use Python 3.12 on Windows PowerShell:
 
 ```powershell
 cd backend
@@ -74,24 +83,38 @@ $env:PYTHONPATH = "."
 pytest -q
 ```
 
+Run frontend checks from the `frontend` directory using the scripts defined in `package.json`.
+
+## Repository layout
+
+```text
+.
+├── backend/       FastAPI application, migrations, and operations guides
+├── docs/          Product, data model, ingestion, security, and deployment notes
+├── frontend/      Next.js application
+├── supabase/      Supabase configuration and migrations
+├── README.md
+└── docker-compose.yml
+```
+
 ## Documentation
 
-| Document | Contents |
+| Document | Description |
 |---|---|
-| [Product scope](docs/PRODUCT_SCOPE.md) | Product purpose, workflow, and exclusions |
-| [Multi-source ingestion](docs/multi-source-ingestion.md) | File formats, connectors, limits, and implementation boundaries |
-| [Catalog record model](docs/catalog-record-model.md) | Products, identifiers, variants, offers, and inventory |
-| [AI-assisted mapping](docs/column-mapping-ai-design.md) | AI mapping contract, consent, evaluation, and limitations |
-| [Demo deployment](docs/DEMO_DEPLOYMENT.md) | Public demo deployment and verification |
-| [Security baseline](docs/SECURITY.md) | Current demo controls and known gaps |
-| [Backend operations](backend/OPERATIONS.md) | Runtime configuration and operational procedures |
-| [Authentication](backend/docs/authentication.md) | Supabase Auth, onboarding, invitations, and tenant permissions |
+| [Product scope](docs/PRODUCT_SCOPE.md) | Intended users, workflows, and current exclusions |
+| [Multi-source ingestion](docs/multi-source-ingestion.md) | File formats, connectors, limits, and verification status |
+| [Catalog record model](docs/catalog-record-model.md) | Products, variants, offers, inventory, and identifiers |
+| [AI-assisted mapping](docs/column-mapping-ai-design.md) | Mapping request contract, evaluation, and safeguards |
+| [Dataset audit](docs/column-mapping-dataset-audit.md) | Benchmark source, preparation, and limitations |
+| [Industry-aware validation](docs/industry-aware-catalog-validation.md) | Industry profiles, field mapping, and validation rules |
+| [Demo deployment](docs/DEMO_DEPLOYMENT.md) | Deployment steps for the public demo |
+| [Security](docs/SECURITY.md) | Security controls and known gaps |
+| [Backend operations](backend/OPERATIONS.md) | Authentication, connectors, migrations, and deletion procedures |
+| [Authentication](backend/docs/authentication.md) | Signup, invitations, and organization access |
 | [Razorpay setup](backend/RAZORPAY_SETUP.md) | Subscription and webhook configuration |
-| [DPDP implementation status](DPDP_PROGRESS.md) | India privacy audit, decisions, and open work |
-| [Breach response runbook](BREACH_RUNBOOK.md) | Incident response steps and notification templates |
 
-## Project status
+## Release and deployment limits
 
-This repository is not evidence of a production-ready SaaS release or legal compliance certification. Before production use, verify authentication and tenant isolation for every route, persistent import controls, provider configuration, backups and recovery, monitoring, abuse prevention, security testing, privacy operations, and legal documentation.
+Do not describe CompatFlow as a production-ready catalog-import service based only on this repository. Before enabling a workflow for customers, verify its deployed configuration, organization-level access controls, provider credentials, database migrations, backups, monitoring, rate limits, and failure handling.
 
-See the linked scope, security, deployment, and DPDP documents for specific implementation status. Do not infer readiness from the existence of code or documentation.
+A connector that passes mocked tests has not been proven against a live supplier. A backend endpoint that can commit records is not necessarily exposed in the user interface. Keep product descriptions aligned with what is deployed and verified.
