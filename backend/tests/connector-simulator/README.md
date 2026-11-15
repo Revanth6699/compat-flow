@@ -1,8 +1,8 @@
 # Supplier Connector Simulators
 
-**Purpose:** Local development and CI only  
-**Data:** Synthetic records  
-**Credentials:** Disposable per-run test credentials
+These containers provide local test endpoints for the REST, SFTP, and SQL Server connectors. They use synthetic records and disposable credentials.
+
+**CI status:** Simulator integration tests are currently disabled and must remain out of normal CI runs. Keep the test setup in the repository for controlled future use; do not start the simulators or run these tests unless they are explicitly re-enabled.
 
 Do not deploy this Compose stack to a public or production network. Never reuse simulator credentials for a real supplier.
 
