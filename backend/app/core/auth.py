@@ -177,8 +177,8 @@ def get_active_plan(current: AuthenticatedUser, db: Session):
 
 def is_platform_admin(current: AuthenticatedUser) -> bool:
     """Return true only for the verified identity on the configured platform-admin allowlist."""
-    allowed_email = settings.platform_admin_email.strip().lower()
-    return bool(allowed_email) and current.identity.email.strip().lower() == allowed_email
+    allowed_emails = {email.strip().lower() for email in settings.platform_admin_email.split(",") if email.strip()}
+    return current.identity.email.strip().lower() in allowed_emails
 
 
 def require_plan_feature(feature: str):
