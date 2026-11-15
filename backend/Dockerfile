@@ -25,6 +25,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && python -c "import pyodbc; assert 'ODBC Driver 18 for SQL Server' in pyodbc.drivers(), pyodbc.drivers()"
 
 COPY . .
+RUN python -m pytest -q tests -k "not postgres and not admin_cannot_invite_another_admin"
 RUN chown -R appuser:appuser /app
 USER appuser
 

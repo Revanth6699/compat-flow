@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import RolePermission, Subscription, SubscriptionPlan, User
+from app.models import DemoAccessRequest, RolePermission, Subscription, SubscriptionPlan, User
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -164,7 +164,7 @@ def get_active_plan(current: AuthenticatedUser, db: Session):
         select(Subscription).where(
             Subscription.organization_id == current.profile.organization_id,
             Subscription.status.in_(("active", "trialing")),
-            (Subscription.current_period_end.is_(None)) | (Subscription.current_period_end > now),
+            Subscription.current_period_end > now,
         ).order_by(Subscription.created_at.desc())
     )
     if subscription is None:
@@ -175,11 +175,19 @@ def get_active_plan(current: AuthenticatedUser, db: Session):
     return subscription, plan
 
 
+def is_platform_admin(current: AuthenticatedUser) -> bool:
+    """Return true only for the verified identity on the configured platform-admin allowlist."""
+    allowed_emails = {email.strip().lower() for email in settings.platform_admin_email.split(",") if email.strip()}
+    return current.identity.email.strip().lower() in allowed_emails
+
+
 def require_plan_feature(feature: str):
     def dependency(
         current: AuthenticatedUser = Depends(get_current_user),
         db: Session = Depends(get_db),
     ) -> AuthenticatedUser:
+        if is_platform_admin(current):
+            return current
         subscription, plan = get_active_plan(current, db)
         if subscription is None or plan is None:
             raise HTTPException(status_code=402, detail="An active CompatFlow subscription is required to access this feature.")
@@ -190,5 +198,28 @@ def require_plan_feature(feature: str):
                 "required_feature": feature,
                 "upgrade_url": "/pricing",
             })
+        return current
+    return dependency
+
+
+def require_demo_or_paid_access():
+    """Allow only a current paid CSV entitlement or an explicitly approved demo email."""
+    def dependency(
+        current: AuthenticatedUser = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> AuthenticatedUser:
+        if is_platform_admin(current):
+            return current
+        subscription, plan = get_active_plan(current, db)
+        if subscription is not None and plan is not None and bool((plan.entitlements or {}).get("csv_validation", False)):
+            return current
+        approved = db.scalar(
+            select(DemoAccessRequest.id).where(
+                DemoAccessRequest.email == current.identity.email,
+                DemoAccessRequest.status == "approved",
+            ).limit(1)
+        )
+        if approved is None:
+            raise HTTPException(status_code=403, detail="Approved demo access or an active CSV-validation subscription is required.")
         return current
     return dependency

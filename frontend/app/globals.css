@@ -90,8 +90,8 @@ p { margin-top: 0; }
   background: #fff; border-bottom: 1px solid var(--line);
 }
 .header-inner {
-  min-height: 76px; display: flex; align-items: center;
-  justify-content: space-between; gap: 28px;
+  min-height: 76px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center; gap: 24px;
 }
 .brand {
   display: inline-flex; align-items: baseline; gap: 0;
@@ -103,6 +103,8 @@ p { margin-top: 0; }
 .brand:hover { color: #0B8F85; transform: translateY(-1px); }
 .brand:hover .brand-mark { color: #08766F; }
 .nav { display: flex; align-items: center; gap: 30px; flex-wrap: wrap; }
+.header-main-nav { justify-content: center; }
+.header-account-nav { justify-self: end; justify-content: flex-end; white-space: nowrap; }
 .nav a {
   position: relative; color: var(--muted); font-size: 13px; font-weight: 700;
   transition: color var(--ease);
@@ -393,7 +395,9 @@ button.button:disabled { opacity: .5; cursor: not-allowed; transform: none; box-
 }
 @media (max-width: 760px) {
   .container { width: calc(100% - 36px); }
-  .header-inner { min-height: 0; align-items: flex-start; flex-direction: column; gap: 14px; padding: 16px 0; }
+  .header-inner { min-height: 0; grid-template-columns: 1fr; align-items: start; gap: 14px; padding: 16px 0; }
+  .header-main-nav { justify-content: flex-start; }
+  .header-account-nav { justify-self: start; justify-content: flex-start; }
   .nav { gap: 13px 20px; }
   .home-hero { padding: 58px 0 48px; }
   .home-section { padding: 60px 0; }
@@ -749,7 +753,7 @@ small, .caption, .home-hero-note, .import-disclaimer { font-size: var(--type-xs)
   border-color: #9BB1C6; box-shadow: 0 8px 22px rgba(32,40,51,.06);
   transform: translateY(-2px);
 }
-.pricing-card-featured { border-top: 3px solid #16877F; padding-top: 20px; }
+.pricing-card-featured { border-top: 3px solid var(--navy); padding-top: 20px; }\n.billing-plan { border-top: 3px solid var(--line-strong); }\n.billing-plan.selected { border-top-color: var(--navy); }
 .billing-plan { align-items: flex-start; gap: 12px; width: 100%; text-align: left; color: #202833; font: inherit; cursor: pointer; }
 .billing-plan:disabled { cursor: not-allowed; opacity: .58; }
 .billing-plan.selected { border-color: #00689C; box-shadow: 0 0 0 2px rgba(0,104,156,.12); }
@@ -977,3 +981,49 @@ button:disabled, .button:disabled {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Dataset profiling and semantic validation colors */
+.metric-valid { color: var(--green) !important; font-weight: 750; }
+.metric-invalid { color: var(--red) !important; font-weight: 750; }
+.metric-warning { color: #B7791F !important; font-weight: 750; }
+.metric-bar { width: 100%; height: 12px; overflow: hidden; border-radius: 999px; background: #E8EEF4; }
+.metric-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--green); transition: width 240ms ease; }
+.metric-bar-small { display: inline-block; width: 90px; height: 7px; margin-right: 8px; vertical-align: middle; }
+.result-status.success { color: var(--green); }
+.result-status.warning { color: #B7791F; }
+
+/* Account deletion and customer reviews */
+.danger-zone { border-color: #FECACA; }
+.danger-zone h2 { color: var(--red); }
+.delete-confirmation-input { display: block; width: 100%; max-width: 560px; min-height: 48px; margin: 8px 0 10px; padding: 12px 14px; border: 1px solid var(--line-strong); border-radius: 6px; background: #fff; color: var(--ink); text-align: left; letter-spacing: .02em; }
+.delete-confirmation-input:focus { border-color: var(--navy); outline: 3px solid rgba(36,82,125,.14); outline-offset: 1px; }
+.button-danger { background: var(--red); border-color: var(--red); color: #fff; }
+.button-danger:hover { background: #B91C1C; border-color: #B91C1C; }
+.button-danger:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
+.reviews-page, .review-form-page { max-width: 1080px; }
+.reviews-heading { max-width: 760px; padding-bottom: 30px; }
+.reviews-heading h1 { margin: 10px 0; color: var(--navy); font-size: clamp(36px, 5vw, 52px); line-height: 1.12; }
+.reviews-heading p { color: var(--muted); margin-bottom: 20px; }
+.reviews-summary { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; margin: 0 0 24px; padding: 18px 20px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.reviews-summary strong { color: var(--navy); font-size: 1.8rem; }
+.reviews-summary span:last-child { color: var(--muted); font-size: .85rem; }
+.review-stars { color: #D97706; letter-spacing: .12em; font-size: 1.05rem; }
+.reviews-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; }
+.review-card { padding: 22px; }
+.review-card-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.review-card-top strong { color: var(--navy); }
+.review-card-top time { color: var(--subtle); font-size: .75rem; }
+.review-card p { margin: 12px 0 0; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-empty { max-width: 650px; }
+.review-form-page .settings-panel { max-width: 760px; }
+@media (max-width: 640px) { .reviews-grid { grid-template-columns: 1fr; } .review-card-top { align-items: flex-start; flex-direction: column; gap: 4px; } }
+
+.validation-chart { display: flex; width: 100%; height: 16px; overflow: hidden; border-radius: 999px; background: #E8EEF4; }
+.validation-chart span { display: block; height: 100%; transition: width 220ms ease; }
+.chart-valid { background: var(--green); }
+.chart-invalid { background: var(--red); }
+.field-chart-list { display: grid; gap: 12px; margin-top: 16px; }
+.field-chart-list > div { display: grid; grid-template-columns: minmax(120px, 180px) minmax(90px, 1fr) 64px; align-items: center; gap: 12px; }
+.field-chart-list > div > span { color: var(--muted); font-size: .82rem; }
+.field-chart-list strong { color: var(--navy); font-size: .8rem; text-align: right; }
+@media (max-width: 560px) { .field-chart-list > div { grid-template-columns: 1fr 60px; gap: 6px 10px; } .field-chart-list .metric-bar { grid-column: 1 / -1; grid-row: 2; } }

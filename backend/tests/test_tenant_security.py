@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -353,6 +354,7 @@ def test_postgres_enforces_live_tenant_isolation_and_viewer_permissions():
             plan_code=plan_code,
             status="active",
             billing_interval="month",
+            current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
         ))
         db.commit()
 
@@ -561,6 +563,7 @@ def test_postgres_enforces_tenant_isolation_for_all_catalog_record_types():
             plan_code=plan_code,
             status="active",
             billing_interval="month",
+            current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
         ))
         db.commit()
 
@@ -680,6 +683,7 @@ def test_postgres_role_permission_matrix_for_catalog_read_and_write():
             plan_code=plan_code,
             status="active",
             billing_interval="month",
+            current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
         ))
         # Build detached-safe auth snapshots before commit expires ORM attributes.
         role_identities = [

@@ -218,3 +218,98 @@ def test_xml_rejects_nested_fields_deeper_than_supported():
     )
     with pytest.raises(IngestionParseError, match="supported nesting depth"):
         parse_xml(payload)
+
+
+def _assert_industry_pipeline(parsed):
+    from app.services.industry_catalog import validate_industry_records
+
+    result = validate_industry_records(
+        parsed.headers, [record.values for record in parsed.records], profile_id="ecommerce"
+    )
+    assert result["total_rows"] == 2
+    assert result["valid_rows"] == 2
+    assert result["invalid_rows"] == 0
+    assert {item["field"] for item in result["column_mappings"]} >= {
+        "sku", "title", "unit_price", "currency"
+    }
+    assert result["preview"][0]["currency"] == "USD"
+    assert result["persisted"] is False
+
+
+def test_csv_and_json_feed_the_same_industry_pipeline():
+    csv_source = parse_source(
+        b"sku,title,price,currency\nS-1,Widget,12.50,USD\nS-2,Gadget,8,EUR\n",
+        "catalog.csv",
+    )
+    json_source = parse_source(
+        b'[{"sku":"S-1","title":"Widget","price":12.5,"currency":"USD"},'
+        b'{"sku":"S-2","title":"Gadget","price":8,"currency":"EUR"}]',
+        "catalog.json",
+    )
+    _assert_industry_pipeline(csv_source)
+    _assert_industry_pipeline(json_source)
+
+
+def test_xlsx_feeds_the_same_industry_pipeline():
+    openpyxl = pytest.importorskip("openpyxl")
+    output = io.BytesIO()
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = "Catalog"
+    sheet.append(["sku", "title", "price", "currency"])
+    sheet.append(["S-1", "Widget", 12.5, "USD"])
+    sheet.append(["S-2", "Gadget", 8, "EUR"])
+    workbook.save(output)
+
+    parsed = parse_source(output.getvalue(), "catalog.xlsx")
+    assert parsed.metadata["sheet"] == "Catalog"
+    _assert_industry_pipeline(parsed)
+
+
+def test_xls_feeds_the_same_industry_pipeline(monkeypatch):
+    import sys
+    import types
+
+    class Sheet:
+        name = "Catalog"
+        nrows = 3
+
+        def row_values(self, index):
+            return [
+                ["sku", "title", "price", "currency"],
+                ["S-1", "Widget", 12.5, "USD"],
+                ["S-2", "Gadget", 8, "EUR"],
+            ][index]
+
+    class Workbook:
+        def sheet_by_index(self, index):
+            assert index == 0
+            return Sheet()
+
+        def release_resources(self):
+            pass
+
+    monkeypatch.setitem(
+        sys.modules,
+        "xlrd",
+        types.SimpleNamespace(
+            open_workbook=lambda **kwargs: Workbook(),
+            XLRDError=type("XLRDError", (Exception,), {}),
+        ),
+    )
+    parsed = parse_source(b"mock-xls-bytes", "catalog.xls")
+    assert parsed.metadata["sheet"] == "Catalog"
+    _assert_industry_pipeline(parsed)
+
+
+def test_xml_feeds_the_same_industry_pipeline():
+    parsed = parse_source(
+        b"<products>"
+        b"<product><sku>S-1</sku><title>Widget</title><price>12.5</price><currency>USD</currency></product>"
+        b"<product><sku>S-2</sku><title>Gadget</title><price>8</price><currency>EUR</currency></product>"
+        b"</products>",
+        "catalog.xml",
+    )
+    _assert_industry_pipeline(parsed)
+
+# CI regression coverage for the format-neutral industry ingestion path.
