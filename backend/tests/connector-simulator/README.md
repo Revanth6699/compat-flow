@@ -15,8 +15,9 @@ docker compose -f backend/tests/connector-simulator/compose.yaml up -d --wait re
 docker compose -f backend/tests/connector-simulator/compose.yaml run --rm sql-init
 mkdir -p backend/tests/connector-simulator/runtime
 docker compose -f backend/tests/connector-simulator/compose.yaml cp rest-supplier:/run/tls/server.crt backend/tests/connector-simulator/runtime/rest-ca.crt
+docker compose -f backend/tests/connector-simulator/compose.yaml cp sql-supplier:/tls/sql-ca.crt backend/tests/connector-simulator/runtime/sql-ca.crt
 docker compose -f backend/tests/connector-simulator/compose.yaml cp sql-supplier:/tls/sql-server.crt backend/tests/connector-simulator/runtime/sql-server.crt
-sudo cp backend/tests/connector-simulator/runtime/sql-server.crt /usr/local/share/ca-certificates/compatflow-sql-simulator.crt
+sudo cp backend/tests/connector-simulator/runtime/sql-ca.crt /usr/local/share/ca-certificates/compatflow-sql-simulator-ca.crt
 sudo update-ca-certificates
 export SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt
 ssh-keyscan -p 2222 localhost > backend/tests/connector-simulator/runtime/known_hosts
@@ -28,16 +29,15 @@ Endpoints:
 - SQL Server: `localhost:14333`, database `CompatFlowSupplier`; read-only login `compatflow_reader`, with a fresh per-run password in `SIMULATOR_READER_PASSWORD`; the SA password is held separately in `SIMULATOR_SA_PASSWORD`.
 
 The SQL initializer creates a synthetic product table and grants the connector login
-SELECT permission only. A disposable local CA signs a SQL Server certificate whose
+SELECT permission only. A disposable local root CA signs a short-lived SQL Server leaf certificate whose
 SAN covers `localhost` and `sql-supplier`; the SQL Server container forces TLS 1.2.
-The simulator uses a short-lived self-signed server certificate. The test client
-explicitly installs that certificate into its local trust store; this is a
-simulator-only trust arrangement, not a production certificate recommendation.
+The test client trusts only the simulator root CA. The CA private key and all
+certificates are generated per run and discarded with the Compose volume.
 The CI test uses Microsoft ODBC Driver 18 with `Encrypt=yes`,
 `TrustServerCertificate=no`, and `HostNameInCertificate=sql-supplier`.
 The client trust bundle is set through `SSL_CERT_FILE`; certificate validation
 is not bypassed. Do not replace this with `TrustServerCertificate=yes`.
-Production supplier connections must use the supplier's CA-trusted certificate.
+Production supplier connections must validate the supplier's real CA chain and hostname; never trust this simulator CA in production.
 The seed step uses the SQL tools image's `-C` option only for initial synthetic
 database setup; the actual connector integration test validates the trusted
 server certificate and hostname.
