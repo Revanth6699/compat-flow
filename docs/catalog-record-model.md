@@ -1,5 +1,7 @@
 # Catalog Record Model
 
+This document defines how CompatFlow separates product identity from supplier-specific and time-dependent data.
+
 ## 1. Why the model separates record types
 
 The original `products` table represents a product master but also carries a supplier link and canonical SKU. Supplier feeds can contain multiple supplier-specific identifiers and offers for one product, multiple sellable variants, and changing stock positions.
