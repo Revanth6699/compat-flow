@@ -282,3 +282,21 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
         "persisted": False,
         "validation_scope": "industry_profile_mapping_and_row_level_syntax_checks; no external reference-data verification",
     }
+
+
+
+def validate_industry_records(headers: list[str], records: list[dict[str, Any]], profile_id: str | None = None) -> dict[str, Any]:
+    """Run the shared industry validator against rows extracted from any supported format.
+
+    The parser owns format-specific extraction; this adapter preserves source headers and
+    values while reusing exactly the same industry mapping and row validation rules.
+    """
+    output = io.StringIO(newline="")
+    writer = csv.writer(output)
+    writer.writerow(headers)
+    for record in records:
+        writer.writerow([
+            "" if record.get(header) is None else str(record.get(header))
+            for header in headers
+        ])
+    return validate_industry_csv(output.getvalue(), profile_id=profile_id)
