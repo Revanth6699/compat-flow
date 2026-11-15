@@ -10,6 +10,7 @@ import csv
 import io
 import json
 import re
+import zipfile
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
@@ -19,6 +20,9 @@ from defusedxml.ElementTree import fromstring
 MAX_RECORDS = 10_000
 MAX_COLUMNS = 500
 MAX_CELL_CHARS = 1_000_000
+MAX_SOURCE_BYTES = 50 * 1024 * 1024
+MAX_XLSX_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
+MAX_XLSX_ARCHIVE_ENTRIES = 10_000
 
 
 class IngestionParseError(ValueError):
@@ -40,6 +44,41 @@ class ParsedSource:
     metadata: dict[str, Any]
 
 
+def _check_source_size(data: bytes) -> None:
+    if len(data) > MAX_SOURCE_BYTES:
+        raise IngestionParseError("Input exceeds the maximum source byte limit.")
+
+
+def _trim_trailing_empty(values: list[Any]) -> list[Any]:
+    while values and (
+        values[-1] is None
+        or (isinstance(values[-1], str) and not values[-1].strip())
+    ):
+        values.pop()
+    return values
+
+
+def _validate_xlsx_archive(data: bytes) -> None:
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            entries = archive.infolist()
+            if len(entries) > MAX_XLSX_ARCHIVE_ENTRIES:
+                raise IngestionParseError("XLSX workbook contains too many archive entries.")
+            total_uncompressed = sum(entry.file_size for entry in entries)
+            if total_uncompressed > MAX_XLSX_UNCOMPRESSED_BYTES:
+                raise IngestionParseError("XLSX workbook exceeds the uncompressed size limit.")
+            for entry in entries:
+                if entry.file_size and (
+                    entry.compress_size == 0
+                    or entry.file_size > entry.compress_size * 2000
+                ):
+                    raise IngestionParseError("XLSX workbook has an unsafe compression ratio.")
+    except IngestionParseError:
+        raise
+    except (OSError, zipfile.BadZipFile):
+        raise IngestionParseError("XLSX workbook is not a valid ZIP archive.") from None
+
+
 def _clean_headers(headers: list[Any]) -> list[str]:
     cleaned = [str(value).strip() if value is not None else "" for value in headers]
     if not cleaned or any(not value for value in cleaned):
@@ -54,13 +93,24 @@ def _clean_headers(headers: list[Any]) -> list[str]:
 
 def _record(values: dict[str, Any], location: str, key: Any = None) -> SourceRecord:
     for name, value in values.items():
-        if isinstance(value, str) and len(value) > MAX_CELL_CHARS:
+        if value is None:
+            continue
+        measured = (
+            json.dumps(value, ensure_ascii=False, default=str)
+            if isinstance(value, (dict, list))
+            else str(value)
+        )
+        if len(measured) > MAX_CELL_CHARS:
             raise IngestionParseError(f"Value in '{name}' exceeds the maximum cell size.")
-    return SourceRecord(values=values, source_location=location,
-                        source_key=None if key is None else str(key))
+    return SourceRecord(
+        values=values,
+        source_location=location,
+        source_key=None if key is None else str(key),
+    )
 
 
 def parse_csv(data: bytes, *, max_records: int = MAX_RECORDS) -> ParsedSource:
+    _check_source_size(data)
     try:
         text = data.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -96,6 +146,7 @@ def parse_csv(data: bytes, *, max_records: int = MAX_RECORDS) -> ParsedSource:
 
 def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
                 header_row: int = 1, max_records: int = MAX_RECORDS) -> ParsedSource:
+    _check_source_size(data)
     ext = extension.lower().lstrip(".")
     if ext not in {"xlsx", "xls"}:
         raise IngestionParseError("Excel format must be .xlsx or .xls.")
@@ -103,6 +154,7 @@ def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
         raise IngestionParseError("header_row must be 1 or greater.")
     records: list[SourceRecord] = []
     if ext == "xlsx":
+        _validate_xlsx_archive(data)
         try:
             from openpyxl import load_workbook
             workbook = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
@@ -112,13 +164,18 @@ def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
             if sheet_name and sheet_name not in workbook.sheetnames:
                 raise IngestionParseError("Requested worksheet does not exist.")
             sheet = workbook[sheet_name] if sheet_name else workbook[workbook.sheetnames[0]]
+            if (
+                (sheet.max_row is not None and sheet.max_row > max_records + header_row)
+                or (sheet.max_column is not None and sheet.max_column > MAX_COLUMNS)
+            ):
+                raise IngestionParseError("Worksheet dimensions exceed the configured row or column limits.")
             iterator = sheet.iter_rows(values_only=True)
             for _ in range(header_row - 1):
                 next(iterator, None)
             raw_headers = next(iterator, None)
             if raw_headers is None:
                 raise IngestionParseError("Worksheet header row is missing.")
-            headers = _clean_headers(list(raw_headers))
+            headers = _clean_headers(_trim_trailing_empty(list(raw_headers)))
             for row_number, row in enumerate(iterator, start=header_row + 1):
                 values = list(row[:len(headers)])
                 if any(value is not None and str(value).strip() for value in row[len(headers):]):
@@ -150,7 +207,9 @@ def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
                 sheet = workbook.sheet_by_index(0)
             if sheet.nrows < header_row:
                 raise IngestionParseError("Worksheet header row is missing.")
-            headers = _clean_headers(sheet.row_values(header_row - 1))
+            if sheet.nrows > max_records + header_row or sheet.ncols > MAX_COLUMNS:
+                raise IngestionParseError("Worksheet dimensions exceed the configured row or column limits.")
+            headers = _clean_headers(_trim_trailing_empty(sheet.row_values(header_row - 1)))
             for index in range(header_row, sheet.nrows):
                 raw_values = sheet.row_values(index)
                 if any(value is not None and str(value).strip() for value in raw_values[len(headers):]):
@@ -169,19 +228,27 @@ def parse_excel(data: bytes, extension: str, *, sheet_name: str | None = None,
                         {"sheet": selected_sheet, "header_row": header_row})
 
 
-def _flatten_json_object(value: dict[str, Any], prefix: str = "") -> dict[str, Any]:
+def _flatten_json_object(value: dict[str, Any]) -> dict[str, Any]:
     flattened: dict[str, Any] = {}
-    for key, item in value.items():
-        name = f"{prefix}.{key}" if prefix else str(key)
-        if isinstance(item, dict):
-            flattened.update(_flatten_json_object(item, name))
-        else:
-            flattened[name] = item
+    stack: list[tuple[str, Any]] = [("", value)]
+    seen_paths: set[str] = set()
+    while stack:
+        prefix, current = stack.pop()
+        for key, item in current.items():
+            name = f"{prefix}.{key}" if prefix else str(key)
+            if name in seen_paths:
+                raise IngestionParseError("JSON keys produce duplicate flattened field paths.")
+            seen_paths.add(name)
+            if isinstance(item, dict):
+                stack.append((name, item))
+            else:
+                flattened[name] = item
     return flattened
 
 
 def parse_json(data: bytes, *, record_path: str | None = None,
                max_records: int = MAX_RECORDS) -> ParsedSource:
+    _check_source_size(data)
     try:
         payload = json.loads(data.decode("utf-8-sig"))
     except (UnicodeDecodeError, json.JSONDecodeError):
@@ -206,8 +273,13 @@ def parse_json(data: bytes, *, record_path: str | None = None,
         raise IngestionParseError("JSON must contain an object or an array of objects; configure record_path for nested arrays.")
     if len(payload) > max_records:
         raise IngestionParseError(f"Input exceeds the {max_records:,}-record limit.")
-    records = [_record(_flatten_json_object(item), f"item:{index}", item.get("id"))
-               for index, item in enumerate(payload, start=1)]
+    try:
+        records = [
+            _record(_flatten_json_object(item), f"item:{index}", item.get("id"))
+            for index, item in enumerate(payload, start=1)
+        ]
+    except RecursionError:
+        raise IngestionParseError("JSON nesting exceeds the supported parser depth.") from None
     headers = sorted({key for item in records for key in item.values})
     if len(headers) > MAX_COLUMNS:
         raise IngestionParseError(f"Input exceeds the {MAX_COLUMNS} column limit.")
@@ -220,6 +292,7 @@ def _local_name(tag: str) -> str:
 
 def parse_xml(data: bytes, *, record_tag: str | None = None,
               max_records: int = MAX_RECORDS) -> ParsedSource:
+    _check_source_size(data)
     try:
         root = fromstring(data)
     except Exception:
@@ -268,8 +341,18 @@ def parse_xml(data: bytes, *, record_tag: str | None = None,
             name = _local_name(child.tag)
             value = child.text.strip() if child.text else ""
             if list(child):
-                nested = { _local_name(grand.tag): (grand.text or "").strip()
-                           for grand in list(child) }
+                if name in values or any(key.startswith(f"{name}.") for key in values):
+                    raise IngestionParseError(
+                        f"XML record contains repeated nested field group '{name}'."
+                    )
+                nested: dict[str, str] = {}
+                for grand in list(child):
+                    nested_name = _local_name(grand.tag)
+                    if nested_name in nested:
+                        raise IngestionParseError(
+                            f"XML record contains repeated nested field '{name}.{nested_name}'."
+                        )
+                    nested[nested_name] = (grand.text or "").strip()
                 for key, nested_value in nested.items():
                     values[f"{name}.{key}"] = nested_value
             elif name in values:
@@ -288,6 +371,7 @@ def parse_source(data: bytes, filename: str, *, sheet_name: str | None = None,
                  xml_record_tag: str | None = None,
                  max_records: int = MAX_RECORDS) -> ParsedSource:
     """Dispatch a bounded file upload to its parser based on its extension."""
+    _check_source_size(data)
     extension = PurePosixPath(filename.replace("\\", "/")).suffix.lower()
     if not extension:
         raise IngestionParseError("A file extension is required.")
