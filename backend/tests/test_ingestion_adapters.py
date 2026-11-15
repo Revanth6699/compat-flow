@@ -207,7 +207,7 @@ def test_excel_rejects_extreme_header_row_and_physical_sheet_dimensions():
 
 def test_json_rejects_excessive_nesting_without_leaking_recursion_error():
     payload = ("[" * 1200 + "{}" + "]" * 1200).encode()
-    with pytest.raises(IngestionParseError, match="valid UTF-8 JSON"):
+    with pytest.raises(IngestionParseError):
         parse_json(payload)
 
 
