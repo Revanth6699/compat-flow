@@ -79,7 +79,6 @@ function WorkspaceContent() {
         <header className="workspace-heading">
           <div><span className="eyebrow">YOUR ORGANIZATION</span><h1>Workspace</h1><p>Signed in as {user?.email || "your account"}.</p></div>
           <div className="workspace-actions">
-            {!profile?.is_platform_admin && <Link className="button button-secondary" href="/pricing">Plans</Link>}
             <Link className="button button-secondary" href="/settings">Profile settings</Link>
             <button className="button button-secondary" onClick={() => void signOut()}>Sign out</button>
           </div>
@@ -116,7 +115,7 @@ function WorkspaceContent() {
                 <div><dt>Subscription status</dt><dd>{profile.is_platform_admin ? "Exempt" : profile.subscription_status || "Not subscribed"}</dd></div>
                 <div><dt>Workspace access</dt><dd>{profile.is_active ? "Active" : "Inactive"}</dd></div>
               </dl>
-              {!profile.plan_code && !profile.is_platform_admin && <div className="notice"><strong>Your organization is set up.</strong>{profile.role === "admin" ? <><p>Choose a subscription to unlock paid organization features. Your workspace remains available while you decide.</p><Link className="button" href="/pricing">Choose a plan</Link></> : <p>Your organization does not currently have a paid plan. Contact your organization admin about subscription access.</p>}</div>}
+              {!profile.is_platform_admin && <div className="notice"><strong>Demo validation mode is active.</strong><p>Subscription purchasing is temporarily paused. Continue testing the available organization and validation workflows without starting checkout.</p></div>}
               {profile.is_platform_admin && <div className="notice"><strong>Platform administrator access is enabled.</strong><p>No subscription is required for your account. Customer subscription rules remain unchanged.</p></div>}
             </section>
 
@@ -124,7 +123,7 @@ function WorkspaceContent() {
               <article className="panel settings-panel"><span className="eyebrow">CATALOG OPERATIONS</span><h2>Catalog validation</h2><p>Run a validation preview with the file formats and limits available to your organization. Files are not saved or committed to the catalog in this workflow.</p><Link className="button button-secondary" href="/catalog/import">Open validation preview</Link></article>
               <article className="panel settings-panel"><span className="eyebrow">CONNECTED DATA</span><h2>Data sources</h2><p>Configure eligible REST API, SFTP and SQL Server source connections.</p><Link className="button button-secondary" href="/catalog/sources">Manage data sources</Link></article>
               {(profile.role === "admin") && <article className="panel settings-panel"><span className="eyebrow">PEOPLE</span><h2>Team access</h2><p>Invite employees, review members and manage permitted access for this organization.</p><Link className="button button-secondary" href="/team">Manage team</Link></article>}
-              {!profile.is_platform_admin && <article className="panel settings-panel"><span className="eyebrow">ORGANIZATION</span><h2>Billing</h2><p>Review subscription status and payment details for this organization.</p><Link className="button button-secondary" href="/billing">Manage subscription</Link></article>}
+
             </section>
           </>
         )}
