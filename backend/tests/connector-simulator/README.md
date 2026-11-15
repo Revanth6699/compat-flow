@@ -1,7 +1,7 @@
 # Disposable supplier connector simulators
 
 These services are for local development and CI only. They use synthetic records
-and intentionally weak, fixed credentials. Never deploy this Compose stack to
+and disposable per-run credentials. Never deploy this Compose stack to
 a public or production network and never reuse its credentials for a real supplier.
 
 ## Start
@@ -10,6 +10,7 @@ From the repository root:
 
 ```bash
 export SIMULATOR_READER_PASSWORD="$(python -c 'import secrets,string; print("Aa7" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(25)))')"
+export SIMULATOR_SA_PASSWORD="$(python -c 'import secrets,string; print("Aa7" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(25)))')"
 docker compose -f backend/tests/connector-simulator/compose.yaml up -d --wait rest-supplier sftp-supplier sql-supplier
 docker compose -f backend/tests/connector-simulator/compose.yaml run --rm sql-init
 mkdir -p backend/tests/connector-simulator/runtime
@@ -23,7 +24,7 @@ ssh-keyscan -p 2222 localhost > backend/tests/connector-simulator/runtime/known_
 Endpoints:
 - REST: `https://localhost:8443/catalog?page=1`; header `X-API-Key: local-test-key`.
 - SFTP: `localhost:2222`, user `supplier`, password `Supplier-ReadOnly-2026!`, file `/upload/catalog.csv`.
-- SQL Server: `localhost:14333`, database `CompatFlowSupplier`; read-only login `compatflow_reader`, with a fresh per-run password in `SIMULATOR_READER_PASSWORD`.
+- SQL Server: `localhost:14333`, database `CompatFlowSupplier`; read-only login `compatflow_reader`, with a fresh per-run password in `SIMULATOR_READER_PASSWORD`; the SA password is held separately in `SIMULATOR_SA_PASSWORD`.
 
 The SQL initializer creates a synthetic product table and grants the connector login
 SELECT permission only. A disposable local CA signs a SQL Server certificate whose
