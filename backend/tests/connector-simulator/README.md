@@ -9,7 +9,8 @@ a public or production network and never reuse its credentials for a real suppli
 From the repository root:
 
 ```bash
-docker compose -f backend/tests/connector-simulator/compose.yaml up -d --wait
+docker compose -f backend/tests/connector-simulator/compose.yaml up -d --wait rest-supplier sftp-supplier sql-supplier
+docker compose -f backend/tests/connector-simulator/compose.yaml run --rm sql-init
 mkdir -p backend/tests/connector-simulator/runtime
 docker compose -f backend/tests/connector-simulator/compose.yaml cp rest-supplier:/run/tls/server.crt backend/tests/connector-simulator/runtime/rest-ca.crt
 ssh-keyscan -p 2222 localhost > backend/tests/connector-simulator/runtime/known_hosts
@@ -18,17 +19,18 @@ ssh-keyscan -p 2222 localhost > backend/tests/connector-simulator/runtime/known_
 Endpoints:
 - REST: `https://localhost:8443/catalog?page=1`; header `X-API-Key: local-test-key`.
 - SFTP: `localhost:2222`, user `supplier`, password `Supplier-ReadOnly-2026!`, file `/upload/catalog.csv`.
-- SQL Server: `localhost:14333`, database `CompatFlowSupplier`. The seeded read-only SQL login is `compatflow_reader`; use Microsoft ODBC Driver 18, encryption enabled, and certificate validation enabled.
+- SQL Server: `localhost:14333`, database `CompatFlowSupplier`; read-only login `compatflow_reader`, password `Simulator-ReadOnly-2026!`.
 
-The SQL Server container is provided with a synthetic database. The checked-in SQL
-login is SELECT-only. The connector's SQL Server integration test runs only when
-`SIMULATOR_SQLSERVER_URL` points to a SQL Server instance whose TLS certificate
-is trusted by the test runner. The default SQL Server container uses its own
-development certificate, so do not set `TrustServerCertificate=yes` merely to
-force the test through: that would bypass a production security requirement.
-Configure a trusted test certificate before enabling that assertion.
+The SQL initializer creates a synthetic product table and grants the connector login
+SELECT permission only. The container uses a development TLS certificate. The SQL
+connector requires Microsoft ODBC Driver 18, encryption enabled, and certificate
+validation enabled; do not set `TrustServerCertificate=yes` just to force a test
+through. A trusted SQL Server test certificate must be configured before running
+the SQL connector against this simulator. Until then, the automated protocol job
+executes live REST and SFTP tests and retains SQL Server policy/query tests in the
+unit suite; it does not claim a live SQL Server connector pass.
 
-## Run protocol tests
+## Run REST and SFTP protocol tests
 
 Install backend requirements, then run:
 
