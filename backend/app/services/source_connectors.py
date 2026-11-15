@@ -8,6 +8,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import re
+from pathlib import Path
 import socket
 from urllib.parse import unquote_plus
 from typing import Any
@@ -130,10 +131,19 @@ def fetch_sql_server_rows(connection_url: str, *, schema: str, table: str,
     )
     if "ODBC Driver 18" not in connection_options:
         raise SourceConnectorError("SQL Server must use Microsoft ODBC Driver 18.")
-    if not re.search(r"Encrypt\s*=\s*(yes|true)", connection_options, re.IGNORECASE):
-        raise SourceConnectorError("SQL Server connections must enable encryption.")
-    if not re.search(r"TrustServerCertificate\s*=\s*(no|false)", connection_options, re.IGNORECASE):
-        raise SourceConnectorError("SQL Server certificate verification must remain enabled.")
+    strict_encryption = bool(re.search(r"Encrypt\\s*=\\s*strict", connection_options, re.IGNORECASE))
+    if strict_encryption:
+        certificate_match = re.search(r"ServerCertificate\\s*=\\s*([^;]+)", connection_options, re.IGNORECASE)
+        if not certificate_match:
+            raise SourceConnectorError("Strict SQL Server encryption requires a pinned ServerCertificate file.")
+        certificate_path = Path(certificate_match.group(1).strip().strip('"')).expanduser()
+        if not certificate_path.is_file():
+            raise SourceConnectorError("The pinned SQL Server certificate file was not found.")
+    else:
+        if not re.search(r"Encrypt\\s*=\\s*(yes|true)", connection_options, re.IGNORECASE):
+            raise SourceConnectorError("SQL Server connections must enable encryption.")
+        if not re.search(r"TrustServerCertificate\\s*=\\s*(no|false)", connection_options, re.IGNORECASE):
+            raise SourceConnectorError("SQL Server certificate verification must remain enabled.")
     identifier = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
     if not identifier.fullmatch(schema) or not identifier.fullmatch(table):
         raise SourceConnectorError("Invalid SQL Server schema or table identifier.")
