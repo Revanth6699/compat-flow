@@ -3,7 +3,7 @@ import io
 import json
 import os
 import xml.etree.ElementTree as ET
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from openpyxl import Workbook
@@ -173,7 +173,7 @@ def test_all_five_file_formats_persist_all_five_record_types_with_lineage(db_ses
                 )
                 assert committed["status"] == "completed", (record_type, extension, committed)
                 assert committed["imported_records"] == 1
-                job = db_session.get(ImportJob, committed["import_id"])
+                job = db_session.get(ImportJob, UUID(committed["import_id"]))
                 assert job is not None
                 assert job.source_type == "file"
                 assert job.source_descriptor == filename
