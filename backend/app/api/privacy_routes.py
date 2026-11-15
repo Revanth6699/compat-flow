@@ -16,7 +16,7 @@ from app.models import DataRightsRequest, PrivacyConsentEvent
 
 router = APIRouter(prefix="/privacy", tags=["privacy"])
 NOTICE_VERSION = "2026-11-15-draft"
-ALLOWED_PURPOSES = {"service_processing", "product_updates", "ai_mapping"}
+ALLOWED_PURPOSES = {"service_processing", "product_updates", "ai_mapping", "public_review"}
 
 
 class ConsentPayload(BaseModel):
