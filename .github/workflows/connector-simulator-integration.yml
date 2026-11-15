@@ -63,8 +63,10 @@ jobs:
           docker compose -f backend/tests/connector-simulator/compose.yaml cp sql-supplier:/tls/sql-server.crt backend/tests/connector-simulator/runtime/sql-server.crt
           sudo cp backend/tests/connector-simulator/runtime/sql-ca.crt /usr/local/share/ca-certificates/compatflow-simulator-ca.crt
           sudo update-ca-certificates
-          openssl x509 -in backend/tests/connector-simulator/runtime/sql-ca.crt -noout -subject -issuer -ext subjectKeyIdentifier -ext authorityKeyIdentifier
-          openssl x509 -in backend/tests/connector-simulator/runtime/sql-server.crt -noout -subject -issuer -ext subjectKeyIdentifier -ext authorityKeyIdentifier
+          openssl x509 -in backend/tests/connector-simulator/runtime/sql-ca.crt -noout -subject -issuer -ext subjectKeyIdentifier
+          openssl x509 -in backend/tests/connector-simulator/runtime/sql-ca.crt -noout -ext authorityKeyIdentifier
+          openssl x509 -in backend/tests/connector-simulator/runtime/sql-server.crt -noout -subject -issuer -ext subjectKeyIdentifier
+          openssl x509 -in backend/tests/connector-simulator/runtime/sql-server.crt -noout -ext authorityKeyIdentifier
           openssl verify -verbose -show_chain -purpose sslserver -verify_hostname sql-supplier -CAfile /etc/ssl/certs/ca-certificates.crt backend/tests/connector-simulator/runtime/sql-server.crt
           ssh-keyscan -p 2222 localhost > backend/tests/connector-simulator/runtime/known_hosts 2>/dev/null
       - name: Run REST, SFTP and SQL Server protocol integration tests
