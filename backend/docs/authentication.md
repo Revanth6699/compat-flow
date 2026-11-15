@@ -6,6 +6,18 @@ Supabase Auth provides user identity. The backend validates access tokens agains
 
 Application permissions are read from the user's record in the backend PostgreSQL database. The API does not use frontend state or user-editable JWT role metadata to make authorization decisions.
 
+The backend also calls Supabase Auth's current-user endpoint for each authenticated API request. This checks that the identity and email still match the token, rather than relying only on a locally verified JWT. It adds an Auth network request to protected API calls and fails closed if Supabase cannot confirm the identity. This is required because deleting an Auth user revokes refresh tokens, but an already-issued JWT can otherwise remain valid until its expiry.
+
+## Account deletion
+
+`DELETE /api/v1/auth/account` requires an explicit confirmation phrase.
+
+- An organization owner must enter `DELETE ORGANIZATION`. The backend cancels supported active Razorpay subscriptions, removes stored import CSV files, deletes all organization members' Supabase identities (owner last), and deletes the organization. Organization-owned relational records are removed through database foreign-key cascades and explicit payment/webhook cleanup.
+- A non-owner must enter `DELETE MY ACCOUNT`. The backend deletes that Supabase identity, the member profile, user-owned payment rows, and invitations created by that member. The organization and shared catalog remain.
+- The browser clears its local session after deletion succeeds or when the backend rejects an invalidated session.
+
+Deleting an Auth user does not erase legally required records held by payment providers, backups, or separate privacy/audit records. Those require their own documented retention and deletion rules. Uploaded CSV cleanup currently covers files referenced by `import_jobs.storage_key` in the configured local import directory; it does not imply deletion from third-party source systems.
+
 ### Backend configuration
 
 - `SUPABASE_URL`: Supabase project URL, such as `https://<project-ref>.supabase.co`.
