@@ -116,8 +116,8 @@ function WorkspaceContent() {
                 <div><dt>Subscription status</dt><dd>{profile.is_platform_admin ? "Exempt" : profile.subscription_status || "Not subscribed"}</dd></div>
                 <div><dt>Workspace access</dt><dd>{profile.is_active ? "Active" : "Inactive"}</dd></div>
               </dl>
-              {!profile.plan_code && !profile.is_platform_admin && <div className="notice"><strong>Your organization is set up.</strong><p>Choose a subscription to unlock paid organization features. Your workspace and admin account remain available while you decide.</p><Link className="button" href="/pricing">Choose a plan</Link></div>}
-              {profile.is_platform_admin && <div className="notice"><strong>Platform-owner access is enabled.</strong><p>No subscription is required for your account. Customer subscription rules remain unchanged.</p></div>}
+              {!profile.plan_code && !profile.is_platform_admin && <div className="notice"><strong>Your organization is set up.</strong>{profile.role === "admin" ? <><p>Choose a subscription to unlock paid organization features. Your workspace remains available while you decide.</p><Link className="button" href="/pricing">Choose a plan</Link></> : <p>Your organization does not currently have a paid plan. Contact your organization admin about subscription access.</p>}</div>}
+              {profile.is_platform_admin && <div className="notice"><strong>Platform administrator access is enabled.</strong><p>No subscription is required for your account. Customer subscription rules remain unchanged.</p></div>}
             </section>
 
             <section className="pricing-grid" aria-label="Workspace areas">
