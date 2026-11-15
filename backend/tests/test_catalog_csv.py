@@ -460,8 +460,8 @@ def test_olist_product_id_is_not_misclassified_as_sku():
     content = (
         "product_id,product_category_name,product_name_lenght,"
         "product_description_lenght,product_photos_qty,product_weight_g,"
-        "product_length_cm,product_height_cm,product_width_cm\\n"
-        "0001,beleza,40,200,3,500,20,10,15\\n"
+        "product_length_cm,product_height_cm,product_width_cm\n"
+        "0001,beleza,40,200,3,500,20,10,15\n"
     )
     result = parse_catalog_csv(content, allow_incomplete_mapping=True)
     mapped = {item.field: item.source_header for item in result.column_mappings}
