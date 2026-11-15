@@ -454,3 +454,22 @@ def test_pipe_delimited_feed_is_detected():
     result = parse_catalog_csv(content)
     assert result.total_rows == 1
     assert result.valid_count == 1
+
+
+def test_olist_product_export_maps_product_id_and_category_without_guessing_missing_fields():
+    content = (
+        "product_id,product_category_name,product_name_lenght,"
+        "product_description_lenght,product_photos_qty,product_weight_g,"
+        "product_length_cm,product_height_cm,product_width_cm\\n"
+        "0001,beleza,40,200,3,500,20,10,15\\n"
+    )
+    result = parse_catalog_csv(content, allow_incomplete_mapping=True)
+    mapped = {item.field: item.source_header for item in result.column_mappings}
+    assert mapped["sku"] == "product_id"
+    assert mapped["category"] == "product_category_name"
+    assert "product_name_lenght" in result.unmapped_headers
+    assert "product_description_lenght" in result.unmapped_headers
+    assert "manufacturer" not in mapped
+    assert "part_number" not in mapped
+    assert result.valid_count == 0
+    assert result.total_rows == 1
