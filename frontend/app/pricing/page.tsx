@@ -2,133 +2,113 @@
 
 import Link from "next/link";
 
-const plans = [
+type FeatureStatus = "Included" | "Planned" | "Not included";
+type Plan = {
+  name: string; price: string; description: string; featured?: boolean;
+  features: [string, FeatureStatus][]; action: string; href: string;
+};
+
+const plans: Plan[] = [
   {
-    name: "Starter",
-    price: "₹1,999",
-    description: "For teams that need a straightforward starting point for supplier file quality.",
-    items: [
-      ["CSV catalog validation", "Demo available"],
-      ["Required-field checks", "Demo available"],
-      ["Duplicate SKU detection", "Demo available"],
-      ["Validation summary", "Demo available"],
+    name: "Demo", price: "Free", description: "Evaluate the core validation workflow without creating an account.",
+    features: [
+      ["CSV, XLS and XLSX uploads", "Included"],
+      ["Required-field and duplicate checks", "Included"],
+      ["On-screen quality metrics", "Included"],
+      ["Issue details and recommendations", "Included"],
+      ["Downloadable validation report", "Not included"],
+      ["JSON and XML inputs", "Not included"],
+      ["API, SFTP and database connections", "Not included"],
+      ["Organization workspace", "Not included"],
     ],
+    action: "Try the demo", href: "/catalog/import",
   },
   {
-    name: "Professional",
-    price: "₹5,999",
-    description: "For teams managing multiple supplier catalogs and more structured review workflows.",
-    items: [
-      ["Everything in Starter", "Planned"],
-      ["Multiple catalogs and suppliers", "Planned"],
-      ["Catalog change detection", "Planned"],
-      ["Custom validation rules", "Planned"],
-      ["Scheduled validation and API access", "Planned"],
+    name: "Starter", price: "$27", description: "For small teams that need repeatable validation and shareable results.", featured: true,
+    features: [
+      ["CSV validation", "Included"],
+      ["Required-field and duplicate checks", "Included"],
+      ["Validation metrics and issue details", "Included"],
+      ["Downloadable validation report", "Included"],
+      ["Signed-in organization workspace", "Included"],
+      ["XLS, XLSX, JSON and XML inputs", "Not included"],
+      ["API, SFTP and database connections", "Not included"],
     ],
+    action: "Create an account", href: "/sign-up",
   },
   {
-    name: "Business",
-    price: "₹14,999",
-    description: "For teams that need controlled catalog operations across business workflows.",
-    items: [
-      ["Everything in Professional", "Planned"],
-      ["Product data transformations", "Planned"],
+    name: "Growth", price: "$64", description: "For teams working with multiple supplier feeds and connected data sources.",
+    features: [
+      ["Everything in Starter", "Included"],
+      ["XLS, XLSX, JSON and XML inputs", "Included"],
+      ["REST API, SFTP and SQL Server connections", "Included"],
+      ["Multiple supplier catalog imports", "Included"],
+      ["Recurring validation and version comparison", "Planned"],
+      ["Team review and issue assignment", "Planned"],
+    ],
+    action: "Discuss Growth", href: "/contact?intent=pricing&plan=growth",
+  },
+  {
+    name: "Business", price: "$153", description: "For operations teams coordinating catalog quality across departments.",
+    features: [
+      ["Everything in Growth", "Included"],
+      ["Team review and issue assignment", "Planned"],
       ["Approval workflows", "Planned"],
-      ["SFTP and catalog synchronization", "Planned"],
-      ["Audit logs", "Planned"],
+      ["Audit history and governance", "Planned"],
+      ["Advanced integrations", "Planned"],
     ],
+    action: "Discuss Business", href: "/contact?intent=pricing&plan=business",
   },
   {
-    name: "Enterprise",
-    price: "Custom",
-    description: "For organizations with specific integration, governance and deployment requirements.",
-    items: [
-      ["Custom integrations", "Planned"],
-      ["Deployment options", "Planned"],
-      ["Governance controls", "Planned"],
-      ["SLA and dedicated support", "Planned"],
+    name: "Enterprise", price: "Custom", description: "For organizations with custom scale, integration and governance requirements.",
+    features: [
+      ["Everything in Business", "Included"],
+      ["Custom import and usage limits", "Planned"],
+      ["Custom governance and security controls", "Planned"],
+      ["Dedicated onboarding and support terms", "Planned"],
     ],
+    action: "Discuss Enterprise", href: "/contact?intent=pricing&plan=enterprise",
   },
 ];
 
 export default function PricingPage() {
   return (
-    <>
-
-      <main id="main" className="page pricing-page">
-        <div className="container">
-          <section className="pricing-intro">
-            <div className="eyebrow">Simple, capability-based plans</div>
-            <h1>Pricing that grows with your catalog operations.</h1>
-            <p>
-              Indicative monthly pricing for the planned CompatFlow platform.
-              The public product is currently an early-stage CSV validation demo;
-              paid plans and subscription billing are not yet available.
-            </p>
-            <div className="pricing-note" role="note">
-              <strong>Pricing status:</strong> These are proposed prices, not
-              active offers. Annual pricing has not been published.
-            </div>
-          </section>
-
-          <section className="pricing-grid" aria-label="Indicative pricing plans">
-            {plans.map((plan) => (
-              <article className="pricing-card" key={plan.name}>
-                <div className="pricing-card-top">
-                  <h2>{plan.name}</h2>
-                  <p>{plan.description}</p>
-                  <div className="pricing-amount">
-                    <strong>{plan.price}</strong>
-                    {plan.price !== "Custom" && <span>/ month</span>}
-                  </div>
-                </div>
-                <div className="pricing-includes">Planned plan scope</div>
-                <ul className="pricing-feature-list">
-                  {plan.items.map(([item, status]) => (
-                    <li key={item}>
-                      <span>{item}</span>
-                      <span className={status === "Demo available" ? "pricing-status available" : "pricing-status planned"}>
-                        {status}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="pricing-card-action">
-                  {plan.name === "Starter" ? (
-                    <Link className="button button-secondary" href="/catalog/import">
-                      Try CSV demo
-                    </Link>
-                  ) : (
-                    <a className="button button-secondary" href="mailto:sarvasettyrevanth.66@gmail.com?subject=CompatFlow%20early%20access%20enquiry">
-                      Register interest
-                    </a>
-                  )}
-                </div>
-              </article>
-            ))}
-          </section>
-
-          <section className="pricing-footnote">
-            <h2>What is available today?</h2>
-            <p>
-              The public demo currently supports CSV uploads, required-column
-              checks, row validation, duplicate SKU checks and a validation
-              preview. Files are processed in memory and are not saved. The
-              advanced capabilities listed above are planned and should not be
-              treated as currently available plan features.
-            </p>
-            <p>
-              Do not upload confidential supplier data, personal information
-              or production catalog files to the public demo.
-            </p>
-            <Link className="pricing-text-link" href="/catalog/import">
-              Explore the current CSV demo
-            </Link>
-          </section>
-        </div>
-      </main>
-
-
-    </>
+    <main id="main" className="page pricing-page">
+      <div className="container">
+        <section className="pricing-intro">
+          <div className="eyebrow">Plans built around your workflow</div>
+          <h1>Start with a demo. Upgrade when your catalog operations need more.</h1>
+          <p>Reference prices are in USD per month. These are proposed early-access prices; paid checkout is not enabled yet. Features marked Planned are not currently available for purchase.</p>
+        </section>
+        <section className="pricing-grid" aria-label="CompatFlow plans">
+          {plans.map(plan => (
+            <article className={`pricing-card${plan.featured ? " pricing-card-featured" : ""}`} key={plan.name}>
+              <div className="pricing-card-top">
+                <div className="eyebrow">{plan.name === "Demo" ? "No account required" : plan.featured ? "For small teams" : "For growing operations"}</div>
+                <h2>{plan.name}</h2><p>{plan.description}</p>
+                <div className="pricing-amount"><strong>{plan.price}</strong>{plan.price !== "Free" && plan.price !== "Custom" && <span>/ month</span>}</div>
+              </div>
+              <div className="pricing-includes">Capabilities</div>
+              <ul className="pricing-feature-list">
+                {plan.features.map(([feature, status]) => (
+                  <li key={`${plan.name}-${feature}`}>
+                    <span>{feature}</span>
+                    <span className={status === "Included" ? "pricing-status available" : "pricing-status planned"}>{status}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="pricing-card-action"><Link className={plan.featured ? "button" : "button button-secondary"} href={plan.href}>{plan.action}</Link></div>
+            </article>
+          ))}
+        </section>
+        <section className="pricing-footnote">
+          <h2>Demo vs Starter</h2>
+          <p>The public demo lets anyone test CSV and Excel validation without signing in. It is limited to 5 MB per file, shows results on screen and does not offer report downloads or a saved workspace.</p>
+          <p>Starter adds a signed-in organization workspace, a larger 25 MB upload ceiling and downloadable validation reports. It does not unlock JSON/XML ingestion or external source connectors.</p>
+          <p>Growth connector access is also subject to operator-side host allowlisting and source security configuration. Subscription checkout and provider credentials are still being completed.</p>
+          <Link className="pricing-text-link" href="/catalog/import">Try the public demo</Link>
+        </section>
+      </div>
+    </main>
   );
 }

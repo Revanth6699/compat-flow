@@ -8,6 +8,32 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: compatflow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d compatflow_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/compatflow_test
+      REDIS_URL: redis://localhost:6379/0
     defaults:
       run:
         working-directory: backend
@@ -17,9 +43,12 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
+      - run: alembic upgrade head
       - run: python -m pytest
       - run: ruff check app tests
       - run: bandit -q -r app
+      - name: Build backend runtime image with Microsoft ODBC Driver 18
+        run: docker build --tag compatflow-backend-ci .
 
   frontend:
     runs-on: ubuntu-latest

@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     app_secret_key: str = "local-development-only-change-me"
     frontend_origin: str = "http://localhost:3001"
     allowed_hosts: str = "*"
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
 
     database_url: str = (
         "postgresql+psycopg://compatflow_local:"
@@ -22,7 +24,15 @@ class Settings(BaseSettings):
     celery_result_backend: str = "redis://localhost:6379/2"
 
     import_storage_dir: str = "/data/imports"
-    import_max_upload_bytes: int = 5 * 1024 * 1024
+    import_max_upload_bytes: int = 25 * 1024 * 1024
+    connector_allowed_hosts: str = ""
+    sftp_known_hosts_path: str = ""
+    connector_rate_limit_per_minute: int = 20
+
+    razorpay_key_id: str = ""
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""
+    razorpay_plan_ids_json: str = "{}"
 
     model_config = SettingsConfigDict(
         env_file="../.env",
@@ -36,6 +46,8 @@ class Settings(BaseSettings):
 
         if self.import_max_upload_bytes > 50 * 1024 * 1024:
             raise ValueError("IMPORT_MAX_UPLOAD_BYTES cannot exceed 50 MB.")
+        if self.connector_rate_limit_per_minute < 1 or self.connector_rate_limit_per_minute > 1000:
+            raise ValueError("CONNECTOR_RATE_LIMIT_PER_MINUTE must be between 1 and 1000.")
 
         if self.app_env.lower() != "production":
             return self

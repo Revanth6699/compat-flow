@@ -1,0 +1,562 @@
+{
+  "version": 1,
+  "purpose": "Reviewed seed examples for evaluating column-mapping suggestions; not a supervised training dataset.",
+  "audit_file_count": 100,
+  "label_policy": "Labels are based on manual review of source headers and available sample values. Source-specific examples are correlated within repositories and must be grouped by source family during evaluation.",
+  "records": [
+    {
+      "source_dataset": 11,
+      "header": "PRODUCT_SKU",
+      "canonical_field": "sku",
+      "decision": "auto_alias",
+      "reason": "Explicit product SKU header."
+    },
+    {
+      "source_dataset": 11,
+      "header": "PRODUCT_MPN",
+      "canonical_field": "part_number",
+      "decision": "auto_alias",
+      "reason": "Explicit MPN header."
+    },
+    {
+      "source_dataset": 11,
+      "header": "PRODUCT_MODEL",
+      "canonical_field": null,
+      "semantic_role": "model",
+      "decision": "do_not_auto_map",
+      "reason": "Model is distinct from MPN."
+    },
+    {
+      "source_dataset": 22,
+      "header": "ManufacturerPartNumber",
+      "canonical_field": "part_number",
+      "decision": "auto_alias",
+      "reason": "Explicit manufacturer part number in CamelCase."
+    },
+    {
+      "source_dataset": 22,
+      "header": "SupplierSKU",
+      "canonical_field": null,
+      "semantic_role": "supplier_sku",
+      "decision": "manual_review",
+      "reason": "Supplier-specific SKU is a separate identifier namespace."
+    },
+    {
+      "source_dataset": 26,
+      "header": "model_number",
+      "canonical_field": null,
+      "semantic_role": "model_number",
+      "decision": "do_not_auto_map",
+      "reason": "Model number is not reliably equivalent to MPN."
+    },
+    {
+      "source_dataset": 31,
+      "header": "brand",
+      "canonical_field": null,
+      "semantic_role": "brand",
+      "decision": "do_not_auto_map",
+      "reason": "Brand is distinct from manufacturer."
+    },
+    {
+      "source_dataset": 31,
+      "header": "vendor",
+      "canonical_field": null,
+      "semantic_role": "vendor",
+      "decision": "do_not_auto_map",
+      "reason": "Vendor is distinct from manufacturer."
+    },
+    {
+      "source_dataset": 33,
+      "header": "device_name",
+      "canonical_field": "name",
+      "decision": "auto_alias",
+      "reason": "Explicit device/product name."
+    },
+    {
+      "source_dataset": 33,
+      "header": "hash",
+      "canonical_field": null,
+      "semantic_role": "source_record_key",
+      "decision": "do_not_auto_map",
+      "reason": "Hash is a source record key, not SKU."
+    },
+    {
+      "source_dataset": 37,
+      "header": "MPN",
+      "canonical_field": "part_number",
+      "decision": "auto_alias",
+      "reason": "Explicit manufacturer part number."
+    },
+    {
+      "source_dataset": 37,
+      "header": "Supplier",
+      "canonical_field": null,
+      "semantic_role": "supplier",
+      "decision": "do_not_auto_map",
+      "reason": "Supplier is not manufacturer."
+    },
+    {
+      "source_dataset": 37,
+      "header": "Value",
+      "canonical_field": null,
+      "semantic_role": "component_value",
+      "decision": "do_not_auto_map",
+      "reason": "Electrical value is not product name."
+    },
+    {
+      "source_dataset": 41,
+      "header": "sku",
+      "canonical_field": "sku",
+      "decision": "auto_alias",
+      "reason": "Explicit SKU header."
+    },
+    {
+      "source_dataset": 41,
+      "header": "mpn",
+      "canonical_field": "part_number",
+      "decision": "auto_alias",
+      "reason": "Explicit MPN header."
+    },
+    {
+      "source_dataset": 41,
+      "header": "gtin",
+      "canonical_field": null,
+      "semantic_role": "gtin",
+      "decision": "do_not_auto_map",
+      "reason": "GTIN is distinct from SKU and MPN."
+    },
+    {
+      "source_dataset": 42,
+      "header": "product_id",
+      "canonical_field": null,
+      "semantic_role": "workflow_record_id",
+      "decision": "do_not_auto_map",
+      "reason": "Product ID is not a confirmed supplier SKU."
+    },
+    {
+      "source_dataset": 43,
+      "header": "SKU / Pioneer part number",
+      "canonical_field": "sku",
+      "decision": "source_specific_alias",
+      "reason": "Source explicitly labels the field as SKU/Pioneer part number."
+    },
+    {
+      "source_dataset": 43,
+      "header": "manufacturer_part_number",
+      "canonical_field": "part_number",
+      "decision": "auto_alias",
+      "reason": "Explicit manufacturer part number."
+    },
+    {
+      "source_dataset": 43,
+      "header": "product_id",
+      "canonical_field": null,
+      "semantic_role": "source_product_id",
+      "decision": "do_not_auto_map",
+      "reason": "Source product ID is distinct from SKU."
+    },
+    {
+      "source_dataset": 44,
+      "header": "Non disponible",
+      "canonical_field": null,
+      "semantic_role": "missing_value_marker",
+      "decision": "normalize_as_missing",
+      "reason": "French placeholder means unavailable."
+    },
+    {
+      "source_dataset": 45,
+      "header": "brand_name",
+      "canonical_field": null,
+      "semantic_role": "brand",
+      "decision": "do_not_auto_map",
+      "reason": "Brand and manufacturer are different entities."
+    },
+    {
+      "source_dataset": 45,
+      "header": "manufacturer",
+      "canonical_field": "manufacturer",
+      "decision": "auto_alias",
+      "reason": "Explicit manufacturer field."
+    },
+    {
+      "source_dataset": 45,
+      "header": "product_id",
+      "canonical_field": null,
+      "semantic_role": "source_product_id",
+      "decision": "manual_review",
+      "reason": "SKU-like values do not prove product_id is SKU."
+    },
+    {
+      "source_dataset": 47,
+      "header": "brand_type",
+      "canonical_field": null,
+      "semantic_role": "brand_classification",
+      "decision": "do_not_auto_map",
+      "reason": "Branded/private-label classification is not brand or manufacturer."
+    },
+    {
+      "source_dataset": 48,
+      "header": "manufacturer",
+      "canonical_field": "manufacturer",
+      "decision": "auto_alias",
+      "reason": "Explicit manufacturer field."
+    },
+    {
+      "source_dataset": 48,
+      "header": "brand",
+      "canonical_field": null,
+      "semantic_role": "brand",
+      "decision": "do_not_auto_map",
+      "reason": "Brand is separately present from manufacturer."
+    },
+    {
+      "source_dataset": 49,
+      "header": "sku_number",
+      "canonical_field": "sku",
+      "decision": "auto_alias",
+      "reason": "Explicit SKU number header."
+    },
+    {
+      "source_dataset": 50,
+      "header": "brand_name",
+      "canonical_field": null,
+      "semantic_role": "brand",
+      "decision": "do_not_auto_map",
+      "reason": "Brand is not manufacturer."
+    },
+    {
+      "source_dataset": 51,
+      "header": "sku_id",
+      "canonical_field": "sku",
+      "decision": "auto_alias",
+      "reason": "Explicit SKU_ID header with SKU-shaped values."
+    },
+    {
+      "source_dataset": 51,
+      "header": "record_id",
+      "canonical_field": null,
+      "semantic_role": "source_record_id",
+      "decision": "do_not_auto_map",
+      "reason": "Record ID is distinct from SKU."
+    },
+    {
+      "source_dataset": 52,
+      "header": "category_id",
+      "canonical_field": null,
+      "semantic_role": "category_reference",
+      "decision": "do_not_auto_map",
+      "reason": "Category ID is a reference key, not category label."
+    },
+    {
+      "source_dataset": 54,
+      "header": "barcode_ean",
+      "canonical_field": null,
+      "semantic_role": "ean",
+      "decision": "do_not_auto_map",
+      "reason": "Barcode/EAN is a separate identifier and must remain a string."
+    },
+    {
+      "source_dataset": 55,
+      "header": "product_id",
+      "canonical_field": null,
+      "semantic_role": "source_product_id",
+      "decision": "do_not_auto_map",
+      "reason": "SKU-like values do not override the explicit product_id meaning."
+    },
+    {
+      "source_dataset": 57,
+      "header": "product_sku",
+      "canonical_field": "sku",
+      "decision": "auto_alias",
+      "reason": "Explicit product SKU field."
+    },
+    {
+      "source_dataset": 57,
+      "header": "product_upc",
+      "canonical_field": null,
+      "semantic_role": "upc",
+      "decision": "do_not_auto_map",
+      "reason": "UPC is distinct from SKU."
+    },
+    {
+      "source_dataset": 60,
+      "header": "top_category",
+      "canonical_field": "category",
+      "decision": "auto_alias",
+      "reason": "Explicit top-level category field."
+    },
+    {
+      "source_dataset": 60,
+      "header": "supplier",
+      "canonical_field": null,
+      "semantic_role": "supplier",
+      "decision": "do_not_auto_map",
+      "reason": "Supplier is not manufacturer."
+    },
+    {
+      "source_dataset": 63,
+      "header": "gtin14",
+      "canonical_field": null,
+      "semantic_role": "gtin14",
+      "decision": "do_not_auto_map",
+      "reason": "GTIN-14 is a distinct identifier; preserve leading zeros."
+    },
+    {
+      "source_dataset": 64,
+      "header": "SKU_Code",
+      "canonical_field": "sku",
+      "decision": "auto_alias",
+      "reason": "Explicit SKU code header."
+    },
+    {
+      "source_dataset": 66,
+      "header": "amazon_sku",
+      "canonical_field": null,
+      "semantic_role": "marketplace_sku",
+      "decision": "do_not_auto_map",
+      "reason": "Marketplace-specific SKU is not a universal supplier SKU."
+    },
+    {
+      "source_dataset": 66,
+      "header": "rakuten_item_code",
+      "canonical_field": null,
+      "semantic_role": "marketplace_item_code",
+      "decision": "do_not_auto_map",
+      "reason": "Marketplace-specific item code is a separate namespace."
+    },
+    {
+      "source_dataset": 68,
+      "header": "MODEL_NUMBER",
+      "canonical_field": null,
+      "semantic_role": "model_number",
+      "decision": "do_not_auto_map",
+      "reason": "Model number is distinct from MPN."
+    },
+    {
+      "source_dataset": 68,
+      "header": "CATEGORIES",
+      "canonical_field": null,
+      "semantic_role": "multi_value_categories",
+      "decision": "manual_review",
+      "reason": "Plural category field may contain multiple values."
+    },
+    {
+      "source_dataset": 69,
+      "header": "ASIN",
+      "canonical_field": null,
+      "semantic_role": "marketplace_id",
+      "decision": "do_not_auto_map",
+      "reason": "ASIN is not SKU or MPN."
+    },
+    {
+      "source_dataset": 69,
+      "header": "UPC",
+      "canonical_field": null,
+      "semantic_role": "upc",
+      "decision": "do_not_auto_map",
+      "reason": "UPC is distinct from SKU."
+    },
+    {
+      "source_dataset": 69,
+      "header": "EAN",
+      "canonical_field": null,
+      "semantic_role": "ean",
+      "decision": "do_not_auto_map",
+      "reason": "EAN is distinct from SKU."
+    },
+    {
+      "source_dataset": 69,
+      "header": "GTIN",
+      "canonical_field": null,
+      "semantic_role": "gtin",
+      "decision": "do_not_auto_map",
+      "reason": "GTIN is distinct from SKU."
+    },
+    {
+      "source_dataset": 76,
+      "header": "Medicine_Name",
+      "canonical_field": "name",
+      "decision": "auto_alias",
+      "reason": "Explicit medicine name field."
+    },
+    {
+      "source_dataset": 80,
+      "header": "snapshot_date",
+      "canonical_field": null,
+      "semantic_role": "inventory_snapshot_date",
+      "decision": "do_not_map",
+      "reason": "Snapshot date defines inventory row grain."
+    },
+    {
+      "source_dataset": 81,
+      "header": "product_title",
+      "canonical_field": "name",
+      "decision": "auto_alias",
+      "reason": "Explicit marketplace product title."
+    },
+    {
+      "source_dataset": 81,
+      "header": "seller_name",
+      "canonical_field": null,
+      "semantic_role": "seller",
+      "decision": "do_not_auto_map",
+      "reason": "Seller is not manufacturer."
+    },
+    {
+      "source_dataset": 86,
+      "header": "sku",
+      "canonical_field": "sku",
+      "decision": "auto_alias",
+      "reason": "Explicit SKU; compare normalized keys while retaining source value."
+    },
+    {
+      "source_dataset": 90,
+      "header": "full_name",
+      "canonical_field": "name",
+      "decision": "auto_alias",
+      "reason": "Explicit full product name field."
+    },
+    {
+      "source_dataset": 90,
+      "header": "manufacturer_code",
+      "canonical_field": null,
+      "semantic_role": "manufacturer_code",
+      "decision": "do_not_auto_map",
+      "reason": "Manufacturer code is not manufacturer name or MPN."
+    },
+    {
+      "source_dataset": 91,
+      "header": "Manufacturer Part #",
+      "canonical_field": "part_number",
+      "decision": "auto_alias",
+      "reason": "Explicit manufacturer part number shorthand."
+    },
+    {
+      "source_dataset": 91,
+      "header": "Ferguson Part #",
+      "canonical_field": null,
+      "semantic_role": "distributor_part_number",
+      "decision": "do_not_auto_map",
+      "reason": "Distributor part number is not manufacturer part number."
+    },
+    {
+      "source_dataset": 93,
+      "header": "product_type",
+      "canonical_field": null,
+      "semantic_role": "product_type",
+      "decision": "do_not_auto_map",
+      "reason": "Product type is distinct from category."
+    },
+    {
+      "source_dataset": 93,
+      "header": "description",
+      "canonical_field": null,
+      "semantic_role": "description",
+      "decision": "do_not_auto_map",
+      "reason": "Description is not product name."
+    },
+    {
+      "source_dataset": 97,
+      "header": "headerless_file",
+      "canonical_field": null,
+      "semantic_role": "missing_header_row",
+      "decision": "require_template",
+      "reason": "First data row must not be silently treated as a header."
+    },
+    {
+      "source_dataset": 99,
+      "header": "unquoted_comma",
+      "canonical_field": null,
+      "semantic_role": "ragged_row",
+      "decision": "reject_or_quarantine",
+      "reason": "Unquoted commas shift values across columns."
+    },
+    {
+      "source_dataset": 100,
+      "header": "Product_Code",
+      "canonical_field": "sku",
+      "decision": "auto_alias",
+      "reason": "Explicit product code identifier; keep Product_ID separate."
+    },
+    {
+      "source_dataset": 58,
+      "header": "item_code",
+      "canonical_field": null,
+      "semantic_role": "item_identifier",
+      "decision": "manual_review",
+      "reason": "Item code is not guaranteed to be a SKU without the source contract."
+    },
+    {
+      "source_dataset": 74,
+      "header": "part_no",
+      "canonical_field": null,
+      "semantic_role": "internal_part_identifier",
+      "decision": "manual_review",
+      "reason": "Generic part number may be a maintenance/internal identifier rather than an MPN."
+    },
+    {
+      "source_dataset": 23,
+      "header": "item_number",
+      "canonical_field": null,
+      "semantic_role": "item_identifier",
+      "decision": "manual_review",
+      "reason": "Item number is not guaranteed to be a SKU."
+    },
+    {
+      "source_dataset": 37,
+      "header": "stock_code",
+      "canonical_field": null,
+      "semantic_role": "stock_identifier",
+      "decision": "manual_review",
+      "reason": "Stock code requires source-specific confirmation before mapping to SKU."
+    },
+    {
+      "source_dataset": 37,
+      "header": "part_id",
+      "canonical_field": null,
+      "semantic_role": "part_identifier",
+      "decision": "manual_review",
+      "reason": "Part ID is not necessarily a sellable SKU."
+    },
+    {
+      "source_dataset": 93,
+      "header": "product_type",
+      "canonical_field": null,
+      "semantic_role": "product_type",
+      "decision": "do_not_auto_map",
+      "reason": "Product type is distinct from category in the same source."
+    },
+    {
+      "source_dataset": 14,
+      "header": "item_type",
+      "canonical_field": null,
+      "semantic_role": "item_type",
+      "decision": "manual_review",
+      "reason": "Item type can be taxonomy or operational classification depending on source."
+    },
+    {
+      "source_dataset": 75,
+      "header": "product",
+      "canonical_field": null,
+      "semantic_role": "product_name_candidate",
+      "decision": "manual_review",
+      "reason": "Product is a contextual name candidate, not a safe global alias."
+    },
+    {
+      "source_dataset": 13,
+      "header": "description",
+      "canonical_field": null,
+      "semantic_role": "description",
+      "decision": "do_not_auto_map",
+      "reason": "Description is not product name."
+    },
+    {
+      "source_dataset": 13,
+      "header": "short_description",
+      "canonical_field": null,
+      "semantic_role": "description",
+      "decision": "do_not_auto_map",
+      "reason": "Short description is not product name."
+    }
+  ]
+}
