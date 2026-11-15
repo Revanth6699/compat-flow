@@ -15,6 +15,7 @@ The backend also calls Supabase Auth's current-user endpoint for each authentica
 - An organization owner must enter `DELETE ORGANIZATION`. The backend cancels supported active Razorpay subscriptions, removes stored import CSV files, deletes all organization members' Supabase identities (owner last), and deletes the organization. Organization-owned relational records are removed through database foreign-key cascades and explicit payment/webhook cleanup.
 - A non-owner must enter `DELETE MY ACCOUNT`. The backend deletes that Supabase identity, the member profile, user-owned payment rows, and invitations created by that member. The organization and shared catalog remain.
 - The browser clears its local session after deletion succeeds or when the backend rejects an invalidated session.
+- If the same email address registers again, Supabase creates a new Auth identity. First-time organization setup creates a new organization and owner profile; the deleted organization and memberships are not restored.
 
 Deleting an Auth user does not erase legally required records held by payment providers, backups, or separate privacy/audit records. Those require their own documented retention and deletion rules. Uploaded CSV cleanup currently covers files referenced by `import_jobs.storage_key` in the configured local import directory; it does not imply deletion from third-party source systems.
 
