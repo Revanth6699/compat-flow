@@ -222,6 +222,20 @@ def test_sql_server_connector_requires_encryption_and_certificate_validation():
         )
 
 
+def test_sql_server_connector_requires_pinned_certificate_for_strict_encryption(tmp_path):
+    with pytest.raises(SourceConnectorError, match="pinned ServerCertificate"):
+        fetch_sql_server_rows(
+            "mssql+pyodbc://user:pass@host/db?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=strict",
+            schema="dbo", table="Products", columns=["sku"],
+        )
+
+    with pytest.raises(SourceConnectorError, match="certificate file was not found"):
+        fetch_sql_server_rows(
+            "mssql+pyodbc://user:pass@host/db?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=strict&ServerCertificate=/missing/server.crt",
+            schema="dbo", table="Products", columns=["sku"],
+        )
+
+
 def test_sql_server_connector_reads_only_selected_bounded_columns(monkeypatch):
     calls = {}
 
