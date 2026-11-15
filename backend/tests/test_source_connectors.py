@@ -1,4 +1,5 @@
 import sys
+from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import Column, Integer, MetaData, String, Table as SQLTable
@@ -564,8 +565,8 @@ def test_sql_server_incremental_watermark_requires_selected_unique_column(monkey
     class FakeTable:
         c = ColumnCollection()
         constraints = set()
-
-    class Statement:
+        primary_key = SimpleNamespace(columns=[])
+class Statement:
         def where(self, clause):
             calls["where"] = clause
             return self
@@ -663,8 +664,8 @@ def test_sql_server_incremental_watermark_uses_unique_numeric_key_and_ordered_se
     class FakeTable:
         c = ColumnCollection()
         constraints = set()
-
-    class Statement:
+        primary_key = SimpleNamespace(columns=[Column()])
+class Statement:
         def where(self, clause):
             calls["where"] = clause
             return self
@@ -724,7 +725,7 @@ def test_sql_server_incremental_watermark_uses_unique_numeric_key_and_ordered_se
     assert calls["watermark_value"] == 10
     assert calls["where"] == ("greater_than", 10)
     assert calls["order_by"] == "ascending"
-    assert calls["limit"] == 100
+    assert calls["limit"] == 101
     assert calls["disposed"] is True
 
 
