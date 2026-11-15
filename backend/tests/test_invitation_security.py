@@ -194,7 +194,7 @@ class QueryCaptureDB:
         self.committed = True
 
 
-def make_current(role="owner"):
+def make_current(role="admin"):
     profile = SimpleNamespace(
         id=uuid4(),
         organization_id=uuid4(),
