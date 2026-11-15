@@ -20,7 +20,7 @@ Do not delay required notifications while waiting for a perfect forensic picture
 
 ## 3. Regulatory and individual notifications
 
-The DPDP Rules provide for notice to affected Data Principals without delay and notice to the Data Protection Board without delay, followed by detailed information within 72 hours of becoming aware of the breach (subject to any extension granted by the Board). Counsel must confirm applicable commencement, current prescribed form/channel and any additional CERT-In, sectoral or contractual deadlines for the incident.
+Under Rule 7 of the DPDP Rules, affected Data Principals are to be notified without delay and the Data Protection Board is to be notified without delay, followed by detailed information within 72 hours of awareness (subject to any extension granted by the Board). **Rule 7 is scheduled to commence on 13 May 2027**, 18 months after publication of the Rules on 13 November 2025. This runbook is therefore a preparedness procedure; counsel must confirm the commencement date, any subsequent amendments, current prescribed form/channel and any additional CERT-In, sectoral or contractual deadlines for the specific incident. Do not treat the future Rule 7 timeline as replacing obligations that may apply under other laws or contracts today.
 
 Record awareness time, notice send times, channels and acknowledgements. This runbook does not replace legal advice or other reporting duties.
 
