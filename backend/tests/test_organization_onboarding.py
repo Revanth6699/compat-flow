@@ -43,7 +43,7 @@ def make_identity():
     )
 
 
-def test_verified_first_user_creates_owner_and_organization(monkeypatch):
+def test_verified_first_user_creates_admin_and_organization(monkeypatch):
     identity = make_identity()
     db = OnboardingDB()
     monkeypatch.setattr(auth_routes, "require_verified_supabase_email", lambda _: None)
@@ -60,7 +60,7 @@ def test_verified_first_user_creates_owner_and_organization(monkeypatch):
     assert profile.organization_id == organization.id
     assert profile.auth_user_id == identity.auth_user_id
     assert profile.email == identity.email
-    assert profile.role == "owner"
+    assert profile.role == "admin"
     assert profile.is_active is True
     assert response.organization_id == organization.id
     assert db.committed is True
