@@ -9,7 +9,9 @@ openssl req -x509 -newkey rsa:2048 -nodes \
   -days 7 -sha256 \
   -subj "/CN=CompatFlow Disposable Simulator CA" \
   -addext "basicConstraints=critical,CA:TRUE" \
-  -addext "keyUsage=critical,keyCertSign,cRLSign"
+  -addext "keyUsage=critical,keyCertSign,cRLSign" \\
+  -addext "subjectKeyIdentifier=hash" \\
+  -addext "authorityKeyIdentifier=keyid:always,issuer"
 openssl genrsa -out /tls/sql-server.key 2048
 openssl req -new -key /tls/sql-server.key -out /tmp/sql-server.csr \
   -subj "/CN=sql-supplier"
@@ -18,6 +20,8 @@ cat > /tmp/sql-server.ext <<'EOF'
 basicConstraints=critical,CA:FALSE
 keyUsage=critical,digitalSignature,keyEncipherment
 extendedKeyUsage=serverAuth
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid,issuer
 subjectAltName=DNS:localhost,DNS:sql-supplier,IP:127.0.0.1
 EOF
 openssl x509 -req -in /tmp/sql-server.csr \
