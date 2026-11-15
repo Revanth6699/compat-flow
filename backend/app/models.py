@@ -567,7 +567,7 @@ class PrivacyConsentEvent(Base):
     """Append-only record of a purpose-specific consent choice."""
     __tablename__ = "privacy_consent_events"
     __table_args__ = (
-        CheckConstraint("purpose IN ('service_processing', 'product_updates', 'ai_mapping')", name="ck_privacy_consent_purpose"),
+        CheckConstraint("purpose IN ('service_processing', 'product_updates', 'ai_mapping', 'public_review')", name="ck_privacy_consent_purpose"),
         Index("ix_privacy_consent_email_purpose_time", "email", "purpose", "recorded_at"),
     )
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
