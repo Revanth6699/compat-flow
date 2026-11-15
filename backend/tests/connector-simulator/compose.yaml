@@ -39,6 +39,7 @@ services:
 
   sql-supplier:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    hostname: sql-supplier
     user: "0"
     entrypoint: ["/bin/bash", "-c"]
     command:
