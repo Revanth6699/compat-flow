@@ -13,6 +13,10 @@ from app.api.connector_import_routes import ConnectorImportRequest, _prepare, _r
 client = TestClient(app)
 
 
+async def _async_noop():
+    return None
+
+
 def test_connector_routes_require_authentication():
     payload = {
         "source_type": "rest_api",
@@ -101,6 +105,7 @@ def test_authenticated_connector_preview_runs_validation_without_persisting(monk
             "supplier.json",
         )
     monkeypatch.setattr(routes, "_load_source", fake_load_source)
+    monkeypatch.setattr(routes, "_enforce_connector_rate_limit", lambda organization_id: _async_noop())
     try:
         response = TestClient(app).post(
             "/api/v1/catalog/import/connectors/preview",
@@ -127,6 +132,7 @@ def test_authenticated_connector_commit_persists_for_authenticated_tenant(monkey
         calls.update(kwargs)
         return {"status": "completed", "imported_records": 1}
     monkeypatch.setattr(routes, "_load_source", fake_load_source)
+    monkeypatch.setattr(routes, "_enforce_connector_rate_limit", lambda organization_id: _async_noop())
     monkeypatch.setattr(routes, "persist_validated_import", fake_persist)
     try:
         response = TestClient(app).post(
@@ -150,3 +156,93 @@ def test_connector_preview_rejects_user_without_catalog_read_permission(monkeypa
         assert response.status_code == 403
     finally:
         clear_connector_auth()
+
+
+
+def test_connector_source_descriptors_never_include_credentials_or_query_tokens():
+    api = ConnectorImportRequest(
+        source_type="rest_api",
+        record_type="products",
+        api_url="https://reader:secret@supplier.example/catalog?api_key=hidden",
+    )
+    assert routes._source_descriptor(api) == "https://supplier.example"
+
+    sql = ConnectorImportRequest(
+        source_type="sql_server",
+        record_type="products",
+        sql_server_url="mssql+pyodbc://reader:secret@sql.example/catalog?password=hidden",
+        sql_schema="dbo",
+        sql_table="Products",
+    )
+    descriptor = routes._source_descriptor(sql)
+    assert descriptor == "sqlserver://sql.example/catalog/dbo.Products"
+    assert "secret" not in descriptor and "hidden" not in descriptor
+
+
+def test_connector_source_metadata_records_pagination_and_watermark_without_secrets():
+    api = ConnectorImportRequest(
+        source_type="rest_api",
+        record_type="products",
+        api_url="https://supplier.example/catalog",
+        api_page_param="page",
+        api_page_size_param="limit",
+        api_page_size=100,
+        api_max_pages=5,
+        api_retry_attempts=3,
+        api_headers={"X-API-Key": "do-not-persist"},
+    )
+    parsed = routes.parse_source(
+        b'[{"sku":"001","name":"Widget","manufacturer":"Acme","part_number":"A-1","category":"Parts"}]',
+        "connector.json",
+    )
+    metadata = routes._source_metadata(api, parsed)
+    assert metadata["pagination"]["mode"] == "page_number"
+    assert metadata["pagination"]["max_pages"] == 5
+    assert "do-not-persist" not in str(metadata)
+
+
+@pytest.mark.anyio
+async def test_connector_rate_limit_is_enforced_per_organization(monkeypatch):
+    calls = {"count": 0, "closed": False}
+
+    class FakeRedis:
+        @classmethod
+        def from_url(cls, *args, **kwargs):
+            return cls()
+
+        async def eval(self, script, key_count, key, expiry):
+            calls["count"] += 1
+            return calls["count"]
+
+        async def aclose(self):
+            calls["closed"] = True
+
+    monkeypatch.setattr(routes, "Redis", FakeRedis)
+    monkeypatch.setattr(settings, "connector_rate_limit_per_minute", 1)
+    organization_id = uuid4()
+    await routes._enforce_connector_rate_limit(organization_id)
+    with pytest.raises(Exception) as exc:
+        await routes._enforce_connector_rate_limit(organization_id)
+    assert getattr(exc.value, "status_code", None) == 429
+    assert calls["count"] == 2
+    assert calls["closed"] is True
+
+
+@pytest.mark.anyio
+async def test_connector_rate_limit_fails_closed_when_redis_is_unavailable(monkeypatch):
+    class FakeRedis:
+        @classmethod
+        def from_url(cls, *args, **kwargs):
+            return cls()
+
+        async def eval(self, *args):
+            from redis.exceptions import RedisError
+            raise RedisError("connection failed")
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(routes, "Redis", FakeRedis)
+    with pytest.raises(Exception) as exc:
+        await routes._enforce_connector_rate_limit(uuid4())
+    assert getattr(exc.value, "status_code", None) == 503
