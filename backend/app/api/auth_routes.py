@@ -391,8 +391,8 @@ def create_invitation(
     _ensure_invitation_seat_available(
         db, current.profile.organization_id, include_pending_invitations=True, current=current
     )
-    if current.profile.role != "admin" and payload.role == "admin":
-        raise HTTPException(status_code=403, detail="Only an organization admin can invite administrators.")
+    if payload.role == "admin":
+        raise HTTPException(status_code=403, detail="Administrator access is reserved for the existing organization admin.")
     existing = db.scalar(select(User).where(func.lower(User.email) == email))
     if existing:
         raise HTTPException(
@@ -553,8 +553,8 @@ def update_organization_member(
     if current.profile.role != "admin" and member.role == "admin":
         raise HTTPException(status_code=403, detail="Only the organization admin can modify an administrator.")
     if payload.role is not None:
-        if payload.role == "admin" and current.profile.role != "admin":
-            raise HTTPException(status_code=403, detail="Only the organization admin can assign administrator access.")
+        if payload.role == "admin":
+            raise HTTPException(status_code=403, detail="Administrator access cannot be reassigned through member management.")
         member.role = payload.role
     if payload.is_active is not None:
         if payload.is_active and not member.is_active:
