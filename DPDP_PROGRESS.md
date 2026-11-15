@@ -46,6 +46,8 @@
 - Authenticated consent history and withdrawal endpoints added for optional product updates/AI mapping.
 - AI mapping action records a per-action consent event and retains the existing opt-in gate.
 - Unticked required service-processing acknowledgement and unticked optional product-updates checkbox added to signup and contact/demo form.
+- Explicit public-review publication checkbox added; affirmative choice is recorded separately as a `public_review` consent event.
+- Catalog file upload requires an authorization/data-minimization attestation; supplier connector preview/commit requires an authorization attestation. These are customer-authority declarations, not a substitute for consent from individuals whose data may be present.
 - Contact API requires submitted privacy choices and records them before storing an enquiry.
 - Cookie banner supports essential/analytics/marketing categories; optional categories default off and preferences dispatch a consent-change event.
 - No analytics or marketing tracker is currently loaded by the inspected app; future tracker code must not initialize until affirmative consent.
