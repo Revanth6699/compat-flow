@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     import_max_upload_bytes: int = 25 * 1024 * 1024
     connector_allowed_hosts: str = ""
     sftp_known_hosts_path: str = ""
+    connector_rate_limit_per_minute: int = 20
 
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
@@ -45,6 +46,8 @@ class Settings(BaseSettings):
 
         if self.import_max_upload_bytes > 50 * 1024 * 1024:
             raise ValueError("IMPORT_MAX_UPLOAD_BYTES cannot exceed 50 MB.")
+        if self.connector_rate_limit_per_minute < 1 or self.connector_rate_limit_per_minute > 1000:
+            raise ValueError("CONNECTOR_RATE_LIMIT_PER_MINUTE must be between 1 and 1000.")
 
         if self.app_env.lower() != "production":
             return self
