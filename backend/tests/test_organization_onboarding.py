@@ -38,7 +38,7 @@ class OnboardingDB:
 def make_identity():
     return SupabaseIdentity(
         auth_user_id=uuid4(),
-        email="owner@example.com",
+        email="admin@example.com",
         access_token="verified-access-token",
     )
 
@@ -111,7 +111,7 @@ def test_same_email_after_deletion_creates_a_fresh_identity_and_organization(mon
     deleted_auth_user_id = uuid4()
     new_identity = SupabaseIdentity(
         auth_user_id=uuid4(),
-        email="owner@example.com",
+        email="admin@example.com",
         access_token="new-verified-access-token",
     )
     assert new_identity.auth_user_id != deleted_auth_user_id
@@ -128,6 +128,6 @@ def test_same_email_after_deletion_creates_a_fresh_identity_and_organization(mon
     profile = next(item for item in db.added if isinstance(item, auth_routes.User))
     assert profile.auth_user_id == new_identity.auth_user_id
     assert profile.auth_user_id != deleted_auth_user_id
-    assert profile.email == "owner@example.com"
+    assert profile.email == "admin@example.com"
     assert organization.id == response.organization_id
     assert db.committed is True
