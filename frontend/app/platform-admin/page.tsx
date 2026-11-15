@@ -26,6 +26,8 @@ const metricCards = (data: Overview) => [
 
 export default function PlatformAdminPage() {
   const { user, loading } = useAuth();
+  const [authorizationChecked, setAuthorizationChecked] = useState(false);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [overview, setOverview] = useState<Overview | null>(null);
   const [requests, setRequests] = useState<DemoRequest[]>([]);
   const [error, setError] = useState("");
@@ -46,8 +48,11 @@ export default function PlatformAdminPage() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) { setAuthorizationChecked(true); setIsPlatformAdmin(false); return; }
     let active = true;
+    apiRequest<{ is_platform_admin?: boolean }>("/api/v1/auth/me")
+      .then((profile) => { if (active) { setIsPlatformAdmin(profile.is_platform_admin === true); setAuthorizationChecked(true); } })
+      .catch((err) => { if (active) { setError(err instanceof Error ? err.message : "Could not verify platform-owner access."); setAuthorizationChecked(true); } });
     Promise.all([
       apiRequest<Overview>("/api/v1/platform-admin/overview"),
       apiRequest<DemoRequest[]>("/api/v1/platform-admin/demo-requests"),
@@ -88,7 +93,8 @@ export default function PlatformAdminPage() {
 
   if (loading) return <main className="page"><div className="container">Checking account...</div></main>;
   if (!user) return <main className="page"><div className="container panel"><h1>Platform administration</h1><p>Sign in with the configured platform-owner account.</p><Link className="button" href="/sign-in?next=%2Fplatform-admin">Sign in</Link></div></main>;
-  if ((user.email || "").trim().toLowerCase() !== "sarvasettyrevanth.66@gmail.com") {
+  if (!authorizationChecked) return <main className="page"><div className="container">Verifying platform-owner access...</div></main>;
+  if (!isPlatformAdmin) {
     return <main className="page"><div className="container panel"><h1>Access denied</h1><p>This account is not authorized to access platform administration.</p><Link className="button button-secondary" href="/">Return to website</Link></div></main>;
   }
 
