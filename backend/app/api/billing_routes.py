@@ -20,7 +20,16 @@ from app.services.razorpay_client import (
     verify_webhook_signature,
 )
 
-router = APIRouter(prefix="/billing", tags=["billing"])
+def require_billing_enabled() -> None:
+    if not settings.billing_enabled:
+        raise HTTPException(status_code=503, detail="Billing is temporarily disabled while CompatFlow is in demo validation.")
+
+
+router = APIRouter(
+    prefix="/billing",
+    tags=["billing"],
+    dependencies=[Depends(require_billing_enabled)],
+)
 
 
 class CreateSubscriptionRequest(BaseModel):
