@@ -155,7 +155,7 @@ def _assert_industry_pipeline(parsed):
 
 def test_csv_and_json_feed_the_same_industry_pipeline():
     csv_source = parse_source(
-        b"sku,title,price,currency\\nS-1,Widget,12.50,USD\\nS-2,Gadget,8,EUR\\n",
+        b"sku,title,price,currency\nS-1,Widget,12.50,USD\nS-2,Gadget,8,EUR\n",
         "catalog.csv",
     )
     json_source = parse_source(
