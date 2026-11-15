@@ -1,0 +1,36 @@
+name: Backend industry ingestion tests
+
+on:
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-industry-ingestion-tests.yml"
+  push:
+    branches:
+      - feature/organization-first-onboarding
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-industry-ingestion-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  industry-ingestion:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Test industry mapping and all supported input parsers
+        env:
+          PYTHONPATH: .
+        run: python -m pytest -q tests/test_industry_catalog.py tests/test_ingestion_adapters.py
