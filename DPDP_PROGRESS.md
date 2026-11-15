@@ -4,6 +4,12 @@
 **Baseline:** `feature/organization-first-onboarding` at `658df92df407d628d757225f6c0ac6fb22603f65`  
 **Status:** Implementation draft; not legal certification. Legal copy is marked for counsel review.
 
+## Commencement snapshot (checked 15 November 2026)
+
+The official Gazette commencement notifications phase the Act and Rules. The main Data Fiduciary duties and rights provisions (Act sections 3–17 and related provisions) and Rules 3, 5–16, 22 and 23 are scheduled to commence 18 months after 13 November 2025, i.e. **13 May 2027**. Rule 4 commenced one year after publication, on **13 November 2026**; Rule 4 concerns Consent Manager registration/obligations, and counsel should confirm whether CompatFlow has any Consent Manager role (this implementation does not provide a Consent Manager service). The breach-notification process in Rule 7 and rights/grievance mechanisms in Rule 14 are therefore future commencement items as of this audit date. This does not remove the need to prepare now or comply with any other currently applicable law/contractual duties.
+
+Official sources: [G.S.R. 843(E), Act commencement](https://egazette.gov.in/WriteReadData/2025/267647.pdf) and [G.S.R. 846(E), DPDP Rules 2025](https://egazette.gov.in/WriteReadData/2025/267650.pdf).
+
 ## Decisions recorded
 
 1. Work is isolated on `compliance/dpdp`, based on the latest organization-onboarding code branch so current signup, tenant and catalog workflows are present. Do not merge or deploy without review.
@@ -63,7 +69,7 @@
 - **Privacy requests:** Intake records are not yet routed to a monitored mailbox/dashboard; no automated identity verification or fulfilment workflow exists.
 - **Consent proof:** Events store supplied email, purpose, choice, notice version, source and timestamp. Public intake does not independently verify control of the supplied email; stronger proof may be required.
 - **Rate limiting/abuse:** New public privacy endpoints need rate limiting, abuse monitoring and bot controls.
-- **Retention:** No complete category-specific retention schedule or automatic deletion jobs were confirmed.
+- **Retention:** No complete category-specific retention schedule or automatic deletion jobs were confirmed. Rule 6(1)(e) and Rule 8(3) include one-year retention requirements for specified security/processing logs and data once the relevant provisions commence on 13 May 2027; map exact datasets and exceptions with counsel.
 - **Provider governance:** DPA/subprocessor lists, data locations, cross-border safeguards and provider retention settings must be checked against contracts and account settings.
 - **Contact inbox:** Confirm `NEXT_PUBLIC_CONTACT_EMAIL` and `NEXT_PUBLIC_GRIEVANCE_EMAIL` resolve to monitored inboxes. Fallback is a placeholder, not verified contact.
 - **Legal entity:** Confirm operator legal name/address and formal Grievance Officer details.
@@ -74,7 +80,7 @@
 2. Whether required service-processing acknowledgement and each purpose are legally appropriate; avoid bundled/coerced consent where another lawful basis applies.
 3. Final notice contents, data-fiduciary identity, notice delivery/withdrawal requirements and children/guardian applicability.
 4. Retention schedule, deletion exceptions, backups, audit logs and legal holds.
-5. Grievance Officer appointment, contact publication and response process.
+5. Grievance Officer appointment, contact publication and response process, including the Rule 14(3) grievance-redressal mechanism and reasonable period not exceeding 90 days once applicable.
 6. Customer/fiduciary and processor roles, DPA and contractual allocation.
 7. International processing, provider contracts and transfer restrictions.
 8. Breach assessment and notification duties, current Board formats/timelines and any additional CERT-In/sectoral obligations.
@@ -96,5 +102,6 @@
 ## Verification record
 
 - Source review was performed against the organization-onboarding branch at the baseline commit above.
-- Branch changes have not yet been run through CI or deployed.
-- No production or staging database has been changed.
+- CI at source commit `56ec34024f0d28f68fc41b685c5cbbdcd97c41b3`: backend 242 passed / 4 skipped; Ruff and Bandit passed; Alembic upgrade passed; frontend lint and build passed; backend runtime image build passed; industry-ingestion suite 242 passed / 4 skipped.
+- Focused privacy endpoint tests were added after that CI run and are awaiting the latest CI result.
+- No staging or production migration/deployment has been run; no production or staging database has been changed.
