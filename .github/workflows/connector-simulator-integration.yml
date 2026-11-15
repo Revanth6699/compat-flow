@@ -70,6 +70,9 @@ jobs:
         run: |
           export SIMULATOR_SQLSERVER_URL="mssql+pyodbc://compatflow_reader:${SIMULATOR_READER_PASSWORD}@localhost:14333/CompatFlowSupplier?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no"
           python -m pytest -q tests/test_connector_simulator_integration.py
+      - name: Print supplier simulator logs on failure
+        if: failure()
+        run: docker compose -f backend/tests/connector-simulator/compose.yaml logs --no-color sql-cert-init sql-supplier
       - name: Stop and remove simulators
         if: always()
         run: docker compose -f backend/tests/connector-simulator/compose.yaml down -v
