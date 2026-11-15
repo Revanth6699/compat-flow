@@ -180,12 +180,12 @@ function BillingContent() {
 
   return (
     <>
-      <Script
+      {isAdmin && <Script
         src="https://checkout.razorpay.com/v1/checkout.js"
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}
         onError={() => setError("Razorpay Checkout could not be loaded. Check your network and content-security settings.")}
-      />
+      />}
       <main id="main" className="page">
         <div className="container account-settings">
           <header className="workspace-heading">
