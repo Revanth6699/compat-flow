@@ -2,9 +2,20 @@
 
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
+import { apiRequest } from "@/lib/auth-client";
+import { useEffect, useState } from "react";
 
 export function SiteHeader() {
   const { user, loading, signOut } = useAuth();
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setIsPlatformAdmin(false);
+    if (user) apiRequest<{ is_platform_admin?: boolean }>("/api/v1/auth/me")
+      .then((profile) => { if (active) setIsPlatformAdmin(profile.is_platform_admin === true); })
+      .catch(() => { if (active) setIsPlatformAdmin(false); });
+    return () => { active = false; };
+  }, [user]);
 
   return (
     <header className="site-header">
@@ -19,8 +30,8 @@ export function SiteHeader() {
               <Link href="/workspace">Workspace</Link>
               <Link href="/catalog/import">Catalog</Link>
               <Link href="/catalog/sources">Data sources</Link>
-              {user.email?.toLowerCase() !== "sarvasettyrevanth.66@gmail.com" && <Link href="/pricing">Plans</Link>}
-              {user.email?.toLowerCase() === "sarvasettyrevanth.66@gmail.com" && <Link href="/platform-admin">Platform admin</Link>}
+              {!isPlatformAdmin && <Link href="/pricing">Plans</Link>}
+              {isPlatformAdmin && <Link href="/platform-admin">Platform admin</Link>}
             </>
           ) : (
             <>
