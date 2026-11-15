@@ -1,0 +1,54 @@
+name: Connector simulator integration
+
+on:
+  pull_request:
+    paths:
+      - "backend/app/services/source_connectors.py"
+      - "backend/tests/connector-simulator/**"
+      - "backend/tests/test_connector_simulator_integration.py"
+      - ".github/workflows/connector-simulator-integration.yml"
+      - "backend/Dockerfile"
+      - "backend/requirements.txt"
+  push:
+    branches:
+      - feature/organization-first-onboarding
+    paths:
+      - "backend/app/services/source_connectors.py"
+      - "backend/tests/connector-simulator/**"
+      - "backend/tests/test_connector_simulator_integration.py"
+      - ".github/workflows/connector-simulator-integration.yml"
+      - "backend/Dockerfile"
+      - "backend/requirements.txt"
+
+permissions:
+  contents: read
+
+jobs:
+  simulator-integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        working-directory: backend
+        run: python -m pip install -r requirements.txt
+      - name: Start disposable supplier simulators
+        run: docker compose -f backend/tests/connector-simulator/compose.yaml up -d --wait
+      - name: Prepare local test trust and SFTP host key
+        run: |
+          mkdir -p backend/tests/connector-simulator/runtime
+          docker compose -f backend/tests/connector-simulator/compose.yaml cp rest-supplier:/run/tls/server.crt backend/tests/connector-simulator/runtime/rest-ca.crt
+          ssh-keyscan -p 2222 localhost > backend/tests/connector-simulator/runtime/known_hosts 2>/dev/null
+      - name: Run protocol integration tests
+        working-directory: backend
+        env:
+          PYTHONPATH: .
+          COMPATFLOW_CONNECTOR_SIMULATOR: "1"
+          SIMULATOR_REST_CERT: tests/connector-simulator/runtime/rest-ca.crt
+          SIMULATOR_SFTP_KNOWN_HOSTS: tests/connector-simulator/runtime/known_hosts
+        run: python -m pytest -q tests/test_connector_simulator_integration.py
+      - name: Stop and remove simulators
+        if: always()
+        run: docker compose -f backend/tests/connector-simulator/compose.yaml down -v
