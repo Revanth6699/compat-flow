@@ -239,12 +239,18 @@ def get_current_subscription(
     )
     if subscription is None:
         return {"subscription": None}
+    displayed_status = subscription.status
+    if displayed_status in {"active", "trialing"} and (
+        subscription.current_period_end is None
+        or subscription.current_period_end <= datetime.now(timezone.utc)
+    ):
+        displayed_status = "expired"
     return {
         "subscription": {
             "id": str(subscription.id),
             "plan_code": subscription.plan_code,
             "provider": subscription.provider,
-            "status": subscription.status,
+            "status": displayed_status,
             "billing_interval": subscription.billing_interval,
             "current_period_start": subscription.current_period_start,
             "current_period_end": subscription.current_period_end,
