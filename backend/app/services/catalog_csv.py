@@ -19,7 +19,7 @@ ERROR_LIMIT = 500
 # not a claim about the correctness of the underlying product data.
 HEADER_ALIASES = {
     "sku": {
-        "sku": 1.0, "product_sku": 0.98, "item_sku": 0.98,
+        "sku": 1.0, "product_sku": 0.98, "product_id": 0.98, "item_sku": 0.98,
         "product_code": 0.96, "sku_number": 0.98,
         "sku_id": 0.98, "sku_code": 0.98,
         "sku_pioneer_part_number": 0.95,
@@ -38,7 +38,7 @@ HEADER_ALIASES = {
         "product_mpn": 0.98, "google_shopping_manufacturer_part_number_mpn": 0.96, "manufacturer_part": 0.97, "mpn": 0.98,
     },
     "category": {
-        "category": 1.0, "product_category": 0.99, "category_name": 0.98, "top_category": 0.97,
+        "category": 1.0, "product_category": 0.99, "product_category_name": 0.99, "category_name": 0.98, "top_category": 0.97,
     },
     "compatibility": {
         "compatibility": 1.0, "compatible_with": 0.98,
