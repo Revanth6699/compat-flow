@@ -26,8 +26,6 @@ export default function ReviewsPage() {
     return () => { active = false; };
   }, [user]);
 
-  if (user) return <main id="main" className="page"><div className="container panel"><h1>Customer reviews</h1><p>The public reviews page is available to visitors only.</p><Link className="button button-secondary" href="/workspace">Return to workspace</Link></div></main>;
-
   const average = reviews.length ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length : 0;
   return <main id="main" className="page"><div className="container reviews-page">
     <header className="reviews-heading"><span className="eyebrow">CUSTOMER FEEDBACK</span><h1>Reviews from CompatFlow users</h1><p>Read feedback shared by people using CompatFlow for their catalog and data workflows.</p>
