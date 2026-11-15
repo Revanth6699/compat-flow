@@ -45,6 +45,8 @@ services:
     command:
       - |
         set -euo pipefail
+        cp /tls/ca.crt /usr/local/share/ca-certificates/compatflow-simulator-ca.crt
+        update-ca-certificates
         chown mssql:mssql /tls/sql-server.crt /tls/sql-server.key
         chmod 440 /tls/sql-server.crt /tls/sql-server.key
         /opt/mssql/bin/mssql-conf set network.tlscert /tls/sql-server.crt
