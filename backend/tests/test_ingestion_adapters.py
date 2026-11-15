@@ -187,3 +187,34 @@ def test_parse_source_rejects_input_over_source_byte_limit(monkeypatch):
     monkeypatch.setattr("app.services.ingestion_adapters.MAX_SOURCE_BYTES", 4)
     with pytest.raises(IngestionParseError, match="maximum source byte limit"):
         parse_source(b"12345", "catalog.csv")
+
+
+
+def test_excel_rejects_extreme_header_row_and_physical_sheet_dimensions():
+    openpyxl = pytest.importorskip("openpyxl")
+    output = io.BytesIO()
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["sku", "name"])
+    sheet.append(["001", "Widget"])
+    sheet["A20"] = "outside-bound"
+    workbook.save(output)
+    with pytest.raises(IngestionParseError, match="header_row"):
+        parse_excel(output.getvalue(), ".xlsx", header_row=1001)
+    with pytest.raises(IngestionParseError, match="dimensions"):
+        parse_excel(output.getvalue(), ".xlsx", max_records=10)
+
+
+def test_json_rejects_excessive_nesting_without_leaking_recursion_error():
+    payload = ("[" * 1200 + "{}" + "]" * 1200).encode()
+    with pytest.raises(IngestionParseError, match="valid UTF-8 JSON"):
+        parse_json(payload)
+
+
+def test_xml_rejects_nested_fields_deeper_than_supported():
+    payload = (
+        b"<Records><Record><details><manufacturer><name>Acme</name>"
+        b"</manufacturer></details></Record></Records>"
+    )
+    with pytest.raises(IngestionParseError, match="supported nesting depth"):
+        parse_xml(payload)
