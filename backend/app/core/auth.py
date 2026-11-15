@@ -175,11 +175,19 @@ def get_active_plan(current: AuthenticatedUser, db: Session):
     return subscription, plan
 
 
+def is_platform_admin(current: AuthenticatedUser) -> bool:
+    """Return true only for the verified identity on the configured platform-admin allowlist."""
+    allowed_email = settings.platform_admin_email.strip().lower()
+    return bool(allowed_email) and current.identity.email.strip().lower() == allowed_email
+
+
 def require_plan_feature(feature: str):
     def dependency(
         current: AuthenticatedUser = Depends(get_current_user),
         db: Session = Depends(get_db),
     ) -> AuthenticatedUser:
+        if is_platform_admin(current):
+            return current
         subscription, plan = get_active_plan(current, db)
         if subscription is None or plan is None:
             raise HTTPException(status_code=402, detail="An active CompatFlow subscription is required to access this feature.")
@@ -200,6 +208,8 @@ def require_demo_or_paid_access():
         current: AuthenticatedUser = Depends(get_current_user),
         db: Session = Depends(get_db),
     ) -> AuthenticatedUser:
+        if is_platform_admin(current):
+            return current
         subscription, plan = get_active_plan(current, db)
         if subscription is not None and plan is not None and bool((plan.entitlements or {}).get("csv_validation", False)):
             return current
