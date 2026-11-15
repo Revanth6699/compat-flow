@@ -316,7 +316,7 @@ def fetch_sftp_file(
             try:
                 client.close()
             except Exception:
-                pass
+                raise SourceConnectorError("SFTP session cleanup failed.") from None
 
 
 def _coerce_watermark(value: str, column: Any) -> Any:
