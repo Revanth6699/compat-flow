@@ -6,6 +6,15 @@ import { apiRequest } from "@/lib/auth-client";
 
 
 type DatasetProfile = { filename: string; format: string; total_records: number; total_columns: number; total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number; duplicate_rows: number; is_product_catalog: boolean; persisted: false; columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string; minimum: number | null; maximum: number | null; average: number | null }[]; preview: Record<string, unknown>[] };
+type IndustryResult = {
+  filename: string; profile_id: string | null; profile_detection: { profile_id: string | null; confidence: number; scores: Record<string, number>; needs_confirmation: boolean };
+  requires_profile_confirmation: boolean; total_rows: number; valid_rows: number; invalid_rows: number;
+  validation_pass_rate: number; column_mappings: { field: string; source_header: string; confidence: number }[];
+  unmapped_headers: string[]; field_metrics: { field: string; applicable: boolean; populated: number; missing: number; completeness_pct: number }[];
+  issues: { row_number: number; field: string | null; error_code: string; message: string; severity: string }[];
+  preview: Record<string, unknown>[]; metrics: { mapping_coverage_pct: number; validation_pass_rate_pct: number; issue_count: number; critical_issue_count: number; warning_issue_count: number };
+  persisted: false; validation_scope: string;
+};
 type PreviewRow = {
   sku: string; name: string; manufacturer: string; part_number: string;
   category: string; compatibility?: string | null; replacement_sku?: string | null;
@@ -65,6 +74,7 @@ export default function CatalogImportPage() {
   const [result, setResult] = useState<PreviewResponse | null>(null);
   const [datasetResult, setDatasetResult] = useState<DatasetProfile | null>(null);
   const [multiResult, setMultiResult] = useState<MultiResult | null>(null);
+  const [industryResult, setIndustryResult] = useState<IndustryResult | null>(null);
   const [recordType, setRecordType] = useState("products");
   const [aiConsent, setAiConsent] = useState(false);
   const [aiResult, setAiResult] = useState<AiMappingResult | null>(null);
@@ -75,7 +85,7 @@ export default function CatalogImportPage() {
   const canonicalFields = ["sku", "name", "manufacturer", "part_number", "category", "compatibility", "replacement_sku"];
 
   function handleFileChange(selectedFile: File | null) {
-    setFile(selectedFile); setResult(null); setDatasetResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setManualMapping({}); setError("");
+    setFile(selectedFile); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setAiResult(null); setAiConsent(false); setManualMapping({}); setError("");
     if (!selectedFile) return;
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
     const allowed = demoApproved ? ["csv", "xlsx", "xls"] : ["csv", "xlsx", "xls", "json", "xml"];
@@ -92,13 +102,19 @@ export default function CatalogImportPage() {
 
   async function handleValidate() {
     if (!file || loading || !user) return;
-    setLoading(true); setError(""); setResult(null); setDatasetResult(null); setMultiResult(null);
+    setLoading(true); setError(""); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
       const extension = file.name.split(".").pop()?.toLowerCase();
 
       if (demoApproved) {
+        if (extension === "csv") {
+          if (profileId) formData.append("profile_id", profileId);
+          const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/preview-industry", { method: "POST", body: formData });
+          setIndustryResult(data);
+          return;
+        }
         const profile = await apiRequest<DatasetProfile>("/api/v1/catalog/import/profile", { method: "POST", body: formData });
         if (!profile.is_product_catalog) { setDatasetResult(profile); return; }
         if (extension === "csv") {
@@ -111,6 +127,13 @@ export default function CatalogImportPage() {
           const data = await apiRequest<MultiResult>("/api/v1/catalog/import/preview-records", { method: "POST", body: formData });
           setMultiResult(data);
         }
+        return;
+      }
+
+      if (extension === "csv") {
+        if (profileId) formData.append("profile_id", profileId);
+        const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/validate-industry", { method: "POST", body: formData });
+        setIndustryResult(data);
         return;
       }
 
@@ -222,7 +245,7 @@ export default function CatalogImportPage() {
         </div>
 
         <section className="panel import-panel">
-          <h2>Catalog file validation</h2>
+          <h2>Multi-industry catalog validation</h2>
           <p className="import-description">{demoApproved ? "Approved demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file." : "Subscribed validation: file limits and formats are controlled by your active plan."}</p>
           <div className="import-description">
             {demoApproved ? "Approved demo access is stateless and does not save uploaded files." : "CompatFlow detects common supplier product fields and applies the validation features available on your plan."}
@@ -230,6 +253,14 @@ export default function CatalogImportPage() {
           <p className="import-description">Files are validated in memory. This preview does not save files or commit records to your organization catalog.</p>
           {demoApproved && <p className="column-hint">Non-product datasets are profiled using their actual columns; CompatFlow will not label them as invalid product catalogs or invent a product quality score.</p>}
           {demoApproved && <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>}
+          <label className="field-label" htmlFor="industry-profile">Industry profile</label>
+          <select id="industry-profile" className="form-control" value={profileId} onChange={(event) => { setProfileId(event.target.value); setIndustryResult(null); }}>
+            <option value="">Detect industry automatically</option>
+            <option value="d2c">D2C brands</option><option value="ecommerce">Ecommerce / marketplaces</option>
+            <option value="automotive">Automotive aftermarket</option><option value="electronics">Electronics</option>
+            <option value="industrial">Industrial / MRO</option><option value="wholesale">Wholesale / distribution</option>
+          </select>
+          <p className="import-description">CSV files use industry-specific mapping and validation. Select a profile or let CompatFlow infer one from the column evidence.</p>
           <label className="file-picker" htmlFor="catalog-file">
             <span className="file-picker-icon" aria-hidden="true">↥</span>
             <strong>{file ? file.name : "Choose a catalog file"}</strong>
@@ -259,6 +290,25 @@ export default function CatalogImportPage() {
             {aiResult && <><p className="import-description">{aiResult.message} {aiResult.source_data_sent ? "Sample evidence was sent to the configured provider." : "No sample evidence was sent."}</p>
               {aiResult.suggestions.length > 0 && <><ul className="error-list">{aiResult.suggestions.map((item, index) => <li key={index}><strong>{item.source_header} → {item.candidate_field}</strong> (model-reported {Math.round(item.confidence * 100)}%, uncalibrated): {item.rationale}<br />Evidence: {item.evidence.join("; ")}</li>)}</ul>
                 <button className="button button-secondary" type="button" onClick={applyAiSuggestions}>Apply suggestions to mapping form</button></>}
+            </>}
+          </section>
+        )}
+        {industryResult && (
+          <section className="import-results" aria-live="polite">
+            <div className="results-heading"><div><div className="eyebrow">Industry validation complete</div><h2>{industryResult.profile_id ? industryResult.profile_id.replaceAll("_", " ") : "Industry needs confirmation"}</h2><p>{industryResult.filename} · {industryResult.total_rows.toLocaleString()} rows · Stateless preview</p></div><span className={industryResult.profile_id ? "result-status success" : "result-status warning"}>{industryResult.profile_id ? "Profile applied" : "Choose an industry profile"}</span></div>
+            {industryResult.requires_profile_confirmation && <p className="column-hint">Automatic detection did not find enough distinct evidence. Select the correct profile and validate again.</p>}
+            {industryResult.profile_id && <>
+              <div className="result-stats">
+                <div className="panel stat-card"><span>Total rows</span><strong>{industryResult.total_rows.toLocaleString()}</strong></div>
+                <div className="panel stat-card"><span>Valid rows</span><strong className="metric-valid">{industryResult.valid_rows.toLocaleString()}</strong></div>
+                <div className="panel stat-card"><span>Invalid rows</span><strong className="metric-invalid">{industryResult.invalid_rows.toLocaleString()}</strong></div>
+                <div className="panel stat-card"><span>Mapping coverage</span><strong>{industryResult.metrics.mapping_coverage_pct.toFixed(1)}%</strong></div>
+                <div className="panel stat-card"><span>Pass rate</span><strong>{industryResult.validation_pass_rate.toFixed(1)}%</strong></div>
+                <div className="panel stat-card"><span>Issues</span><strong>{industryResult.metrics.issue_count.toLocaleString()}</strong></div>
+              </div>
+              <div className="panel result-section"><h3>Detected column mappings</h3><div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical field</th><th>Source column</th><th>Confidence</th></tr></thead><tbody>{industryResult.column_mappings.map((item) => <tr key={item.field}><td>{item.field}</td><td>{item.source_header}</td><td>{(item.confidence * 100).toFixed(0)}%</td></tr>)}</tbody></table></div>{industryResult.unmapped_headers.length > 0 && <p className="import-description">Unmapped source columns retained: {industryResult.unmapped_headers.join(", ")}</p>}</div>
+              <div className="panel result-section"><h3>Applicable field completeness</h3><div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead><tbody>{industryResult.field_metrics.map((item) => <tr key={item.field}><td>{item.field}</td><td>{item.populated}</td><td>{item.missing}</td><td>{item.completeness_pct.toFixed(1)}%</td></tr>)}</tbody></table></div></div>
+              <div className="panel result-section"><h3>Validation issues</h3>{industryResult.issues.length === 0 ? <p>No issues detected by the current profile rules.</p> : <ul className="error-list">{industryResult.issues.slice(0, 50).map((item, index) => <li key={index}><strong>Row {item.row_number} · {item.field ?? "Record"}</strong>: {item.message} ({item.severity})</li>)}</ul>}<h3>Source-preserving preview</h3>{industryResult.preview.map((row, index) => <pre key={index} className="code-preview">{JSON.stringify(row, null, 2)}</pre>)}<p className="import-disclaimer">External vehicle fitment, certification, taxonomy and compatibility reference checks are not included. No records are saved.</p></div>
             </>}
           </section>
         )}
