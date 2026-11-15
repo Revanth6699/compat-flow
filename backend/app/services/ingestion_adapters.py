@@ -292,7 +292,7 @@ def _local_name(tag: str) -> str:
 
 
 def parse_xml(data: bytes, *, record_tag: str | None = None,
-              max_records: int = MAX_RECORDS) -> ParsedSource:
+              max_records: int | None = MAX_RECORDS) -> ParsedSource:
     _check_source_size(data)
     try:
         root = fromstring(data)
@@ -407,8 +407,8 @@ def parse_xml(data: bytes, *, record_tag: str | None = None,
 def parse_source(data: bytes, filename: str, *, sheet_name: str | None = None,
                  header_row: int = 1, json_record_path: str | None = None,
                  xml_record_tag: str | None = None,
-                 max_records: int = MAX_RECORDS) -> ParsedSource:
-    """Dispatch a bounded file upload to its parser based on its extension."""
+                 max_records: int | None = MAX_RECORDS) -> ParsedSource:
+    """Dispatch a size-bounded file upload to its parser based on its extension."""
     _check_source_size(data)
     extension = PurePosixPath(filename.replace("\\", "/")).suffix.lower()
     if not extension:
