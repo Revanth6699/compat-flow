@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from app.core.auth import AuthenticatedUser, require_demo_or_paid_access, require_permission, require_plan_feature
 from app.core.database import get_db
@@ -465,7 +465,7 @@ async def suggest_multiformat_mappings(
             json_record_path=json_record_path, xml_record_tag=xml_record_tag,
         )
         db.add(PrivacyConsentEvent(
-            id=__import__("uuid").uuid4(), email=_current.identity.email,
+            id=uuid4(), email=_current.identity.email,
             purpose="ai_mapping", granted=ai_opt_in, notice_version="2026-11-15-draft",
             source="ai_mapping_action",
         ))
