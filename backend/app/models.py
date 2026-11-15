@@ -561,3 +561,36 @@ class DemoAccessRequest(Base):
     reviewed_by: Mapped[str | None] = mapped_column(String(320))
     reviewed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PrivacyConsentEvent(Base):
+    """Append-only record of a purpose-specific consent choice."""
+    __tablename__ = "privacy_consent_events"
+    __table_args__ = (
+        CheckConstraint("purpose IN ('service_processing', 'product_updates', 'ai_mapping')", name="ck_privacy_consent_purpose"),
+        Index("ix_privacy_consent_email_purpose_time", "email", "purpose", "recorded_at"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(320), nullable=False, index=True)
+    purpose: Mapped[str] = mapped_column(String(40), nullable=False)
+    granted: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    notice_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    source: Mapped[str] = mapped_column(String(80), nullable=False)
+    recorded_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class DataRightsRequest(Base):
+    """Privacy/data-principal request intake; fulfilment is a separate verified workflow."""
+    __tablename__ = "data_rights_requests"
+    __table_args__ = (
+        CheckConstraint("request_type IN ('access', 'correction', 'erasure', 'withdraw_consent', 'grievance')", name="ck_data_rights_request_type"),
+        CheckConstraint("status IN ('received', 'identity_verification', 'in_review', 'completed', 'rejected')", name="ck_data_rights_request_status"),
+        Index("ix_data_rights_requests_email_created", "email", "created_at"),
+    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    request_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    details: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="received", server_default="received")
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
