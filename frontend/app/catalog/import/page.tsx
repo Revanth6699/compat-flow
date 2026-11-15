@@ -94,7 +94,7 @@ export default function CatalogImportPage() {
       setError(demoApproved ? "Approved demo supports CSV, XLSX and XLS only." : "Supported formats: CSV, XLSX, XLS, JSON and XML. Your plan determines which formats you can process.");
       return;
     }
-    const limitMb = demoApproved ? 5 : 25;
+    const limitMb = 25;
     if (selectedFile.size > limitMb * 1024 * 1024) {
       setFile(null); setError(`The file exceeds the ${limitMb} MB limit for this access level.`);
     }
@@ -214,7 +214,7 @@ export default function CatalogImportPage() {
 
         <section className="panel import-panel">
           <h2>Multi-industry catalog validation</h2>
-          <p className="import-description">{demoApproved ? "Approved demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file." : "Subscribed validation: file limits and formats are controlled by your active plan."}</p>
+          <p className="import-description">{demoApproved ? "Approved demo: CSV, XLS and XLSX · Maximum 25 MB per file · No demo record-count cap." : "Subscribed validation: file limits and formats are controlled by your active plan."}</p>
           <div className="import-description">
             {demoApproved ? "Approved demo access is stateless and does not save uploaded files." : "CompatFlow detects common supplier product fields and applies the validation features available on your plan."}
           </div>
