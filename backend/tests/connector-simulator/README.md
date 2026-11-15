@@ -16,6 +16,7 @@ docker compose -f backend/tests/connector-simulator/compose.yaml run --rm sql-in
 mkdir -p backend/tests/connector-simulator/runtime
 docker compose -f backend/tests/connector-simulator/compose.yaml cp rest-supplier:/run/tls/server.crt backend/tests/connector-simulator/runtime/rest-ca.crt
 docker compose -f backend/tests/connector-simulator/compose.yaml cp sql-supplier:/tls/ca.crt backend/tests/connector-simulator/runtime/sql-ca.crt
+export SSL_CERT_FILE="$(pwd)/backend/tests/connector-simulator/runtime/sql-ca.crt"
 ssh-keyscan -p 2222 localhost > backend/tests/connector-simulator/runtime/known_hosts
 ```
 
@@ -29,12 +30,12 @@ SELECT permission only. A disposable local CA signs a SQL Server certificate who
 SAN covers `localhost` and `sql-supplier`; the SQL Server container forces TLS 1.2.
 The CA private key is generated outside the shared volume and discarded after signing.
 The CI test verifies the CA chain with OpenSSL, then uses Microsoft ODBC Driver 18
-strict encryption (`Encrypt=strict`) with the exact server certificate pinned via
-`ServerCertificate`. Strict encryption uses TDS 8.0 and requires SQL Server 2022+
-and ODBC Driver 18.1.2.1+. Do not replace this with `TrustServerCertificate=yes`.
-The seed step uses the SQL tools image's `-C` option only for initial synthetic
-database setup; the actual connector integration test validates the pinned
-certificate as part of the strict TLS handshake.
+with `Encrypt=yes`, `TrustServerCertificate=no`, and
+`HostNameInCertificate=sql-supplier`. The client trust file is set explicitly
+through `SSL_CERT_FILE`; certificate validation is not bypassed. Do not replace
+this with `TrustServerCertificate=yes`. The seed step uses the SQL tools image's
+`-C` option only for initial synthetic database setup; the actual connector
+integration test performs CA-chain and hostname verification.
 
 ## Run REST, SFTP and SQL Server protocol tests
 
@@ -45,7 +46,8 @@ cd backend
 PYTHONPATH=. COMPATFLOW_CONNECTOR_SIMULATOR=1 \
 SIMULATOR_REST_CERT=tests/connector-simulator/runtime/rest-ca.crt \
 SIMULATOR_SFTP_KNOWN_HOSTS=tests/connector-simulator/runtime/known_hosts \
-SIMULATOR_SQLSERVER_URL="mssql+pyodbc://compatflow_reader:${SIMULATOR_READER_PASSWORD}@localhost:14333/CompatFlowSupplier?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=strict&ServerCertificate=tests/connector-simulator/runtime/sql-server.crt" \
+SSL_CERT_FILE=tests/connector-simulator/runtime/sql-ca.crt \\
+SIMULATOR_SQLSERVER_URL="mssql+pyodbc://compatflow_reader:${SIMULATOR_READER_PASSWORD}@localhost:14333/CompatFlowSupplier?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&HostNameInCertificate=sql-supplier" \
 python -m pytest -q tests/test_connector_simulator_integration.py
 ```
 
