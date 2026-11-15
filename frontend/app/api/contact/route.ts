@@ -4,11 +4,16 @@ const emailPattern=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export async function POST(request:Request){
  try{
   const body=await request.json();
+  if(body.privacy_notice_acknowledged!==true||typeof body.marketing_consent!=="boolean")return NextResponse.json({error:"Please submit your privacy choices."},{status:400});
   const name=String(body.name||"").trim(),email=String(body.email||"").trim().toLowerCase(),organization=String(body.organization||"").trim(),role=String(body.role||"").trim(),message=String(body.message||"").trim(),website=String(body.website||"").trim(),intent=body.intent==="demo"?"demo":"general";
   if(website)return NextResponse.json({ok:true});
   if(!name||name.length>120||!emailPattern.test(email)||email.length>254||!organization||organization.length>160||!role||role.length>120||message.length<10||message.length>3000){
    return NextResponse.json({error:"Please complete all required fields with valid information."},{status:400});
   }
+  const apiBase=process.env.NEXT_PUBLIC_API_BASE_URL;
+  if(!apiBase?.startsWith("https://"))return NextResponse.json({error:"Privacy processing is not configured. Please try again later."},{status:503});
+  const consent=await fetch(`${apiBase.replace(/\/$/,"")}/api/v1/privacy/consents`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,purposes:{service_processing:true,product_updates:body.marketing_consent},source:"contact_form"})});
+  if(!consent.ok)return NextResponse.json({error:"We could not record your privacy choices. Please try again."},{status:502});
   if(intent==="demo"){
    const apiBase=process.env.NEXT_PUBLIC_API_BASE_URL;
    if(!apiBase?.startsWith("https://"))return NextResponse.json({error:"Demo requests are not configured. Please try again later."},{status:503});

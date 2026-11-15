@@ -1,17 +1,21 @@
-# Razorpay Subscriptions Setup
+# Razorpay Subscription Setup
 
-CompatFlow uses Razorpay Subscriptions for recurring billing. Do not use Razorpay one-time Orders for plan subscriptions.
+CompatFlow uses Razorpay Subscriptions for recurring plan billing. Do not use one-time Razorpay Orders for subscriptions.
 
-## Required backend environment variables
+## Backend configuration
 
-Set these on the backend service (never expose the secret values to the frontend):
+Set these variables on the backend service. Do not expose their values to the frontend.
 
 - `RAZORPAY_KEY_ID`
 - `RAZORPAY_KEY_SECRET`
 - `RAZORPAY_WEBHOOK_SECRET`
 - `RAZORPAY_PLAN_IDS_JSON`
 
-`RAZORPAY_PLAN_IDS_JSON` maps each CompatFlow plan and billing interval to a Razorpay Plan ID. Example with placeholder IDs:
+### Plan ID mapping
+
+`RAZORPAY_PLAN_IDS_JSON` maps each CompatFlow plan and billing interval to a Razorpay Plan ID.
+
+The following is an example with placeholder IDs:
 
 ```json
 {
@@ -26,17 +30,21 @@ Set these on the backend service (never expose the secret values to the frontend
 }
 ```
 
-Create the corresponding plans in Razorpay Dashboard under **Subscriptions → Plans**. Existing Razorpay plans are immutable; create a new plan when price or billing frequency changes. Set the actual currency and amount deliberately. CompatFlow's seeded plan prices are currently stored in USD; do not convert them to INR or assume that a Razorpay merchant account has international recurring-card access. Confirm the account's enabled currencies and recurring payment methods before creating live plans.
+Create the matching plans in the Razorpay Dashboard under **Subscriptions → Plans**.
 
-Use test-mode plan IDs with test-mode API keys. Do not mix test and live IDs.
+Razorpay plans cannot be edited after creation. Create a new plan when the price or billing frequency changes, and set the currency and amount deliberately.
 
-## Webhook configuration
+The seeded CompatFlow plan prices are currently stored in USD. Do not convert them to INR or assume the merchant account supports international recurring-card payments. Check the account's enabled currencies and recurring payment methods before creating live plans.
 
-Configure this endpoint in Razorpay Dashboard:
+Use test plan IDs with test API keys and live plan IDs with live API keys. Do not mix environments.
+
+## Webhook setup
+
+Configure this endpoint in the Razorpay Dashboard:
 
 `POST https://<your-backend-host>/api/v1/billing/webhooks/razorpay`
 
-Set a webhook secret and configure these subscription events:
+Set a webhook secret and subscribe to these events:
 
 - `subscription.authenticated`
 - `subscription.activated`
@@ -48,23 +56,25 @@ Set a webhook secret and configure these subscription events:
 - `subscription.cancelled`
 - `subscription.completed`
 
-Copy the same webhook secret into `RAZORPAY_WEBHOOK_SECRET`. Signature verification uses the original raw request bytes and the `X-Razorpay-Signature` header. Event deduplication uses `x-razorpay-event-id`.
+Set the same secret as `RAZORPAY_WEBHOOK_SECRET`.
 
-## API flow
+The backend verifies the signature against the original request bytes and the `X-Razorpay-Signature` header. It uses `x-razorpay-event-id` to detect duplicate events.
+
+## Subscription flow
 
 1. An organization owner calls `POST /api/v1/billing/subscriptions` with `plan_code`, `billing_interval`, and `total_count`.
-2. The backend creates the Razorpay subscription and returns the provider subscription ID and public key ID for Razorpay Checkout.
-3. The frontend submits `razorpay_payment_id`, `razorpay_subscription_id`, and `razorpay_signature` to `POST /api/v1/billing/subscriptions/verify-checkout`, along with the local `subscription_id`.
-4. Checkout signature verification does not itself activate entitlements. The backend waits for the verified `subscription.activated` webhook.
-5. Razorpay renewal, failure, pause, resume, and cancellation events update the local subscription and payment records.
-6. Owners can request cancellation through `POST /api/v1/billing/subscriptions/{subscription_id}/cancel`. Razorpay's webhook remains authoritative for the final state.
+2. The backend creates the Razorpay subscription and returns the provider subscription ID and public key ID for Checkout.
+3. The frontend sends `razorpay_payment_id`, `razorpay_subscription_id`, and `razorpay_signature` to `POST /api/v1/billing/subscriptions/verify-checkout`, together with the local `subscription_id`.
+4. A valid Checkout signature does not activate entitlements. The backend waits for a verified `subscription.activated` webhook.
+5. Renewal, failure, pause, resume, and cancellation events update the local subscription and payment records.
+6. An owner can request cancellation through `POST /api/v1/billing/subscriptions/{subscription_id}/cancel`. The webhook remains authoritative for the final subscription state.
 
 Monthly subscriptions allow up to 120 billing cycles; yearly subscriptions allow up to 10. A new subscription cannot be created while the organization has an unresolved active, trialing, pending, or past-due subscription.
 
-## Not yet enabled
+## Current setup gaps
 
 - No Razorpay credentials or plan IDs are committed to the repository.
-- No live/test Dashboard webhook has been configured or delivered to the backend.
+- A test or live Dashboard webhook has not been confirmed as configured and successfully delivered to the backend.
 - No real customer payment has been run.
-- Plan changes are not automated. Razorpay's upgrade/downgrade support depends on payment method and account eligibility; do not assume that UPI AutoPay, eMandate, and card subscriptions have identical update behavior.
-- Refund initiation and reconciliation are not exposed as customer-facing APIs yet.
+- Plan upgrades and downgrades are not automated. Behavior depends on the payment method and account eligibility. UPI AutoPay, eMandate, and card subscriptions should not be assumed to behave identically.
+- Refund initiation and reconciliation are not available through customer-facing APIs.

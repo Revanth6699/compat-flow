@@ -239,6 +239,11 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   }
   if (response.status === 204) return undefined as T;
   const data = await response.json().catch(() => ({}));
+  if (response.status === 401) {
+    // A deleted Supabase identity can no longer use its old access or refresh
+    // tokens. Clear the browser session instead of leaving a stale signed-in UI.
+    await signOut();
+  }
   if (!response.ok) throw new ApiRequestError(response.status, data.detail || data.message || "The request could not be completed.");
   return data as T;
 }

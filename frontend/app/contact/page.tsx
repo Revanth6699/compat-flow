@@ -9,12 +9,13 @@ function ContactForm() {
  const planLabel=["starter","growth","business","enterprise"].includes(requestedPlan)?requestedPlan.charAt(0).toUpperCase()+requestedPlan.slice(1):"CompatFlow";
  const [status,setStatus]=useState<"idle"|"sending"|"success"|"error">("idle");
  const [message,setMessage]=useState("");
+ const [serviceConsent,setServiceConsent]=useState(false); const [productUpdates,setProductUpdates]=useState(false);
  const [form,setForm]=useState({name:"",email:"",organization:"",role:"",message:isPricing?`I am interested in the ${planLabel} plan. My team needs...`:"",website:""});
  function update(field:keyof typeof form,value:string){setForm(current=>({...current,[field]:value}));}
  async function submit(event:React.FormEvent<HTMLFormElement>){
-  event.preventDefault();if(status==="sending")return;setStatus("sending");setMessage("");
+  event.preventDefault();if(status==="sending")return;if(!serviceConsent){setStatus("error");setMessage("Please acknowledge the Privacy Notice and required processing purpose.");return;}setStatus("sending");setMessage("");
   try{
-   const response=await fetch("/api/contact",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,intent:isDemo?"demo":"general"})});
+   const response=await fetch("/api/contact",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,intent:isDemo?"demo":"general",privacy_notice_acknowledged:true,marketing_consent:productUpdates})});
    const data=await response.json();
    if(!response.ok)throw new Error(data.error||"We could not submit your message. Please try again.");
    setStatus("success");setMessage(isDemo?"Your demo request has been received. Access is not automatic; requests are reviewed before invitations are sent.":"Your message has been received. We will review it and get back to you.");
@@ -34,6 +35,7 @@ function ContactForm() {
       <div className="contact-field contact-field-full"><label htmlFor="contact-message">Message *</label><textarea id="contact-message" name="message" required minLength={10} maxLength={3000} value={form.message} onChange={e=>update("message",e.target.value)} placeholder={isDemo?"Tell us about your catalog workflow and what you would like to evaluate.":isPricing?`I am interested in the ${planLabel} plan. My team needs...`:"How can we help?"} /></div>
       <div className="contact-honeypot" aria-hidden="true"><label htmlFor="contact-website">Leave this field empty</label><input id="contact-website" tabIndex={-1} autoComplete="off" value={form.website} onChange={e=>update("website",e.target.value)} /></div>
      </div>
+     <div className="privacy-consent-field"><label><input type="checkbox" required checked={serviceConsent} onChange={e=>setServiceConsent(e.target.checked)} /> I acknowledge the <a href="/privacy">Privacy Notice</a> and agree to processing needed to respond to this enquiry. *</label><label><input type="checkbox" checked={productUpdates} onChange={e=>setProductUpdates(e.target.checked)} /> Send me optional product updates. I can withdraw this choice later.</label></div>
      <div className="contact-submit-row"><button className="button" type="submit" disabled={status==="sending"}>{status==="sending"?"Submitting...":isDemo?"Submit demo request":"Send message"}</button><span className={`contact-status ${status}`} role="status">{message}</span></div>
     </form>
     <aside className="contact-aside"><h2>{isDemo?"What happens next?":isPricing?"Plan enquiry":"Talk to CompatFlow"}</h2><p>{isDemo?"We review each request individually. If approved, an invitation will be sent to the email address you provided. Submitting this form does not grant demo access.":isPricing?`Your enquiry is submitted to CompatFlow for review. No email application is needed.`:"Share the context of your supplier catalog workflow and the question you are trying to solve. We will review your message and respond by email."}</p><a href={`mailto:${process.env.NEXT_PUBLIC_CONTACT_EMAIL||"sarvasettyrevanth.66@gmail.com"}`}>Email CompatFlow</a></aside>

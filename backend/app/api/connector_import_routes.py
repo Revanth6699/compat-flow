@@ -37,6 +37,7 @@ class ConnectorImportRequest(BaseModel):
         "products", "product_variants", "supplier_offers",
         "inventory_snapshots", "product_identifiers",
     ]
+    authorized_data_processing: bool = False
     column_mapping: dict[str, str] | None = None
 
     # REST API: endpoint host must be in CONNECTOR_ALLOWED_HOSTS.
@@ -255,6 +256,8 @@ async def preview_connector_import(
     _current: AuthenticatedUser = Depends(require_permission("catalog:read")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
 ):
+    if not payload.authorized_data_processing:
+        raise HTTPException(status_code=422, detail="Confirm authorization to retrieve and process this supplier data.")
     await _enforce_connector_rate_limit(_current.profile.organization_id)
     try:
         raw, filename = await _load_source(payload)
@@ -280,6 +283,8 @@ async def commit_connector_import(
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
+    if not payload.authorized_data_processing:
+        raise HTTPException(status_code=422, detail="Confirm authorization to retrieve and process this supplier data.")
     await _enforce_connector_rate_limit(current.profile.organization_id)
     try:
         raw, filename = await _load_source(payload)

@@ -1,8 +1,11 @@
-# Column-Mapping Dataset Audit
+# Column Mapping Dataset Audit
 
-Status: in progress  
-Branch: `feature/backend-auth-authorization`  
-Purpose: inspect real-world CSV headers individually and use observed evidence to improve column mapping without guessing.
+This is a research log of public datasets inspected while developing the column-mapping rules. Each entry records the source, observed fields, and decisions that can safely be made from the available evidence.
+
+The entries are historical observations, not a description of current runtime support. The original inspection work was carried out on `feature/backend-auth-authorization`; that provenance is retained for reference. For current behavior, see [Multi-source ingestion](multi-source-ingestion.md), [Catalog record model](catalog-record-model.md), and [Column mapping suggestions](column-mapping-ai-design.md).
+
+**Status:** Ongoing research log  
+**Original branch:** `feature/backend-auth-authorization`
 
 ## Inspection rules
 
@@ -103,7 +106,7 @@ Purpose: inspect real-world CSV headers individually and use observed evidence t
 6. `brand`, `brand_name`, and `vendor` should not be treated as equivalent to legal manufacturer at full confidence.
 7. Several datasets have useful fields outside the current canonical model: barcode/GTIN, price, currency, stock, availability, URLs, variant IDs, and provenance. These should not be forced into existing canonical fields.
 
-## Next work
+## Further research
 
 Continue inspecting datasets individually and append each verified file here. After the sample is broad enough, decide whether to add source profiles, context-aware mapping, optional-field support, delimiter detection, and an explicit duplicate-header workflow. Then update implementation and regression tests together.
 

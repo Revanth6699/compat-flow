@@ -77,6 +77,7 @@ export default function CatalogImportPage() {
   const [industryResult, setIndustryResult] = useState<IndustryResult | null>(null);
   const [recordType, setRecordType] = useState("products");
   const [aiConsent, setAiConsent] = useState(false);
+  const [dataUseAcknowledged, setDataUseAcknowledged] = useState(false);
   const [aiResult, setAiResult] = useState<AiMappingResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -102,6 +103,7 @@ export default function CatalogImportPage() {
 
   async function handleValidate() {
     if (!file || loading || !user) return;
+    if (!dataUseAcknowledged) { setError("Confirm that you are authorized to submit this file and have removed unnecessary personal data."); return; }
     setLoading(true); setError(""); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null);
     try {
       const formData = new FormData();
@@ -125,6 +127,7 @@ export default function CatalogImportPage() {
 
   async function handleSuggestMappings() {
     if (!file || !user || !aiConsent || loading) return;
+    if (!dataUseAcknowledged) { setError("Confirm that you are authorized to submit this file and have removed unnecessary personal data."); return; }
     setLoading(true); setError(""); setAiResult(null);
     try {
       const formData = new FormData();
@@ -229,6 +232,7 @@ export default function CatalogImportPage() {
             <option value="industrial">Industrial / MRO</option><option value="wholesale">Wholesale / distribution</option>
           </select>
           <p className="import-description">CSV, XLS, XLSX, JSON and XML files use the same industry-specific mapping and validation pipeline. Select a profile or let CompatFlow infer one from the extracted column evidence.</p>
+          <div className="privacy-consent-field"><label><input type="checkbox" checked={dataUseAcknowledged} onChange={event => setDataUseAcknowledged(event.target.checked)} /> I confirm that my organization is authorized to submit this file, that it is necessary for the requested catalog workflow, and that unnecessary personal data has been removed. *</label></div>
           <label className="file-picker" htmlFor="catalog-file">
             <span className="file-picker-icon" aria-hidden="true">↥</span>
             <strong>{file ? file.name : "Choose a catalog file"}</strong>

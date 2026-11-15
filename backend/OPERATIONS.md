@@ -1,81 +1,127 @@
-# Backend operations
+# Backend Operations
 
-## Authentication and organization onboarding
+This guide covers account setup, invitations, supplier ingestion, staging migrations, and account deletion. It describes repository behavior; verify the target environment before running an operational procedure.
 
-Supabase Auth owns password registration, login, email confirmation, and password recovery. The FastAPI service validates Supabase access tokens and maps authenticated Supabase users to CompatFlow organization profiles.
+## Authentication and organization setup
 
-The first user creates an organization through the authenticated POST /api/v1/auth/organization endpoint after confirming their email. The backend creates the organization and owner profile in one transaction. The caller cannot choose a role or attach themselves to an existing organization through this endpoint.
+Supabase Auth handles registration, login, email confirmation, and password recovery. The FastAPI service validates Supabase access tokens and links authenticated users to CompatFlow organization profiles.
 
-The frontend signup form collects full name, organization name, work email, and password. If Supabase requires email confirmation, the callback exchanges the PKCE code for a session and then provisions the organization. If Supabase returns a session immediately, the signup page provisions it directly.
+The first verified user creates an organization through:
 
-### Required backend environment
+`POST /api/v1/auth/organization`
 
-- DATABASE_URL: PostgreSQL URL using the Psycopg 3 driver.
-- SUPABASE_URL: Supabase project URL.
-- SUPABASE_ANON_KEY: Supabase public anon/publishable key used to verify confirmed email status.
-- REDIS_URL: Redis connection used for Celery and distributed connector rate limiting.
-- CONNECTOR_ALLOWED_HOSTS: comma-separated exact hostnames approved for REST API, SFTP, and SQL Server sources.
-- SFTP_KNOWN_HOSTS_PATH: path to the managed SSH known-hosts file mounted in the backend runtime.
-- CONNECTOR_RATE_LIMIT_PER_MINUTE: per-organization connector preview/commit limit; defaults to 20 and must be 1–1000.
-- IMPORT_MAX_UPLOAD_BYTES: upload/connector byte limit; defaults to 25 MiB and cannot exceed 50 MiB.
-- MAPPING_AI_BASE_URL, MAPPING_AI_API_KEY, MAPPING_AI_MODEL: optional server-side mapping provider configuration. Do not set these unless the provider, retention terms, and cost are approved.
+The backend creates the organization and owner profile in one database transaction. The caller cannot select a role or attach the account to an existing organization through this endpoint.
 
-Do not configure or expose a Supabase service-role key for onboarding. Never commit credentials.
+The signup form collects the user's name, organization name, work email, and password. When email confirmation is enabled, the callback exchanges the PKCE code for a session before creating the organization. When Supabase returns a session immediately, the signup page creates it directly.
 
-## Subsequent users and invitations
+### Backend environment variables
 
-Additional employees join an existing organization through invitations:
+| Variable | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection URL using the Psycopg 3 driver |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Public anon/publishable key used to check confirmed email status |
+| `REDIS_URL` | Redis connection for Celery and distributed connector rate limits |
+| `CONNECTOR_ALLOWED_HOSTS` | Exact hostnames approved for REST, SFTP, and SQL Server sources |
+| `SFTP_KNOWN_HOSTS_PATH` | Path to the managed SSH known-hosts file mounted in the backend |
+| `CONNECTOR_RATE_LIMIT_PER_MINUTE` | Per-organization connector preview/commit limit; default 20, range 1–1,000 |
+| `IMPORT_MAX_UPLOAD_BYTES` | Upload and connector byte limit; default 25 MiB, maximum 50 MiB |
+| `MAPPING_AI_BASE_URL` | Optional HTTPS mapping-provider endpoint |
+| `MAPPING_AI_API_KEY` | Optional server-side mapping-provider key |
+| `MAPPING_AI_MODEL` | Optional provider model identifier |
 
-1. An owner or admin creates an invitation through POST /api/v1/invitations.
-2. The API returns the raw invitation token once. Only its SHA-256 hash is stored in PostgreSQL.
-3. The administrator must deliver the invitation link through an approved channel. Automated invitation email delivery is not implemented.
-4. The recipient creates or signs into a Supabase account using the invited email and confirms that email.
-5. The recipient accepts the invitation through POST /api/v1/invitations/accept.
-6. The backend checks the token, expiry, revocation, single-use state, verified email, and email match before creating the organization membership.
+Do not expose a Supabase service-role key during onboarding. Never commit credentials.
 
-Invitation roles are limited to admin, member, and viewer. Only an owner can invite another administrator. A Supabase identity already linked to an organization cannot join a second organization in this version.
+## Invitations
 
-## Multi-source ingestion operations
+Additional employees join an organization through an invitation:
 
-See the multi-source ingestion guide for the format matrix, API pagination and retry limits, SQL Server watermark requirements, security boundaries, and incomplete capabilities.
+1. An owner or admin creates an invitation through `POST /api/v1/invitations`.
+2. The API returns the raw invitation token once. PostgreSQL stores only its SHA-256 hash.
+3. The administrator sends the invitation link through an approved channel. Automated email delivery is not implemented.
+4. The recipient creates or signs in to a Supabase account using the invited email address and confirms that address.
+5. The recipient accepts the invitation through `POST /api/v1/invitations/accept`.
+6. The backend checks validity, expiry, revocation, single-use state, and verified email match before creating membership.
 
-Connector preview and commit routes require the existing supplier_catalogs plan entitlement and a database-backed catalog:read or catalog:write permission. Redis enforces a fixed-window per-organization request limit; if Redis is unavailable, connector execution fails closed. Import history stores source type, a sanitized source descriptor, non-secret source metadata, row errors, and record lineage. API tokens, SFTP passwords/private keys, and SQL Server connection URLs are request-scoped and must not be written to logs or persisted.
+Invitation roles are `admin`, `member`, and `viewer`. Only an owner can invite another administrator. In this version, a Supabase identity already linked to an organization cannot join a second one.
 
-### SQL Server runtime requirement
+## Supplier ingestion
 
-The backend Dockerfile installs Microsoft ODBC Driver 18 for SQL Server and verifies its registration through pyodbc.drivers() during image build. The runtime connector also checks that the driver exists before connecting. The deployment operator must confirm that the deployed service actually uses the repository Dockerfile. Python package installation alone does not install the Microsoft ODBC driver.
+See [Multi-source ingestion](../docs/multi-source-ingestion.md) for the supported formats, connector limits, and current verification status.
 
-Provision a dedicated SQL-authenticated login with only SELECT on the approved schema/table/view. Use Encrypt=yes, TrustServerCertificate=no, and ApplicationIntent=ReadOnly; the latter is not a substitute for database permissions. Do not enable SQL Server ingestion until a real test connection and permission-boundary test pass.
+Connector preview and commit routes:
+- Require the `supplier_catalogs` plan entitlement.
+- Require database-backed catalog read/write permission.
+- Use the authenticated user's organization as the tenant scope.
+- Are limited through Redis to 20 operations per organization per minute by default.
+- Stop before contacting the source if Redis is unavailable.
 
-### Connector credential handling
+Import history records the source type, a sanitized source descriptor, non-secret metadata, row errors, and record lineage. API tokens, SFTP passwords/private keys, and SQL Server connection URLs are request-scoped. Do not log or persist them.
 
-There is no reusable connector credential vault yet. Credentials are submitted for one preview/commit request and are not stored as source configuration. Do not add secrets to import metadata, mapping templates, or error messages. SFTP known-hosts must be mounted as a managed file; do not accept host keys from the client.
+### SQL Server runtime
 
-## Staging migration procedure
+The backend Dockerfile installs Microsoft ODBC Driver 18 and checks its registration through `pyodbc.drivers()` during the image build. The connector checks for the driver again at runtime.
 
-Before applying migrations to staging:
+Confirm that the deployed service uses the repository Dockerfile. Installing the Python package alone does not install the Microsoft ODBC driver.
 
-1. Create and verify a recoverable backup of the Render staging PostgreSQL database.
-2. Confirm the target database URL is the staging database, not production.
-3. Review the migration status and expected Alembic head.
-4. Run the manually triggered Apply staging database migration workflow only after the backup is confirmed. The workflow requires the exact input APPLY and the repository secret STAGING_DATABASE_URL.
-5. Verify the resulting Alembic revision and run the staging smoke tests.
+Use a dedicated SQL-authenticated login with SELECT permission only on the approved schema, table, or view. Configure:
 
-The workflow does not create a database backup. The operator must create and verify the backup separately before authorizing it. Do not run the workflow against production.
+- `Encrypt=yes`
+- `TrustServerCertificate=no`
+- `ApplicationIntent=ReadOnly`
 
-## Public demo boundary
+`ApplicationIntent=ReadOnly` is not an access-control boundary. Do not enable SQL Server ingestion until a real connection and permission test have passed.
 
-The public demo offers stateless CSV product-quality validation and XLS/XLSX product-record preview within the smaller public demo limit. It does not persist files or catalog records. Authenticated multi-format file validation/preview covers CSV, XLSX, XLS, JSON, and XML, but the current file UI does not expose the backend commit endpoint. Protected connector commit endpoints persist reviewed rows under the authenticated organization. Keep these capabilities clearly separated in UI copy.
+### Connector credentials
 
-Persistent imports and connector runs remain subscription-gated. Do not change pricing or plan entitlements as part of ingestion work.
+A reusable connector credential vault is not implemented. Credentials are supplied for one preview or commit request and are not saved as source configuration.
 
+- Keep secrets out of import metadata, mapping templates, and error messages.
+- Mount SFTP known-hosts as a managed file.
+- Do not accept SSH host keys from the client.
+
+## Staging database migrations
+
+Before applying a migration to staging:
+
+1. Create a backup of the Render staging PostgreSQL database.
+2. Confirm that the backup is accessible and can be restored.
+3. Check that the target connection points to staging, not production.
+4. Review the migration status and expected Alembic head.
+5. Run the manually triggered **Apply staging database migration** workflow only after the backup is verified.
+6. Supply the exact workflow input `APPLY` and the repository secret `STAGING_DATABASE_URL`.
+7. Verify the resulting Alembic revision and run staging smoke tests.
+
+The workflow does not create a backup. The operator is responsible for creating and verifying it. Never use this procedure against production.
+
+## Public demo and authenticated workflows
+
+The public demo provides stateless CSV product-quality validation and XLS/XLSX product-record preview within the public-demo limits. It does not save files or catalog records.
+
+Authenticated file preview supports CSV, XLSX, XLS, JSON, and XML. The current file interface does not expose the backend file-commit endpoint.
+
+Protected connector commit endpoints can save reviewed rows under the authenticated organization. Keep this separate from the public demo when describing the product.
+
+Persistent imports and connector runs remain subscription-gated. Do not change plan entitlements or pricing as part of ingestion work.
 
 ## Account and organization deletion
 
-The backend account deletion endpoint requires a server-only `SUPABASE_SERVICE_ROLE_KEY`. Configure it in the backend secret manager; never expose it as a `NEXT_PUBLIC_*` variable or commit its value.
+The account-deletion endpoint requires the server-only `SUPABASE_SERVICE_ROLE_KEY`. Store it in the backend secret manager. Never expose it through a `NEXT_PUBLIC_*` variable or commit its value.
 
-- A member/admin confirms `DELETE MY ACCOUNT`: their Supabase identity, CompatFlow membership and personal review are removed. Shared organization records and the organization subscription remain.
-- An owner confirms `DELETE ORGANIZATION`: CompatFlow first requests immediate cancellation of provider subscriptions, then removes every linked Supabase identity and cascades the organization, members, catalog records, import history, review records, local subscription/payment rows and related webhook history.
-- If the payment provider cannot confirm cancellation, deletion is stopped before local organization data is removed.
-- Supabase Auth and PostgreSQL cannot participate in one distributed transaction. If Supabase deletes some linked identities and then returns an error, retry deletion; already-absent identities are treated as deleted.
-- Verify a recoverable backup and understand that this operation is irreversible before enabling the feature in a production environment.
+### Member or administrator
+
+The user confirms `DELETE MY ACCOUNT`. The backend removes their Supabase identity, CompatFlow membership, and personal review. Shared organization records and the organization subscription remain.
+
+### Organization owner
+
+The owner confirms `DELETE ORGANIZATION`. CompatFlow:
+
+1. Requests immediate cancellation of provider subscriptions.
+2. Removes linked Supabase identities.
+3. Deletes the organization and related memberships, catalog records, import history, reviews, local subscription/payment rows, and webhook history.
+
+If the payment provider does not confirm cancellation, deletion stops before local organization data is removed.
+
+Supabase Auth and PostgreSQL do not share a distributed transaction. If some Supabase identities are deleted before an error occurs, retry the operation; identities that are already absent are treated as deleted.
+
+Verify a recoverable backup and confirm the consequences before enabling this operation in production. Organization deletion is irreversible.

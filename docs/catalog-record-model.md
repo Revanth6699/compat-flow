@@ -1,80 +1,94 @@
-# Catalog record model separation
+# Catalog Record Model
 
-## Why the previous model was insufficient
+This document defines how CompatFlow separates product identity from supplier-specific and time-dependent data.
 
-The original `products` table represents a product master but also carries one supplier link and one canonical SKU. Real supplier feeds contain multiple supplier-specific identifiers and offers for the same product, multiple sellable variants, and changing stock positions. Treating all of these as columns on a single product row loses provenance and history.
+## 1. Why the model separates record types
 
-## Record types
+The original `products` table represents a product master but also carries a supplier link and canonical SKU. Supplier feeds can contain multiple supplier-specific identifiers and offers for one product, multiple sellable variants, and changing stock positions.
 
-### 1. Product master — existing `products` table
+Combining these concepts in one product row loses source provenance and history. CompatFlow separates product identity from identifiers, variants, offers, and inventory snapshots.
+
+## 2. Record types
+
+### 2.1 Product master — `products`
 
 Owns stable product identity and core descriptive attributes:
-- organization-scoped canonical SKU
-- product name
-- manufacturer
-- manufacturer part number
-- category
 
-Supplier-specific identifiers, prices, warehouse quantities, and variant attributes do not belong on this row. The canonical SKU and MPN stay on the master; additional identifiers use the typed identifier registry.
+- Organization-scoped canonical SKU.
+- Product name.
+- Manufacturer.
+- Manufacturer part number (MPN).
+- Category.
 
-### 2. Product identifiers — `product_identifiers`
+Supplier identifiers, prices, warehouse quantities, and variant attributes do not belong on this row. The canonical SKU and MPN remain on the product master; additional identifiers use the typed identifier registry.
 
-One row per additional identifier attached to a product:
-- identifier type: UPC, EAN, GTIN, ASIN, marketplace ID, manufacturer code, source product ID, or other
-- explicit namespace, such as `global` or a marketplace
-- identifier value stored as text so leading zeros are preserved
-- source reference and primary flag
+### 2.2 Product identifiers — `product_identifiers`
 
-SKU, MPN, supplier SKU, and marketplace identifiers remain separate namespaces. Identifier values are never numerically coerced.
+Stores one additional identifier per row:
 
-### 3. Product variants — `product_variants`
+- Identifier type: UPC, EAN, GTIN, ASIN, marketplace ID, manufacturer code, source product ID, or another explicit type.
+- Namespace, such as `global` or a marketplace.
+- Identifier value stored as text to preserve leading zeros.
+- Source reference and primary flag.
 
-One row per sellable variation of a product:
-- parent product and tenant
-- optional variant SKU
-- structured attributes such as color, size, capacity, material, or pack size
-- active/inactive state
+SKU, MPN, supplier SKU, and marketplace identifiers are separate namespaces. Identifier values must not be numerically coerced.
 
-The same product can have multiple variants. A variant is not a duplicate product merely because the parent name is the same.
+### 2.3 Product variants — `product_variants`
 
-### 4. Supplier offers — `supplier_offers`
+Stores each sellable variation:
 
-One row per supplier's commercial listing:
-- supplier and optional matched product
-- supplier SKU and supplier product ID kept distinct from canonical SKU
-- unit price plus explicit currency and unit of measure
-- minimum order quantity and lead time
-- source URL and offer status
+- Parent product and tenant.
+- Optional variant SKU.
+- Structured attributes such as color, size, capacity, material, or pack size.
+- Active/inactive state.
 
-An offer can exist before it has been confidently matched to a product. A supplier's SKU is never silently promoted to the canonical SKU.
+A product can have multiple variants. A variant is not a duplicate product solely because its parent name is the same.
 
-### 5. Inventory snapshots — `inventory_snapshots`
+### 2.4 Supplier offers — `supplier_offers`
 
-Append-only point-in-time stock positions:
-- product, optional supplier offer, warehouse code
-- quantity on hand, reserved, and available as decimal quantities
-- snapshot timestamp and source reference
+Stores one supplier's commercial listing:
 
-Snapshots preserve history instead of overwriting the latest stock figure. The three quantities are stored separately; the system can flag when available differs from on-hand minus reserved. It does not silently rewrite supplier values.
+- Supplier and optional matched product.
+- Supplier SKU and supplier product ID, distinct from canonical SKU.
+- Unit price with explicit currency and unit of measure.
+- Minimum order quantity and lead time.
+- Source URL and offer status.
 
-## Tenant isolation and constraints
+An offer can exist before it is confidently matched to a product. A supplier SKU must not be silently promoted to canonical SKU.
 
-All new tables carry `organization_id`. Composite foreign keys bind variants, offers, products, suppliers, and inventory snapshots within the same organization. List queries filter by the authenticated organization. Negative prices, quantities, invalid MOQ and negative lead times are rejected at the API/database boundary.
+### 2.5 Inventory snapshots — `inventory_snapshots`
 
-## API surface
+Stores append-only, point-in-time stock positions:
 
-All endpoints require authentication, the existing catalog read/write permission, and the `supplier_catalogs` plan feature.
+- Product, optional supplier offer, and warehouse code.
+- Quantity on hand, reserved, and available.
+- Snapshot timestamp and source reference.
 
-- `GET/POST /api/v1/product-identifiers`
-- `GET/POST /api/v1/product-variants`
-- `GET/POST /api/v1/supplier-offers`
-- `GET/POST /api/v1/inventory-snapshots`
+Snapshots preserve history rather than overwriting the latest stock figure. The three quantities remain separate. The system may flag when available quantity differs from on-hand minus reserved; it must not silently rewrite supplier values.
 
-The create endpoints verify that referenced products, suppliers, and offers belong to the caller's organization. Inventory snapshot creation verifies that an attached supplier offer is for the same product.
+## 3. Tenant isolation and constraints
 
-## Deliberate non-goals in this phase
+All new tables carry `organization_id`. Composite foreign keys bind variants, offers, products, suppliers, and inventory snapshots within the same organization.
 
-- Existing CSV validation still produces a product-master preview; it does not yet persist these new record types.
-- No automatic product matching or supplier-offer linking is performed.
-- No AI model is trained or called. The AI layer must suggest mappings/matches with evidence and confidence; deterministic validation remains authoritative.
-- No inventory reconciliation metric is generated until the import pipeline has reliable row-level lineage and defined business rules.
+List queries filter by the authenticated organization. Negative prices, quantities, invalid minimum order quantities, and negative lead times are rejected at the API or database boundary.
+
+## 4. API surface
+
+All endpoints require authentication, the applicable catalog read/write permission, and the `supplier_catalogs` plan feature.
+
+| Resource | Endpoints |
+|---|---|
+| Product identifiers | `GET/POST /api/v1/product-identifiers` |
+| Product variants | `GET/POST /api/v1/product-variants` |
+| Supplier offers | `GET/POST /api/v1/supplier-offers` |
+| Inventory snapshots | `GET/POST /api/v1/inventory-snapshots` |
+
+Create operations verify that referenced products, suppliers, and offers belong to the caller's organization. Inventory snapshot creation also verifies that an attached supplier offer belongs to the same product.
+
+## 5. Current limitations
+
+- Existing CSV validation still produces a product-master preview; it does not persist these new record types.
+- Automatic product matching and supplier-offer linking are not implemented.
+- No AI model is trained or called by this record model.
+- AI may suggest mappings or matches with evidence and confidence, but deterministic validation remains authoritative.
+- Inventory reconciliation metrics are not generated until import lineage and business rules are defined.

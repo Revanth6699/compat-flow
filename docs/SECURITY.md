@@ -1,31 +1,41 @@
-# Security baseline — public demo
+# Security
 
-## Enabled in the current public demo build
+**Scope:** Public demo  
+**Evidence:** Source-code review. This is not an independent security assessment.
 
-- CSV preview is stateless: uploaded content is read for validation and is not written to application storage or the database.
-- Persistent catalog import creation returns HTTP 403.
+## Controls in the public demo
+
+- CSV preview is stateless. The preview route reads the upload for validation and does not save it to application storage or the database.
+- Persistent catalog-import creation returns HTTP 403.
 - Import-job status routes are not exposed.
-- CSV file size is capped at 5 MB; the complete multipart request body is capped before parsing.
-- CSV row count is capped at 10,000.
-- Accepted file extension is `.csv`; UTF-8 decoding and CSV structure are validated.
-- CORS is restricted to configured frontend origins.
-- Production requires a strong `APP_SECRET_KEY`, HTTPS frontend origins, and explicit API hostnames.
-- Production API docs are disabled.
-- Security response headers and HSTS are enabled in production.
+- CSV uploads are limited to 5 MB and 10,000 data rows.
+- The complete multipart request body is bounded before parsing.
+- The public preview route accepts only files with the `.csv` extension.
+- UTF-8 decoding and CSV structure are checked.
+- CORS is limited to configured frontend origins.
+- Production configuration requires a strong `APP_SECRET_KEY`, HTTPS frontend origins, and explicit API hostnames.
+- API documentation is disabled in production.
+- Production security response headers and HSTS are enabled.
 
-## Not implemented — do not use for real customer data
+These points describe the public demo path. They do not establish that every authenticated route or deployed service has the same controls.
 
-- User authentication and session management.
-- Tenant-level authorization and data isolation.
-- Persistent customer catalog storage or background imports.
-- Distributed rate limiting / abuse prevention.
-- Malware scanning.
-- Audit logging, managed backups and tested recovery.
-- Formal SAST/DAST and independent security review.
+## Not yet verified for production
 
-## Public demo operating rules
+- Independent security review and penetration testing.
+- Consistent rate limiting and abuse monitoring across all public routes.
+- Malware scanning for uploaded files.
+- Backup restoration and disaster-recovery procedures.
+- Complete security audit logs and alerting.
+- Retention and deletion controls for production supplier data.
+- Deployed TLS, response headers, provider settings, and infrastructure encryption.
 
-- Tell visitors to use synthetic or non-confidential test CSVs only.
-- Do not enable persistent imports until authentication, tenant authorization and isolation are implemented and tested.
-- Configure hosting/CDN-level rate limits for the CSV preview endpoint before broad promotion.
-- Keep production secrets out of source control and all `NEXT_PUBLIC_` variables.
+The repository includes authentication and tenant-scoped backend features. Their presence is not proof that every route enforces the correct permissions or that the deployed environment is configured safely.
+
+## Operating requirements
+
+- Use synthetic or non-confidential files in the public demo.
+- Do not enable persistent imports until authentication, tenant authorization, and tenant isolation have been tested for every relevant operation.
+- Configure hosting- or CDN-level rate limits for the public CSV preview endpoint before broad promotion.
+- Keep credentials out of source control and browser-exposed `NEXT_PUBLIC_*` variables.
+- Treat passing builds and unit tests as necessary checks, not as proof of production security.
+- Record each unresolved finding, its owner, and the condition for closure before accepting customer data.

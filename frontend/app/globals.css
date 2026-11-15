@@ -1027,3 +1027,12 @@ button:disabled, .button:disabled {
 .field-chart-list > div > span { color: var(--muted); font-size: .82rem; }
 .field-chart-list strong { color: var(--navy); font-size: .8rem; text-align: right; }
 @media (max-width: 560px) { .field-chart-list > div { grid-template-columns: 1fr 60px; gap: 6px 10px; } .field-chart-list .metric-bar { grid-column: 1 / -1; grid-row: 2; } }
+
+
+/* DPDP compliance branch: accessible privacy-choice controls. */
+.privacy-consent-field { display: grid; gap: 12px; margin: 18px 0; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.privacy-consent-field label, .privacy-preference-options label { display: flex; align-items: flex-start; gap: 10px; color: var(--ink); font-size: .88rem; line-height: 1.5; }
+.privacy-consent-field input, .privacy-preference-options input { width: auto; min-width: 16px; margin-top: 3px; }
+.privacy-consent-field a { text-decoration: underline; }
+.privacy-preference-options { display: grid; gap: 10px; margin-top: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; }
+.legal-review-warning { margin: 0 0 24px; padding: 14px 16px; border: 1px solid #D6A84B; border-radius: 8px; background: #FFF9E8; color: #684B12; line-height: 1.55; }
