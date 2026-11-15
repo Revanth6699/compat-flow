@@ -1,90 +1,21 @@
-name: Connector simulator integration
+name: Connector simulator integration (paused)
 
+# Temporarily paused by request. Keep the workflow and simulator assets so
+# protocol integration testing can be resumed deliberately later.
+# The manual trigger is retained for discoverability, but the job-level guard
+# prevents accidental execution until this workflow is explicitly re-enabled.
 on:
-  pull_request:
-    paths:
-      - "backend/app/services/source_connectors.py"
-      - "backend/tests/connector-simulator/**"
-      - "backend/tests/test_connector_simulator_integration.py"
-      - ".github/workflows/connector-simulator-integration.yml"
-      - "backend/Dockerfile"
-      - "backend/requirements.txt"
-  push:
-    branches:
-      - feature/organization-first-onboarding
-    paths:
-      - "backend/app/services/source_connectors.py"
-      - "backend/tests/connector-simulator/**"
-      - "backend/tests/test_connector_simulator_integration.py"
-      - ".github/workflows/connector-simulator-integration.yml"
-      - "backend/Dockerfile"
-      - "backend/requirements.txt"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   simulator-integration:
+    if: ${{ false }}
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Generate disposable SQL credentials
+      - name: Simulator integration is paused
         run: |
-          reader_password="$(python -c 'import secrets,string; print("Aa7" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(25)))')"
-          sa_password="$(python -c 'import secrets,string; print("Aa7" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(25)))')"
-          echo "::add-mask::$reader_password"
-          echo "::add-mask::$sa_password"
-          echo "SIMULATOR_READER_PASSWORD=$reader_password" >> "$GITHUB_ENV"
-          echo "SIMULATOR_SA_PASSWORD=$sa_password" >> "$GITHUB_ENV"
-      - name: Install Microsoft ODBC Driver 18
-        run: |
-          . /etc/os-release
-          curl -fsSLO "https://packages.microsoft.com/config/ubuntu/${VERSION_ID}/packages-microsoft-prod.deb"
-          sudo dpkg -i packages-microsoft-prod.deb
-          rm packages-microsoft-prod.deb
-          sudo ACCEPT_EULA=Y apt-get update
-          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 unixodbc-dev
-          odbcinst -q -d | grep -F "ODBC Driver 18 for SQL Server"
-      - name: Install backend dependencies
-        working-directory: backend
-        run: python -m pip install -r requirements.txt
-      - name: Start disposable supplier simulators
-        run: docker compose -f backend/tests/connector-simulator/compose.yaml up -d --wait rest-supplier sftp-supplier sql-supplier
-      - name: Initialize synthetic SQL Server catalog
-        run: docker compose -f backend/tests/connector-simulator/compose.yaml run --rm sql-init
-      - name: Prepare local test trust and SFTP host key
-        run: |
-          mkdir -p backend/tests/connector-simulator/runtime
-          docker compose -f backend/tests/connector-simulator/compose.yaml cp rest-supplier:/run/tls/server.crt backend/tests/connector-simulator/runtime/rest-ca.crt
-          docker compose -f backend/tests/connector-simulator/compose.yaml cp sql-supplier:/tls/sql-ca.crt backend/tests/connector-simulator/runtime/sql-ca.crt
-          docker compose -f backend/tests/connector-simulator/compose.yaml cp sql-supplier:/tls/sql-server.crt backend/tests/connector-simulator/runtime/sql-server.crt
-          sudo cp backend/tests/connector-simulator/runtime/sql-ca.crt /usr/local/share/ca-certificates/compatflow-sql-simulator-ca.crt
-          sudo update-ca-certificates --fresh
-          openssl x509 -in backend/tests/connector-simulator/runtime/sql-ca.crt -noout -subject -ext subjectKeyIdentifier
-          openssl x509 -in backend/tests/connector-simulator/runtime/sql-server.crt -noout -subject -issuer -ext subjectKeyIdentifier
-          openssl x509 -in backend/tests/connector-simulator/runtime/sql-server.crt -noout -ext authorityKeyIdentifier
-          openssl verify -verbose -show_chain -purpose sslserver -verify_hostname sql-supplier -CAfile /etc/ssl/certs/ca-certificates.crt backend/tests/connector-simulator/runtime/sql-server.crt
-          ssh-keyscan -p 2222 localhost > backend/tests/connector-simulator/runtime/known_hosts 2>/dev/null
-      - name: Run REST, SFTP and SQL Server protocol integration tests
-        working-directory: backend
-        env:
-          PYTHONPATH: .
-          COMPATFLOW_CONNECTOR_SIMULATOR: "1"
-          SIMULATOR_REST_CERT: tests/connector-simulator/runtime/rest-ca.crt
-          SIMULATOR_SFTP_KNOWN_HOSTS: tests/connector-simulator/runtime/known_hosts
-          SSL_CERT_FILE: /etc/ssl/certs/ca-certificates.crt
-          SSL_CERT_DIR: /etc/ssl/certs
-        run: |
-          export SIMULATOR_SQLSERVER_URL="mssql+pyodbc://compatflow_reader:${SIMULATOR_READER_PASSWORD}@localhost:14333/CompatFlowSupplier?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&HostNameInCertificate=sql-supplier"
-          python -m pytest -q tests/test_connector_simulator_integration.py
-      - name: Print supplier simulator logs on failure
-        if: failure()
-        run: |
-          docker compose -f backend/tests/connector-simulator/compose.yaml logs --no-color sql-cert-init sql-supplier
-          docker compose -f backend/tests/connector-simulator/compose.yaml exec -T sql-supplier cat /var/opt/mssql/log/errorlog || true
-      - name: Stop and remove simulators
-        if: always()
-        run: docker compose -f backend/tests/connector-simulator/compose.yaml down -v
+          echo "Connector simulator integration is intentionally paused."
+          echo "Remove the job-level if guard and restore the original triggers to resume."
