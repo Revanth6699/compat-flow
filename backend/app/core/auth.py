@@ -164,7 +164,7 @@ def get_active_plan(current: AuthenticatedUser, db: Session):
         select(Subscription).where(
             Subscription.organization_id == current.profile.organization_id,
             Subscription.status.in_(("active", "trialing")),
-            (Subscription.current_period_end.is_(None)) | (Subscription.current_period_end > now),
+            Subscription.current_period_end > now,
         ).order_by(Subscription.created_at.desc())
     )
     if subscription is None:
