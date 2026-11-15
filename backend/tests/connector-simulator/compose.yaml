@@ -49,7 +49,7 @@ services:
       /opt/mssql/bin/mssql-conf set network.tlskey /tls/sql-server.key
       /opt/mssql/bin/mssql-conf set network.tlsprotocols 1.2
       /opt/mssql/bin/mssql-conf set network.forceencryption 1
-      exec su -s /bin/bash mssql -c 'exec /opt/mssql/bin/sqlservr'
+      exec su -p -s /bin/bash mssql -c 'exec /opt/mssql/bin/sqlservr'
     depends_on:
       sql-cert-init:
         condition: service_completed_successfully
@@ -77,11 +77,15 @@ services:
     environment:
       SIMULATOR_READER_PASSWORD: ${SIMULATOR_READER_PASSWORD:?Generate a disposable SIMULATOR_READER_PASSWORD before starting the simulator}
     entrypoint: ["/bin/bash", "-c"]
-    command: >
-      "/opt/mssql-tools/bin/sqlcmd -S sql-supplier -U sa
-      -P 'Simulator-SA-Only-2026!' -C -b
-      -v SIMULATOR_READER_PASSWORD="$SIMULATOR_READER_PASSWORD"
-      -i /seed/init.sql"
+    command: |
+      set -e
+      for attempt in $(seq 1 30); do
+        if /opt/mssql-tools/bin/sqlcmd -S sql-supplier -U sa -P 'Simulator-SA-Only-2026!' -C -b -Q "SELECT 1" >/dev/null 2>&1; then
+          break
+        fi
+        sleep 2
+      done
+      /opt/mssql-tools/bin/sqlcmd -S sql-supplier -U sa -P 'Simulator-SA-Only-2026!' -C -b -v SIMULATOR_READER_PASSWORD="$SIMULATOR_READER_PASSWORD" -i /seed/init.sql
 
 volumes:
   rest-tls:
