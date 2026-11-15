@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Literal
 from urllib.parse import urlsplit
 from uuid import UUID
@@ -10,6 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from redis.asyncio import Redis
+from redis.exceptions import RedisError
 
 from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.config import settings
@@ -40,6 +43,12 @@ class ConnectorImportRequest(BaseModel):
     api_url: str | None = None
     api_records_path: str | None = None
     api_headers: dict[str, str] = Field(default_factory=dict)
+    api_page_param: str | None = None
+    api_page_size_param: str | None = None
+    api_page_size: int = Field(default=500, ge=1, le=1000)
+    api_start_page: int = Field(default=1, ge=0, le=1_000_000)
+    api_max_pages: int = Field(default=1, ge=1, le=20)
+    api_retry_attempts: int = Field(default=2, ge=0, le=5)
 
     # SFTP: host must be allowlisted and its key must exist in known_hosts.
     sftp_host: str | None = None
@@ -56,7 +65,100 @@ class ConnectorImportRequest(BaseModel):
     sql_table: str | None = None
     sql_columns: list[str] = Field(default_factory=list)
     sql_row_limit: int = Field(default=10000, ge=1, le=10000)
+    sql_watermark_column: str | None = None
+    sql_watermark_after: str | None = None
 
+
+
+async def _enforce_connector_rate_limit(organization_id: UUID) -> None:
+    """Distributed fixed-window limit; fail closed if Redis cannot enforce it."""
+    redis = Redis.from_url(settings.redis_url, decode_responses=True)
+    bucket = int(time.time() // 60)
+    key = f"compatflow:connector-rate:{organization_id}:{bucket}"
+    script = (
+        "local count = redis.call('INCR', KEYS[1]); "
+        "if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]); end; "
+        "return count"
+    )
+    try:
+        count = await redis.eval(script, 1, key, 60)
+    except RedisError:
+        raise HTTPException(
+            status_code=503,
+            detail="Connector rate limiting is unavailable; the source was not contacted.",
+        ) from None
+    finally:
+        try:
+            await redis.aclose()
+        except RedisError:
+            pass
+    if int(count) > settings.connector_rate_limit_per_minute:
+        raise HTTPException(
+            status_code=429,
+            detail="Connector request limit reached for this organization. Retry after the current minute.",
+        )
+
+
+def _source_descriptor(payload: ConnectorImportRequest) -> str:
+    """Return a safe, credential-free source identifier for import history."""
+    if payload.source_type == "rest_api":
+        try:
+            parsed = urlsplit(payload.api_url or "")
+            host = parsed.hostname or "unknown"
+            port = f":{parsed.port}" if parsed.port else ""
+        except ValueError:
+            return "https://invalid-source"
+        return f"https://{host}{port}"
+    if payload.source_type == "sftp":
+        filename = (payload.sftp_remote_path or "").rsplit("/", 1)[-1]
+        return f"sftp://{payload.sftp_host or 'unknown'}/{filename[:200]}"
+    from sqlalchemy.engine import make_url
+    try:
+        parsed = make_url(payload.sql_server_url or "")
+        database = parsed.database or ""
+        return f"sqlserver://{parsed.host or 'unknown'}/{database}/{payload.sql_schema or ''}.{payload.sql_table or ''}"[:512]
+    except Exception:
+        return "sqlserver://invalid-source"
+
+
+def _source_metadata(payload: ConnectorImportRequest, parsed) -> dict:
+    metadata = dict(parsed.metadata)
+    if payload.source_type == "rest_api":
+        metadata["pagination"] = {
+            "mode": "page_number" if payload.api_page_param else "single_page",
+            "page_param": payload.api_page_param,
+            "page_size_param": payload.api_page_size_param,
+            "page_size": payload.api_page_size,
+            "start_page": payload.api_start_page,
+            "max_pages": payload.api_max_pages,
+            "retry_attempts": payload.api_retry_attempts,
+        }
+    elif payload.source_type == "sftp":
+        metadata["host_key_verification"] = "strict_known_hosts"
+    elif payload.source_type == "sql_server":
+        watermark = None
+        if payload.sql_watermark_column:
+            values = [
+                record.values.get(payload.sql_watermark_column)
+                for record in parsed.records
+                if record.values.get(payload.sql_watermark_column) is not None
+            ]
+            watermark = {
+                "column": payload.sql_watermark_column,
+                "after": payload.sql_watermark_after,
+                "next": str(values[-1]) if values else payload.sql_watermark_after,
+                "strategy": "strictly_greater_than_unique_monotonic_key",
+            }
+        metadata["sql_server"] = {
+            "schema": payload.sql_schema,
+            "table": payload.sql_table,
+            "selected_columns": payload.sql_columns,
+            "row_limit": payload.sql_row_limit,
+            "watermark": watermark,
+            "application_intent": "ReadOnly",
+            "certificate_verification": True,
+        }
+    return metadata
 
 def _allowed_hosts() -> set[str]:
     return {host.strip().casefold().rstrip(".") for host in settings.connector_allowed_hosts.split(",") if host.strip()}
@@ -75,7 +177,10 @@ async def _load_source(payload: ConnectorImportRequest) -> tuple[bytes, str]:
     if payload.source_type == "rest_api":
         if not payload.api_url:
             raise HTTPException(status_code=422, detail="api_url is required.")
-        host = urlsplit(payload.api_url).hostname
+        try:
+            host = urlsplit(payload.api_url).hostname
+        except ValueError:
+            raise HTTPException(status_code=422, detail="API URL is invalid.") from None
         _require_allowed_host(host)
         if len(payload.api_headers) > 10 or any(
             key.casefold() not in {"authorization", "x-api-key", "accept"}
@@ -87,6 +192,12 @@ async def _load_source(payload: ConnectorImportRequest) -> tuple[bytes, str]:
             payload.api_url, allowed_hosts=allowed,
             headers=payload.api_headers, records_key=payload.api_records_path,
             max_bytes=settings.import_max_upload_bytes,
+            page_param=payload.api_page_param,
+            page_size_param=payload.api_page_size_param,
+            page_size=payload.api_page_size,
+            start_page=payload.api_start_page,
+            max_pages=payload.api_max_pages,
+            retry_attempts=payload.api_retry_attempts,
         )
         return json.dumps(records, ensure_ascii=False, default=str).encode("utf-8"), "connector.json"
 
@@ -124,6 +235,8 @@ async def _load_source(payload: ConnectorImportRequest) -> tuple[bytes, str]:
         payload.sql_server_url, schema=payload.sql_schema, table=payload.sql_table,
         columns=payload.sql_columns, limit=payload.sql_row_limit,
         max_bytes=settings.import_max_upload_bytes,
+        watermark_column=payload.sql_watermark_column,
+        watermark_after=payload.sql_watermark_after,
     )
     return json.dumps(rows, ensure_ascii=False, default=str).encode("utf-8"), "connector.json"
 
@@ -140,13 +253,14 @@ async def preview_connector_import(
     _current: AuthenticatedUser = Depends(require_permission("catalog:read")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
 ):
+    await _enforce_connector_rate_limit(_current.profile.organization_id)
     try:
         raw, filename = await _load_source(payload)
         parsed, result = _prepare(payload, raw, filename)
     except (SourceConnectorError, IngestionParseError, RecordMappingError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     return {
-        "source_type": payload.source_type, "filename": filename,
+        "source_type": payload.source_type, "source_descriptor": _source_descriptor(payload), "filename": filename,
         "format": parsed.format, "record_type": result.record_type,
         "total_records": result.total_records, "valid_records": len(result.valid_records),
         "invalid_records": result.invalid_records, "mappings": result.mappings,
@@ -164,6 +278,7 @@ async def commit_connector_import(
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
+    await _enforce_connector_rate_limit(current.profile.organization_id)
     try:
         raw, filename = await _load_source(payload)
         parsed, result = _prepare(payload, raw, filename)
@@ -172,6 +287,9 @@ async def commit_connector_import(
     return persist_validated_import(
         db=db, organization_id=current.profile.organization_id,
         filename=filename, parsed=parsed, result=result,
+        source_type=payload.source_type,
+        source_descriptor=_source_descriptor(payload),
+        source_metadata=_source_metadata(payload, parsed),
     )
 
 
@@ -195,6 +313,10 @@ def list_import_history(
         "total": total, "limit": limit, "offset": offset,
         "items": [{
             "id": str(job.id), "filename": job.filename, "record_type": job.import_type,
+        "source_type": job.source_type, "source_descriptor": job.source_descriptor,
+        "source_metadata": job.source_metadata,
+            "source_type": job.source_type, "source_descriptor": job.source_descriptor,
+            "source_metadata": job.source_metadata,
             "status": job.status, "total_records": job.row_count,
             "imported_records": job.valid_rows, "rejected_records": job.invalid_rows,
             "processed_records": job.processed_rows, "created_at": job.created_at,
