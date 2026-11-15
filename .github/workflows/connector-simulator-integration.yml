@@ -1,18 +1,30 @@
-name: Connector simulator integration (paused)
+name: Connector simulator integration
 
-# Temporarily paused by request. The complete simulator job and all test
-# steps are retained below so this workflow can be resumed later.
 on:
-  workflow_dispatch:
+  pull_request:
+    paths:
+      - "backend/app/services/source_connectors.py"
+      - "backend/tests/connector-simulator/**"
+      - "backend/tests/test_connector_simulator_integration.py"
+      - ".github/workflows/connector-simulator-integration.yml"
+      - "backend/Dockerfile"
+      - "backend/requirements.txt"
+  push:
+    branches:
+      - feature/organization-first-onboarding
+    paths:
+      - "backend/app/services/source_connectors.py"
+      - "backend/tests/connector-simulator/**"
+      - "backend/tests/test_connector_simulator_integration.py"
+      - ".github/workflows/connector-simulator-integration.yml"
+      - "backend/Dockerfile"
+      - "backend/requirements.txt"
 
 permissions:
   contents: read
 
 jobs:
   simulator-integration:
-    # Remove this guard and restore the original push/pull_request path
-    # filters above when connector simulator testing is resumed.
-    if: ${{ false }}
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
