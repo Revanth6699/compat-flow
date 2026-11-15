@@ -14,6 +14,9 @@ docker compose -f backend/tests/connector-simulator/compose.yaml up -d --wait re
 docker compose -f backend/tests/connector-simulator/compose.yaml run --rm sql-init
 mkdir -p backend/tests/connector-simulator/runtime
 docker compose -f backend/tests/connector-simulator/compose.yaml cp rest-supplier:/run/tls/server.crt backend/tests/connector-simulator/runtime/rest-ca.crt
+docker compose -f backend/tests/connector-simulator/compose.yaml cp sql-supplier:/tls/ca.crt backend/tests/connector-simulator/runtime/sql-ca.crt
+sudo cp backend/tests/connector-simulator/runtime/sql-ca.crt /usr/local/share/ca-certificates/compatflow-sql-simulator-ca.crt
+sudo update-ca-certificates
 ssh-keyscan -p 2222 localhost > backend/tests/connector-simulator/runtime/known_hosts
 ```
 
