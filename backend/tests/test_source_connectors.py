@@ -308,6 +308,8 @@ def test_api_connector_rejects_invalid_url_port():
 
 
 def test_sql_server_connector_enforces_serialized_result_byte_limit(monkeypatch):
+    calls = {"yielded": 0}
+
     class ColumnCollection:
         def __getitem__(self, name):
             return name
@@ -321,10 +323,14 @@ def test_sql_server_connector_enforces_serialized_result_byte_limit(monkeypatch)
 
     class MappingResult:
         def yield_per(self, size):
+            calls["batch_size"] = size
             return self
 
         def __iter__(self):
-            return iter([{"sku": "001", "description": "x" * 100}])
+            calls["yielded"] += 1
+            yield {"sku": "001", "description": "x" * 100}
+            calls["yielded"] += 1
+            yield {"sku": "002", "description": "another row"}
 
     class ExecutionResult:
         def mappings(self):
@@ -359,6 +365,8 @@ def test_sql_server_connector_enforces_serialized_result_byte_limit(monkeypatch)
             schema="dbo", table="Products", columns=["sku", "description"],
             limit=10, max_bytes=20,
         )
+    assert calls["yielded"] == 1
+    assert calls["batch_size"] == 500
 
 
 
