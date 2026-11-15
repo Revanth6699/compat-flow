@@ -229,7 +229,9 @@ def get_me(current: AuthenticatedUser = Depends(get_current_user), db: Session =
 
 
 
-def _member_seat_limit(db: Session, organization_id: UUID) -> int | None:
+def _member_seat_limit(db: Session, organization_id: UUID, current: AuthenticatedUser | None = None) -> int | None:
+    if current is not None and is_platform_admin(current):
+        return None
     now = datetime.now(timezone.utc)
     subscription = db.scalar(
         select(Subscription).where(
@@ -257,8 +259,8 @@ def _member_seat_limit(db: Session, organization_id: UUID) -> int | None:
     return limit
 
 
-def _member_seat_usage(db: Session, organization_id: UUID) -> dict:
-    limit = _member_seat_limit(db, organization_id)
+def _member_seat_usage(db: Session, organization_id: UUID, current: AuthenticatedUser | None = None) -> dict:
+    limit = _member_seat_limit(db, organization_id, current)
     active_members = db.scalar(
         select(func.count(User.id)).where(
             User.organization_id == organization_id,
@@ -292,8 +294,9 @@ def _ensure_invitation_seat_available(
     organization_id: UUID,
     *,
     include_pending_invitations: bool,
+    current: AuthenticatedUser | None = None,
 ) -> None:
-    limit = _member_seat_limit(db, organization_id)
+    limit = _member_seat_limit(db, organization_id, current)
     if limit is None:
         return
     active_members = db.scalar(
@@ -331,7 +334,7 @@ def get_member_seat_usage(
     db: Session = Depends(get_db),
 ):
     """Report seat usage without disabling existing members after a downgrade."""
-    return _member_seat_usage(db, current.profile.organization_id)
+    return _member_seat_usage(db, current.profile.organization_id, current)
 
 
 @invitation_router.post("", response_model=InvitationCreatedResponse, status_code=201)
@@ -349,7 +352,7 @@ def create_invitation(
         .with_for_update()
     )
     _ensure_invitation_seat_available(
-        db, current.profile.organization_id, include_pending_invitations=True
+        db, current.profile.organization_id, include_pending_invitations=True, current=current
     )
     if current.profile.role != "owner" and payload.role == "admin":
         raise HTTPException(status_code=403, detail="Only an organization owner can invite administrators.")
