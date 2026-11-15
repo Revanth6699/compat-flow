@@ -42,10 +42,9 @@ class DemoRequestResponse(BaseModel):
 
 
 def require_platform_admin(current: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
-    allowed_email = settings.platform_admin_email.strip().lower()
-    if not allowed_email:
+    if not settings.platform_admin_email.strip():
         raise HTTPException(status_code=503, detail="Platform administrator access is not configured.")
-    if current.identity.email != allowed_email:
+    if not is_platform_admin(current):
         raise HTTPException(status_code=403, detail="Platform administrator access is restricted.")
     require_verified_supabase_email(current.identity)
     return current
