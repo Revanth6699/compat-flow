@@ -122,7 +122,7 @@ function TeamContent() {
   }
 
   const canManage = role === "admin";
-  const canInviteAdmin = role === "admin";
+  const canInviteAdmin = false;
   const canInviteWithCurrentPlan = seats?.available_seats === null || (seats?.available_seats !== undefined && seats.available_seats > 0);
 
   return (
@@ -165,7 +165,7 @@ function TeamContent() {
                   </tr>;
                 })}
               </tbody></table></div>}
-              <p className="settings-description">The organization admin account cannot be changed or deactivated. Only the organization admin can grant administrator access.</p>
+              <p className="settings-description">The organization admin account cannot be changed or deactivated. The organization admin role is assigned during organization setup and cannot be granted through invitations.</p>
             </section>
             {canManage && <section className="panel settings-panel">
               <h2>Invite an employee</h2>
