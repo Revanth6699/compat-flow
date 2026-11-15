@@ -5,7 +5,6 @@ policy only for localhost; production SSRF/allowlist behavior remains covered
 by test_source_connectors.py.
 """
 import os
-from pathlib import Path
 
 import pytest
 import pyodbc

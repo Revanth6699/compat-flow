@@ -10,7 +10,6 @@ import io
 import re
 import unicodedata
 from collections import Counter
-from dataclasses import asdict, dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
