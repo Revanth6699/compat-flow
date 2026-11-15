@@ -6,7 +6,7 @@ from app.services.catalog_csv import HEADER_ALIASES, _normalize_header
 
 def test_reviewed_benchmark_positive_examples_match_alias_map():
     benchmark_path = (
-        Path(__file__).resolve().parents[2]
+        Path(__file__).resolve().parents[1]
         / "docs"
         / "column-mapping-benchmark-seed.json"
     )
@@ -34,7 +34,7 @@ def test_reviewed_benchmark_positive_examples_match_alias_map():
 
 def test_reviewed_negative_and_ambiguous_examples_are_not_auto_mapped():
     benchmark_path = (
-        Path(__file__).resolve().parents[2]
+        Path(__file__).resolve().parents[1]
         / "docs"
         / "column-mapping-benchmark-seed.json"
     )
