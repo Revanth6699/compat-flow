@@ -151,8 +151,8 @@ async def _fetch_api_page(
                     chunks.append(chunk)
             try:
                 return json.loads(b"".join(chunks)), total
-            except (UnicodeDecodeError, json.JSONDecodeError):
-                raise SourceConnectorError("API response is not valid JSON.") from None
+            except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
+                raise SourceConnectorError("API response is not valid or exceeds the supported JSON nesting depth.") from None
         except SourceConnectorError:
             raise
         except httpx.HTTPStatusError:
@@ -456,7 +456,11 @@ def fetch_sql_server_rows(
                 statement = select(*selected_columns)
                 if watermark_column:
                     watermark = source_table.c[watermark_column]
-                    unique_watermark = watermark.primary_key or any(
+                    primary_key_columns = list(source_table.primary_key.columns)
+                    unique_watermark = (
+                        len(primary_key_columns) == 1
+                        and primary_key_columns[0].name == watermark.name
+                    ) or any(
                         isinstance(constraint, UniqueConstraint)
                         and len(constraint.columns) == 1
                         and watermark.name in constraint.columns
@@ -469,11 +473,17 @@ def fetch_sql_server_rows(
                     watermark_value = _coerce_watermark(watermark_after, watermark)
                     statement = statement.where(watermark > watermark_value)
                     statement = statement.order_by(watermark.asc())
-                statement = statement.limit(limit)
+                # Fetch one extra row so reaching the configured cap is not
+                # mistaken for a complete extraction when more source rows exist.
+                statement = statement.limit(limit + 1)
                 result = connection.execute(statement).mappings().yield_per(500)
                 rows: list[dict[str, Any]] = []
                 total_bytes = 2  # JSON array delimiters.
                 for row in result:
+                    if len(rows) >= limit:
+                        raise SourceConnectorError(
+                            "SQL Server result reached the configured row limit; results may be incomplete."
+                        )
                     item = dict(row)
                     encoded_size = len(
                         json.dumps(item, ensure_ascii=False, default=str).encode("utf-8")
