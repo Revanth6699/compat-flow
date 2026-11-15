@@ -15,7 +15,7 @@ CompatFlow uses separate file-format adapters and source connectors. File adapte
 | SFTP | One-file connector implemented | Connector preview and commit endpoints | Strict known-host verification; no polling, scheduled sync, or file deduplication |
 | SQL Server | Bounded connector primitive implemented | Connector preview and commit endpoints | Microsoft ODBC Driver 18 required; no live source connection verified; manual one-shot watermark |
 
-### Status definitions
+### How to read the status table
 
 - **Parser support:** Input bytes can be parsed into source records.
 - **Preview support:** Mapping and schema validation run without writing catalog data.
