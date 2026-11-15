@@ -228,3 +228,5 @@ def test_xml_feeds_the_same_industry_pipeline():
         "catalog.xml",
     )
     _assert_industry_pipeline(parsed)
+
+# CI regression coverage for the format-neutral industry ingestion path.
