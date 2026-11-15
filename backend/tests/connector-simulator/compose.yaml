@@ -49,7 +49,7 @@ services:
       /opt/mssql/bin/mssql-conf set network.tlskey /tls/sql-server.key
       /opt/mssql/bin/mssql-conf set network.tlsprotocols 1.2
       /opt/mssql/bin/mssql-conf set network.forceencryption 1
-      exec su -p -s /bin/bash mssql -c 'exec /opt/mssql/bin/sqlservr'
+      exec su -p -s /bin/bash -c 'exec /opt/mssql/bin/sqlservr' mssql
     depends_on:
       sql-cert-init:
         condition: service_completed_successfully
