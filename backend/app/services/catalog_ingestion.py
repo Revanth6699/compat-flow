@@ -38,14 +38,16 @@ def _reference_error(db: Session, org_id: UUID, record_type: str, row: dict) -> 
             return f"{label} reference does not exist in this organization."
     return None
 
-def persist_validated_import(*, db: Session, organization_id: UUID, filename: str, parsed, result):
+def persist_validated_import(*, db: Session, organization_id: UUID, filename: str, parsed, result, source_type: str = "file", source_descriptor: str | None = None, source_metadata: dict | None = None):
     if result.record_type not in MODEL_BY_TYPE:
         raise HTTPException(status_code=422, detail="Unsupported catalog record type.")
     model, schema = MODEL_BY_TYPE[result.record_type]
     job = ImportJob(
         organization_id=organization_id, filename=filename,
-        import_type=result.record_type, status="processing",
-        row_count=result.total_records, valid_rows=0,
+        import_type=result.record_type, source_type=source_type,
+        source_descriptor=source_descriptor or filename,
+        source_metadata=source_metadata or parsed.metadata or {},
+        status="processing", row_count=result.total_records, valid_rows=0,
         invalid_rows=result.invalid_records, processed_rows=0,
     )
     db.add(job)
@@ -91,6 +93,8 @@ def persist_validated_import(*, db: Session, organization_id: UUID, filename: st
     db.refresh(job)
     return {
         "import_id": str(job.id), "filename": filename, "record_type": result.record_type,
+        "source_type": job.source_type, "source_descriptor": job.source_descriptor,
+        "source_metadata": job.source_metadata,
         "format": parsed.format, "status": job.status, "total_records": result.total_records,
         "imported_records": imported, "rejected_records": rejected, "lineage_records": imported,
         "mappings": result.mappings, "unmapped_headers": result.unmapped_headers,
