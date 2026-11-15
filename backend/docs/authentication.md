@@ -15,39 +15,39 @@ Supabase Auth must use an asymmetric JWT signing key discoverable from `/auth/v1
 
 ## Invitation lifecycle
 
-1. A verified, active CompatFlow user with the `owner` or `admin` role calls `POST /api/v1/invitations`.
+1. A verified, active CompatFlow user with the `admin` role calls `POST /api/v1/invitations`.
 2. The backend creates a cryptographically random, single-use invitation token. Only its SHA-256 hash is stored in PostgreSQL.
 3. The raw token is returned once to the authenticated administrator. The administrator must deliver the invitation link to the intended recipient through an approved channel. Automated email delivery is not wired up yet.
 4. The recipient signs in or creates an account through Supabase Auth and verifies the same email address that received the invitation.
 5. The recipient calls `POST /api/v1/invitations/accept` with the invitation token and their Supabase access token.
 6. The backend verifies the Supabase account's confirmed email, checks the invitation email matches, checks expiry/revocation/reuse, then creates the local organization user and marks the invitation accepted atomically.
 
-Invitation expiry defaults to 72 hours and can be set from 1 to 168 hours. Only `admin`, `member`, and `viewer` can be assigned through invitations. `owner` is reserved for the initial organization bootstrap.
+Invitation expiry defaults to 72 hours and can be set from 1 to 168 hours. Invitations can assign `member` or `viewer`. The initial organization account receives the single privileged `admin` role; invitations cannot grant admin access.
 
 ## Endpoints
 
 - `GET /api/v1/auth/me`: current authorized profile.
-- `POST /api/v1/invitations`: create an invitation (owner/admin only).
-- `GET /api/v1/invitations`: list invitations for the caller's organization (owner/admin only).
-- `DELETE /api/v1/invitations/{invitation_id}`: revoke a pending invitation (owner/admin only).
+- `POST /api/v1/invitations`: create an invitation (admin only).
+- `GET /api/v1/invitations`: list invitations for the caller's organization (admin only).
+- `DELETE /api/v1/invitations/{invitation_id}`: revoke a pending invitation (admin only).
 - `POST /api/v1/invitations/accept`: accept a token for the authenticated, verified matching email.
 
 ## Self-service organization onboarding
 
-The first verified user creates the organization through `POST /api/v1/auth/organization`. This endpoint requires a valid Supabase access token and a confirmed email address. It creates the organization and the user's owner profile in one database transaction.
+The first verified user creates the organization through `POST /api/v1/auth/organization`. This endpoint requires a valid Supabase access token and a confirmed email address. It creates the organization and the user's admin profile in one database transaction.
 
-The endpoint rejects an identity already linked to a CompatFlow user and relies on the unique `users.auth_user_id` constraint to prevent concurrent duplicate provisioning. It does not accept a role or organization ID from the caller; the creator is always assigned the `owner` role for the newly created organization.
+The endpoint rejects an identity already linked to a CompatFlow user and relies on the unique `users.auth_user_id` constraint to prevent concurrent duplicate provisioning. It does not accept a role or organization ID from the caller; the creator is always assigned the `admin` role for the newly created organization.
 
 Subsequent users must join through an invitation. Invitation recipients must verify the invited email and cannot create a second organization for the same Supabase identity. The current data model supports one organization per Supabase user.
 
-There is no public first-owner bootstrap endpoint that allows an unauthenticated visitor to claim an existing organization. The self-service endpoint creates a new organization only for a verified, not-yet-linked identity.
+There is no public bootstrap endpoint that allows an unauthenticated visitor to claim an existing organization. The self-service endpoint creates a new organization only for a verified, not-yet-linked identity.
 
 ## Deployment order
 
 1. Configure `SUPABASE_URL` and `SUPABASE_ANON_KEY` in the backend hosting environment.
 2. Deploy the backend code after review.
 3. Apply the Alembic migration using the deployment's migration procedure.
-4. Bootstrap the initial owner.
+4. Verify the initial organization admin.
 5. Test invite, verify-email, accept, expiry, reuse, revoke, and cross-organization access before enabling protected product workflows.
 
 The existing public CSV preview endpoint remains public for now. Persistent catalog import remains disabled. This PR does not yet add tenant-scoped product routes or organization membership across multiple organizations.
