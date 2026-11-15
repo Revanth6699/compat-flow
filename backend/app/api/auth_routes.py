@@ -237,7 +237,7 @@ def _member_seat_limit(db: Session, organization_id: UUID, current: Authenticate
         select(Subscription).where(
             Subscription.organization_id == organization_id,
             Subscription.status.in_(("active", "trialing")),
-            (Subscription.current_period_end.is_(None)) | (Subscription.current_period_end > now),
+            Subscription.current_period_end > now,
         ).order_by(Subscription.created_at.desc())
     )
     # An unsubscribed organization gets one seat for its owner only.
