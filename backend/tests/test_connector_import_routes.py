@@ -109,7 +109,7 @@ def test_authenticated_connector_preview_runs_validation_without_persisting(monk
     try:
         response = TestClient(app).post(
             "/api/v1/catalog/import/connectors/preview",
-            json={"source_type": "rest_api", "record_type": "products", "api_url": "https://supplier.example/catalog"},
+            json={"source_type": "rest_api", "record_type": "products", "authorized_data_processing": True, "api_url": "https://supplier.example/catalog"},
         )
         assert response.status_code == 200, response.text
         data = response.json()
@@ -137,7 +137,7 @@ def test_authenticated_connector_commit_persists_for_authenticated_tenant(monkey
     try:
         response = TestClient(app).post(
             "/api/v1/catalog/import/connectors/commit",
-            json={"source_type": "rest_api", "record_type": "products", "api_url": "https://supplier.example/catalog"},
+            json={"source_type": "rest_api", "record_type": "products", "authorized_data_processing": True, "api_url": "https://supplier.example/catalog"},
         )
         assert response.status_code == 201, response.text
         assert response.json()["status"] == "completed"
@@ -154,7 +154,7 @@ def test_connector_preview_rejects_user_without_catalog_read_permission(monkeypa
     try:
         response = TestClient(app).post(
             "/api/v1/catalog/import/connectors/preview",
-            json={"source_type": "rest_api", "record_type": "products", "api_url": "https://supplier.example/catalog"},
+            json={"source_type": "rest_api", "record_type": "products", "authorized_data_processing": True, "api_url": "https://supplier.example/catalog"},
         )
         assert response.status_code == 403
     finally:
