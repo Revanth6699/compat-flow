@@ -23,7 +23,7 @@ def upgrade() -> None:
         sa.Column("notice_version", sa.String(length=40), nullable=False),
         sa.Column("source", sa.String(length=80), nullable=False),
         sa.Column("recorded_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.CheckConstraint("purpose IN ('service_processing', 'product_updates', 'ai_mapping')", name="ck_privacy_consent_purpose"),
+        sa.CheckConstraint("purpose IN ('service_processing', 'product_updates', 'ai_mapping', 'public_review')", name="ck_privacy_consent_purpose"),
     )
     op.create_index("ix_privacy_consent_events_email", "privacy_consent_events", ["email"])
     op.create_index("ix_privacy_consent_email_purpose_time", "privacy_consent_events", ["email", "purpose", "recorded_at"])
