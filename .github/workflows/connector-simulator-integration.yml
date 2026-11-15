@@ -31,7 +31,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Generate disposable SQL reader credential
+      - name: Generate disposable SQL credentials
         run: |
           reader_password="$(python -c 'import secrets,string; print("Aa7" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(25)))')"
           sa_password="$(python -c 'import secrets,string; print("Aa7" + "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(25)))')"
