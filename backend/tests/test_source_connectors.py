@@ -509,7 +509,7 @@ async def test_api_connector_fails_instead_of_silently_truncating_full_pages(mon
             page_param="page",
             page_size_param="limit",
             page_size=1,
-            max_pages=1,
+            max_pages=2,
         )
 
 
@@ -614,4 +614,101 @@ def test_sql_server_incremental_watermark_rejects_unselected_column():
             columns=["sku"],
             watermark_column="modified_id",
             watermark_after="10",
+        )
+
+
+
+def test_sql_server_incremental_watermark_uses_unique_numeric_key_and_ordered_select(monkeypatch):
+    calls = {}
+    monkeypatch.setattr(connectors.pyodbc, "drivers", lambda: ["ODBC Driver 18 for SQL Server"])
+
+    class Column:
+        name = "modified_id"
+        primary_key = True
+        type = connectors.Integer()
+
+        def __gt__(self, value):
+            calls["watermark_value"] = value
+            return ("greater_than", value)
+
+        def asc(self):
+            return "ascending"
+
+    class ColumnCollection:
+        def __getitem__(self, name):
+            if name == "modified_id":
+                return Column()
+            return name
+
+    class FakeTable:
+        c = ColumnCollection()
+        constraints = set()
+
+    class Statement:
+        def where(self, clause):
+            calls["where"] = clause
+            return self
+
+        def order_by(self, clause):
+            calls["order_by"] = clause
+            return self
+
+        def limit(self, value):
+            calls["limit"] = value
+            return self
+
+    class MappingResult:
+        def all(self):
+            return [{"modified_id": 11, "sku": "001"}]
+
+    class ExecutionResult:
+        def mappings(self):
+            return MappingResult()
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def execute(self, statement):
+            return ExecutionResult()
+
+    class Engine:
+        def connect(self):
+            return Connection()
+
+        def dispose(self):
+            calls["disposed"] = True
+
+    monkeypatch.setattr(connectors, "create_engine", lambda *args, **kwargs: Engine())
+    monkeypatch.setattr(connectors, "Table", lambda *args, **kwargs: FakeTable())
+    monkeypatch.setattr(connectors, "MetaData", lambda: object())
+    monkeypatch.setattr(connectors, "select", lambda *columns: Statement())
+
+    rows = fetch_sql_server_rows(
+        "mssql+pyodbc://reader:secret@sql.example/catalog?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no&ApplicationIntent=ReadOnly",
+        schema="dbo",
+        table="Products",
+        columns=["modified_id", "sku"],
+        limit=100,
+        watermark_column="modified_id",
+        watermark_after="10",
+    )
+    assert rows == [{"modified_id": 11, "sku": "001"}]
+    assert calls["watermark_value"] == 10
+    assert calls["where"] == ("greater_than", 10)
+    assert calls["order_by"] == "ascending"
+    assert calls["limit"] == 100
+    assert calls["disposed"] is True
+
+
+def test_sql_server_requires_read_only_application_intent():
+    with pytest.raises(SourceConnectorError, match="ApplicationIntent=ReadOnly"):
+        fetch_sql_server_rows(
+            "mssql+pyodbc://reader:secret@sql.example/catalog?driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no",
+            schema="dbo",
+            table="Products",
+            columns=["sku"],
         )
