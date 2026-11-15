@@ -38,7 +38,7 @@ The five catalog record types are:
 4. inventory_snapshots
 5. product_identifiers
 
-The format matrix tests each of these five record types against all five file formats (25 parser-to-schema combinations). This is parser/validation coverage, not a substitute for database-backed commit tests across all 25 combinations.
+The format matrix tests each of these five record types against all five file formats (25 parser-to-schema combinations). A PostgreSQL-backed integration test now also commits all 25 file-format/record-type combinations and verifies import-job source metadata and row lineage. Separate database-backed tests verify explicit partial success and rejection of a cross-tenant product reference. These tests do not replace live supplier connector verification.
 
 ## Parsing and validation rules
 
