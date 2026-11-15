@@ -34,7 +34,7 @@ function SignUpForm() {
     if(companyWebsite && !/^https?:\/\//i.test(companyWebsite)){setError("Enter a company website beginning with https:// or http://.");return;}
     setBusy(true);
     try {
-      const apiBase=(process.env.NEXT_PUBLIC_API_BASE_URL||"").replace(/\\/$/,"");
+      const apiBase=(process.env.NEXT_PUBLIC_API_BASE_URL||"").replace(/\/$/,"");
       if(!apiBase.startsWith("https://") && !apiBase.startsWith("http://localhost")) throw new Error("Privacy processing is not configured over HTTPS.");
       const consentResponse=await fetch(`${apiBase}/api/v1/privacy/consents`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,purposes:{service_processing:true,product_updates:productUpdates},source:"registration"})});
       if(!consentResponse.ok) throw new Error("We could not record your privacy choices. Please try again.");
