@@ -158,17 +158,17 @@ async def profile_public_dataset(file: UploadFile = File(...), _access: Authenti
     if extension not in {"csv", "xls", "xlsx"}:
         await file.close()
         raise HTTPException(status_code=415, detail="The public dataset demo accepts CSV, XLS and XLSX files.")
-    limit = min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
+    limit = settings.import_max_upload_bytes
     try:
         raw = await file.read(limit + 1)
     finally:
         await file.close()
     if len(raw) > limit:
-        raise HTTPException(status_code=413, detail="Public demo uploads cannot exceed 5 MB.")
+        raise HTTPException(status_code=413, detail="Uploaded dataset exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded dataset is empty.")
     try:
-        parsed = parse_source(raw, filename, max_records=10_000)
+        parsed = parse_source(raw, filename, max_records=None)
     except IngestionParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
 
@@ -235,7 +235,7 @@ async def profile_public_dataset(file: UploadFile = File(...), _access: Authenti
 
 
 
-async def _validate_industry_upload(file: UploadFile, profile_id: str | None, max_bytes: int):
+async def _validate_industry_upload(file: UploadFile, profile_id: str | None, max_bytes: int, max_records: int | None = 10_000):
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
         await file.close()
@@ -249,11 +249,12 @@ async def _validate_industry_upload(file: UploadFile, profile_id: str | None, ma
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
     try:
-        parsed = parse_source(raw, filename, max_records=10_000)
+        parsed = parse_source(raw, filename, max_records=max_records)
         if not parsed.records:
             raise HTTPException(status_code=422, detail="No data rows were found in the uploaded file.")
         result = validate_industry_records(
-            parsed.headers, [record.values for record in parsed.records], profile_id=profile_id
+            parsed.headers, [record.values for record in parsed.records], profile_id=profile_id,
+            max_rows=None if max_records is None else max_records,
         )
     except IngestionParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
@@ -281,7 +282,7 @@ async def preview_industry_catalog_import(
 ):
     """Stateless industry-aware preview with the bounded public demo upload limit."""
     return await _validate_industry_upload(
-        file, profile_id, min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
+        file, profile_id, settings.import_max_upload_bytes, max_records=None
     )
 
 
