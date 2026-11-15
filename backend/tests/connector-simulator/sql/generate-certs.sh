@@ -12,7 +12,7 @@ openssl req -x509 -newkey rsa:2048 -nodes \
   -addext "keyUsage=critical,keyCertSign,cRLSign"
 openssl genrsa -out /tls/sql-server.key 2048
 openssl req -new -key /tls/sql-server.key -out /tmp/sql-server.csr \
-  -subj "/CN=localhost"
+  -subj "/CN=sql-supplier"
 cat > /tmp/sql-server.ext <<'EOF'
 [server_cert]
 basicConstraints=critical,CA:FALSE
