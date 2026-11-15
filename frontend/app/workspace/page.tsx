@@ -9,7 +9,7 @@ import { ApiRequestError, apiRequest } from "@/lib/auth-client";
 
 type Profile = {
   id: string; organization_id: string; email: string; role: string; is_active: boolean;
-  account_type: string; plan_code: string | null; subscription_status: string | null;
+  account_type: string; plan_code: string | null; subscription_status: string | null; is_platform_admin?: boolean;
 };
 
 function WorkspaceContent() {
@@ -79,7 +79,7 @@ function WorkspaceContent() {
         <header className="workspace-heading">
           <div><span className="eyebrow">YOUR ORGANIZATION</span><h1>Workspace</h1><p>Signed in as {user?.email || "your account"}.</p></div>
           <div className="workspace-actions">
-            <Link className="button button-secondary" href="/pricing">Plans</Link>
+            {!profile?.is_platform_admin && <Link className="button button-secondary" href="/pricing">Plans</Link>}
             <Link className="button button-secondary" href="/settings">Profile settings</Link>
             <button className="button button-secondary" onClick={() => void signOut()}>Sign out</button>
           </div>
@@ -112,18 +112,19 @@ function WorkspaceContent() {
               <dl>
                 <div><dt>Organization ID</dt><dd>{profile.organization_id}</dd></div>
                 <div><dt>Your account</dt><dd>{profile.email}</dd></div>
-                <div><dt>Subscription</dt><dd>{profile.plan_code ? profile.plan_code.charAt(0).toUpperCase() + profile.plan_code.slice(1) : "No paid plan selected"}</dd></div>
-                <div><dt>Subscription status</dt><dd>{profile.subscription_status || "Not subscribed"}</dd></div>
+                <div><dt>Subscription</dt><dd>{profile.is_platform_admin ? "Not required — platform owner" : profile.plan_code ? profile.plan_code.charAt(0).toUpperCase() + profile.plan_code.slice(1) : "No paid plan selected"}</dd></div>
+                <div><dt>Subscription status</dt><dd>{profile.is_platform_admin ? "Exempt" : profile.subscription_status || "Not subscribed"}</dd></div>
                 <div><dt>Workspace access</dt><dd>{profile.is_active ? "Active" : "Inactive"}</dd></div>
               </dl>
-              {!profile.plan_code && <div className="notice"><strong>Your organization is set up.</strong><p>Choose a subscription to unlock paid organization features. Your workspace and owner account remain available while you decide.</p><Link className="button" href="/pricing">Choose a plan</Link></div>}
+              {!profile.plan_code && !profile.is_platform_admin && <div className="notice"><strong>Your organization is set up.</strong><p>Choose a subscription to unlock paid organization features. Your workspace and owner account remain available while you decide.</p><Link className="button" href="/pricing">Choose a plan</Link></div>}
+              {profile.is_platform_admin && <div className="notice"><strong>Platform-owner access is enabled.</strong><p>No subscription is required for your account. Customer subscription rules remain unchanged.</p></div>}
             </section>
 
             <section className="pricing-grid" aria-label="Workspace areas">
               <article className="panel settings-panel"><span className="eyebrow">CATALOG OPERATIONS</span><h2>Catalog validation</h2><p>Run a validation preview with the file formats and limits available to your organization. Files are not saved or committed to the catalog in this workflow.</p><Link className="button button-secondary" href="/catalog/import">Open validation preview</Link></article>
               <article className="panel settings-panel"><span className="eyebrow">CONNECTED DATA</span><h2>Data sources</h2><p>Configure eligible REST API, SFTP and SQL Server source connections.</p><Link className="button button-secondary" href="/catalog/sources">Manage data sources</Link></article>
               {(profile.role === "owner" || profile.role === "admin") && <article className="panel settings-panel"><span className="eyebrow">PEOPLE</span><h2>Team access</h2><p>Invite employees, review members and manage permitted access for this organization.</p><Link className="button button-secondary" href="/team">Manage team</Link></article>}
-              <article className="panel settings-panel"><span className="eyebrow">ORGANIZATION</span><h2>Billing</h2><p>Review subscription status and payment details for this organization.</p><Link className="button button-secondary" href="/billing">Manage subscription</Link></article>
+              {!profile.is_platform_admin && <article className="panel settings-panel"><span className="eyebrow">ORGANIZATION</span><h2>Billing</h2><p>Review subscription status and payment details for this organization.</p><Link className="button button-secondary" href="/billing">Manage subscription</Link></article>}
             </section>
           </>
         )}
