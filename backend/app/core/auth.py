@@ -96,7 +96,7 @@ def get_supabase_identity(
 
         if user_response.status_code in {401, 403, 404}:
             raise _unauthorized()
-        if user_response.status_code >= 500:
+        if user_response.status_code == 429 or user_response.status_code >= 500:
             raise HTTPException(status_code=503, detail="Supabase authentication is temporarily unavailable.")
         if user_response.status_code != 200:
             raise _unauthorized()
@@ -104,6 +104,8 @@ def get_supabase_identity(
             current_user = user_response.json()
         except ValueError:
             raise HTTPException(status_code=503, detail="Supabase returned an invalid account status response.") from None
+        if not isinstance(current_user, dict):
+            raise HTTPException(status_code=503, detail="Supabase returned an invalid account status response.")
         if (
             str(current_user.get("id", "")) != str(auth_user_id)
             or str(current_user.get("email", "")).strip().lower() != normalized_email
