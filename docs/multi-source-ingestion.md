@@ -88,7 +88,7 @@ The backend Dockerfile installs Microsoft ODBC Driver 18 and verifies that pyodb
 
 ApplicationIntent=ReadOnly is a client routing hint, not a permission boundary. The database administrator must create a dedicated login with only SELECT permission on the approved schema/table/view and no write, DDL, or broader database permissions. CompatFlow cannot prove those grants from the connection URL.
 
-An optional incremental watermark is supported for a selected primary-key or single-column unique numeric/date/datetime column. The query applies watermark_column > watermark_after, orders ascending, and returns the watermark column in the selected projection. The import history stores the previous and next values. The operator must review and supply the next value on the following run. A monotonic unique key is required; non-unique timestamps are rejected to avoid skipped ties. There is no automated checkpoint scheduler or durable incremental sync.
+An optional incremental watermark is supported only for a selected single-column primary key or single-column unique constraint with an integer, numeric, date, or datetime type. A column that is merely one part of a composite primary key is not accepted as unique. The query applies watermark_column > watermark_after, orders ascending, and returns the watermark column in the selected projection. The query fetches one sentinel row beyond the requested limit and fails if that row exists, rather than silently accepting a potentially truncated batch. The import history stores the previous and next values. The operator must review and supply the next value on the following run. A monotonic unique key is required; non-unique timestamps are rejected to avoid skipped ties. There is no automated checkpoint scheduler or durable incremental sync.
 
 No real SQL Server connection or least-privilege permission test has passed. Do not label SQL Server operational until a live connection and permission test succeeds.
 
@@ -108,11 +108,10 @@ Do not change subscription entitlements or pricing as part of ingestion work. Mu
 
 ## Remaining work
 
-- Add database-backed commit integration tests for every file format and record type, plus tenant-isolation and partial-success assertions.
 - Complete source-configuration management and an encrypted credential vault; current credentials are request-scoped only.
 - Add API cursor/next-link adapters where supplier contracts require them, with source-specific pagination tests.
 - Add SFTP polling/trigger, remote-file deduplication, and retry/recovery orchestration.
-- Add durable SQL Server watermark checkpoint management and composite-key support where a source watermark is not unique.
+- Add durable SQL Server watermark checkpoint management. Composite-key watermark pagination is deliberately unsupported until a safe tie-breaking cursor is designed.
 - Verify DNS pinning/connection-level SSRF controls for API destinations.
 - Run live, least-privilege tests against approved REST, SFTP, and SQL Server test sources before enabling broader product claims.
 - Update UI controls and labels so preview-only, mock-tested, live-verified, and generally available capabilities cannot be confused.
