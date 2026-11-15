@@ -7,7 +7,7 @@ from uuid import uuid4, UUID
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -153,6 +153,11 @@ def delete_account(
     if payload.confirmation != "DELETE MY ACCOUNT":
         raise HTTPException(status_code=422, detail="Type DELETE MY ACCOUNT to confirm.")
     _delete_supabase_user(identity.auth_user_id)
+    # Remove user-owned payment records that otherwise block deletion through
+    # the payments.user_id RESTRICT constraint. Invitations issued by this user
+    # are removed so no invitation history remains attached to the deleted user.
+    db.execute(delete(Payment).where(Payment.user_id == profile.id))
+    db.execute(delete(UserInvitation).where(UserInvitation.invited_by_user_id == profile.id))
     db.execute(delete(User).where(User.id == profile.id, User.organization_id == profile.organization_id))
     db.commit()
     return {"deleted": True, "scope": "account"}
