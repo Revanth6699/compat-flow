@@ -566,7 +566,7 @@ def test_sql_server_incremental_watermark_requires_selected_unique_column(monkey
         c = ColumnCollection()
         constraints = set()
         primary_key = SimpleNamespace(columns=[])
-class Statement:
+    class Statement:
         def where(self, clause):
             calls["where"] = clause
             return self
@@ -665,7 +665,7 @@ def test_sql_server_incremental_watermark_uses_unique_numeric_key_and_ordered_se
         c = ColumnCollection()
         constraints = set()
         primary_key = SimpleNamespace(columns=[Column()])
-class Statement:
+    class Statement:
         def where(self, clause):
             calls["where"] = clause
             return self
