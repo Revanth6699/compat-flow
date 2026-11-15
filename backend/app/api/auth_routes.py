@@ -18,6 +18,7 @@ from app.core.auth import (
     get_supabase_identity,
     require_roles,
     get_active_plan,
+    is_platform_admin,
     require_verified_supabase_email,
 )
 from app.core.database import get_db
@@ -39,6 +40,7 @@ class CurrentUserResponse(BaseModel):
     account_type: str = "demo"
     plan_code: str | None = None
     subscription_status: str | None = None
+    is_platform_admin: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -222,6 +224,7 @@ def get_me(current: AuthenticatedUser = Depends(get_current_user), db: Session =
         account_type=resolved_account_type,
         plan_code=plan.code if plan else None,
         subscription_status=subscription.status if subscription else None,
+        is_platform_admin=is_platform_admin(current),
     )
 
 
