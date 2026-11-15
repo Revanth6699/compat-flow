@@ -421,6 +421,8 @@ def fetch_sql_server_rows(
         raise SourceConnectorError(
             "SQL Server row limit must be between 1 and 10,000."
         )
+    if not 1 <= max_bytes <= 50 * 1024 * 1024:
+        raise SourceConnectorError("SQL Server result-size limit is invalid.")
     if bool(watermark_column) != bool(watermark_after):
         raise SourceConnectorError(
             "Configure both a SQL Server watermark column and its last committed value."
@@ -464,21 +466,20 @@ def fetch_sql_server_rows(
                     statement = statement.where(watermark > watermark_value)
                     statement = statement.order_by(watermark.asc())
                 statement = statement.limit(limit)
-                rows = [
-                    dict(row)
-                    for row in connection.execute(statement).mappings().all()
-                ]
-                if (
-                    len(
-                        json.dumps(rows, ensure_ascii=False, default=str).encode(
-                            "utf-8"
+                result = connection.execute(statement).mappings().yield_per(500)
+                rows: list[dict[str, Any]] = []
+                total_bytes = 2  # JSON array delimiters.
+                for row in result:
+                    item = dict(row)
+                    encoded_size = len(
+                        json.dumps(item, ensure_ascii=False, default=str).encode("utf-8")
+                    )
+                    total_bytes += encoded_size + (1 if rows else 0)
+                    if total_bytes > max_bytes:
+                        raise SourceConnectorError(
+                            "SQL Server result exceeds the configured size limit."
                         )
-                    )
-                    > max_bytes
-                ):
-                    raise SourceConnectorError(
-                        "SQL Server result exceeds the configured size limit."
-                    )
+                    rows.append(item)
                 return rows
         finally:
             engine.dispose()
