@@ -19,9 +19,6 @@ from app.models import (
     Product,
     ProductVariant,
     Supplier,
-    SupplierOffer,
-    InventorySnapshot,
-    ProductIdentifier,
 )
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.ingestion_adapters import parse_source
