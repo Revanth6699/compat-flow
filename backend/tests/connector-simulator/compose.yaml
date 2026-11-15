@@ -30,8 +30,31 @@ services:
     ports:
       - "2222:22"
 
+  sql-cert-init:
+    image: alpine:3.20
+    entrypoint: ["/bin/sh", "/generate-certs.sh"]
+    volumes:
+      - sql-tls:/tls
+      - ./sql/generate-certs.sh:/generate-certs.sh:ro
+
   sql-supplier:
     image: mcr.microsoft.com/mssql/server:2022-latest
+    user: "0"
+    entrypoint: ["/bin/bash", "-c"]
+    command: |
+      set -euo pipefail
+      chown mssql:mssql /tls/sql-server.crt /tls/sql-server.key
+      chmod 440 /tls/sql-server.crt /tls/sql-server.key
+      /opt/mssql/bin/mssql-conf set network.tlscert /tls/sql-server.crt
+      /opt/mssql/bin/mssql-conf set network.tlskey /tls/sql-server.key
+      /opt/mssql/bin/mssql-conf set network.tlsprotocols 1.2
+      /opt/mssql/bin/mssql-conf set network.forceencryption 1
+      exec su -s /bin/bash mssql -c 'exec /opt/mssql/bin/sqlservr'
+    depends_on:
+      sql-cert-init:
+        condition: service_completed_successfully
+    volumes:
+      - sql-tls:/tls
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
@@ -58,3 +81,4 @@ services:
 
 volumes:
   rest-tls:
+  sql-tls:
