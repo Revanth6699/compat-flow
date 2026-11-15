@@ -134,7 +134,7 @@ def delete_account(
 
         # Delete other members first and the admin last. If a provider call fails,
         # the admin can still sign in and retry the organization deletion.
-        members.sort(key=lambda member: member.role == "admin")
+        members.sort(key=lambda member: member.id == profile.id)
         for member in members:
             if member.auth_user_id:
                 _delete_supabase_user(member.auth_user_id)
