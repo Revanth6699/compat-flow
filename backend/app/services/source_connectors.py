@@ -40,9 +40,12 @@ class SourceConnectorError(RuntimeError):
 def _validate_https_url(url: str, allowed_hosts: set[str]) -> None:
     try:
         parsed = urlsplit(url)
-        port = parsed.port or 443
     except ValueError:
         raise SourceConnectorError("Connector URL is invalid.") from None
+    try:
+        port = parsed.port or 443
+    except ValueError:
+        raise SourceConnectorError("Connector URL contains an invalid port.") from None
     if (
         parsed.scheme != "https"
         or not parsed.hostname
