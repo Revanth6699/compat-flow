@@ -80,7 +80,7 @@ export default function CatalogImportPage() {
   const [aiResult, setAiResult] = useState<AiMappingResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [profileId, setProfileId] = useState("general");
+  const [profileId, setProfileId] = useState("");
   const [manualMapping, setManualMapping] = useState<Record<string, string>>({});
   const canonicalFields = ["sku", "name", "manufacturer", "part_number", "category", "compatibility", "replacement_sku"];
 
@@ -273,7 +273,7 @@ export default function CatalogImportPage() {
               {loading ? "Validating..." : "Validate file"}
             </button>
             <button className="button button-secondary" type="button" disabled={loading} onClick={() => {
-              setFile(null); setResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setError("");
+              setFile(null); setResult(null); setMultiResult(null); setIndustryResult(null); setAiResult(null); setAiConsent(false); setError("");
               const input = document.getElementById("catalog-file") as HTMLInputElement | null;
               if (input) input.value = "";
             }}>Clear</button>
