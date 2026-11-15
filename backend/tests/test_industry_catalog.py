@@ -4,6 +4,7 @@ from app.services.industry_catalog import (
     IndustryCSVError,
     detect_industry,
     validate_industry_csv,
+    validate_industry_records,
 )
 
 
@@ -89,3 +90,26 @@ def test_wholesale_supplier_sku_duplicate_is_scoped_by_supplier():
 def test_unknown_profile_rejected():
     with pytest.raises(IndustryCSVError, match="Unknown industry profile"):
         validate_industry_csv("sku,title\nS-1,Widget\n", profile_id="pharma")
+
+
+def test_format_neutral_adapter_applies_same_industry_mapping_to_extracted_records():
+    headers = ["sku", "title", "price", "currency"]
+    records = [
+        {"sku": "S-1", "title": "Widget", "price": 12.5, "currency": "usd"},
+        {"sku": "S-2", "title": "Gadget", "price": 8, "currency": "EUR"},
+    ]
+    result = validate_industry_records(headers, records, profile_id="ecommerce")
+    assert result["total_rows"] == 2
+    assert result["valid_rows"] == 2
+    assert mapped(result)["unit_price"] == "price"
+    assert result["preview"][0]["currency"] == "USD"
+
+
+def test_inventory_available_quantity_alias_is_distinct_and_checked():
+    result = validate_industry_csv(
+        "sku,title,quantity_on_hand,quantity_reserved,quantity_available\n"
+        "S-1,Widget,10,3,9\n",
+        profile_id="ecommerce",
+    )
+    assert mapped(result)["quantity_available"] == "quantity_available"
+    assert any(issue["error_code"] == "INVENTORY_QUANTITY_MISMATCH" for issue in result["issues"])
