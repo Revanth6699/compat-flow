@@ -374,11 +374,18 @@ async def razorpay_webhook(
     # Do not trust browser timestamps or Razorpay's scheduled cycle boundaries.
     if subscription is not None and payment_status == "succeeded" and paid_at is not None:
         if subscription.status not in {"canceled", "expired"}:
-            subscription.status = "active"
-            subscription.current_period_start = paid_at
-            subscription.current_period_end = subscription_period_end(
-                paid_at, subscription.billing_interval
+            # Razorpay can retry webhook delivery out of order. An older charge
+            # must never move the organization's expiry backwards.
+            is_newer_payment = (
+                subscription.current_period_start is None
+                or paid_at > subscription.current_period_start
             )
+            if is_newer_payment:
+                subscription.status = "active"
+                subscription.current_period_start = paid_at
+                subscription.current_period_end = subscription_period_end(
+                    paid_at, subscription.billing_interval
+                )
 
     if subscription is not None and isinstance(provider_payment_id, str):
         payment = db.scalar(
