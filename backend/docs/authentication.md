@@ -67,7 +67,6 @@ The migration seeds database-backed role permissions:
 
 | Role | Catalog read | Catalog write | Supplier read | Supplier write |
 | --- | --- | --- | --- | --- |
-| owner | Yes | Yes | Yes | Yes |
 | admin | Yes | Yes | Yes | Yes |
 | member | Yes | Yes | Yes | Yes |
 | viewer | Yes | No | Yes | No |
