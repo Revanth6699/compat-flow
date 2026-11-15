@@ -291,12 +291,14 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
                 user_id=owner_a.id,
                 plan_code=seat_plan.code,
                 status="active",
+                current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
             ),
             Subscription(
                 organization_id=organization_b.id,
                 user_id=owner_b.id,
                 plan_code=seat_plan.code,
                 status="active",
+                current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
             ),
         ])
         db.commit()
@@ -580,6 +582,7 @@ def test_postgres_downgrade_retains_existing_members_and_blocks_new_seats(monkey
             user_id=owner.id,
             plan_code=plan.code,
             status="active",
+            current_period_end=datetime.now(timezone.utc) + timedelta(days=30),
         ))
         invitation = UserInvitation(
             organization_id=organization.id,
