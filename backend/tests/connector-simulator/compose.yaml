@@ -38,13 +38,23 @@ services:
       MSSQL_SA_PASSWORD: "Simulator-SA-Only-2026!"
     ports:
       - "14333:1433"
-    volumes:
-      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '$$MSSQL_SA_PASSWORD' -C -Q 'SELECT 1' >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 30
+
+  sql-init:
+    image: mcr.microsoft.com/mssql-tools:latest
+    depends_on:
+      sql-supplier:
+        condition: service_healthy
+    volumes:
+      - ./sql/init.sql:/seed/init.sql:ro
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      "/opt/mssql-tools/bin/sqlcmd -S sql-supplier -U sa
+      -P 'Simulator-SA-Only-2026!' -C -b -i /seed/init.sql"
 
 volumes:
   rest-tls:
