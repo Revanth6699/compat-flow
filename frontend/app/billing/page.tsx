@@ -60,6 +60,7 @@ function BillingContent() {
   const requestedPlan = search.get("plan");
   const initialPlan = requestedPlan && plans.some(plan => plan.code === requestedPlan) ? requestedPlan : "starter";
   const [role, setRole] = useState<string | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [selectedPlan, setSelectedPlan] = useState(initialPlan);
   const [loading, setLoading] = useState(true);
@@ -73,10 +74,11 @@ function BillingContent() {
     try {
       const [result, profile] = await Promise.all([
         apiRequest<SubscriptionResponse>("/api/v1/billing/subscription"),
-        apiRequest<{ role: string }>("/api/v1/auth/me"),
+        apiRequest<{ role: string; is_platform_admin?: boolean }>("/api/v1/auth/me"),
       ]);
       setSubscription(result.subscription);
       setRole(profile.role);
+      setIsPlatformAdmin(profile.is_platform_admin === true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load subscription details.");
     } finally {
@@ -157,6 +159,24 @@ function BillingContent() {
 
   const isOwner = role === "owner";
   const subscriptionLocked = !!(subscription && ["active", "trialing", "pending", "past_due"].includes(subscription.status));
+
+  if (!loading && isPlatformAdmin) {
+    return (
+      <main id="main" className="page">
+        <div className="container account-settings">
+          <header className="workspace-heading">
+            <div><span className="eyebrow">PLATFORM ADMINISTRATOR</span><h1>Subscription exemption</h1><p>Your owner account does not require a customer subscription.</p></div>
+            <Link className="button button-secondary" href="/workspace">Back to workspace</Link>
+          </header>
+          <section className="panel settings-panel">
+            <h2>Full platform testing access</h2>
+            <p>Your platform-owner account is exempt from plan selection, checkout, and subscription entitlement checks. You can test the platform without purchasing a plan.</p>
+            <p className="settings-description">Customer organizations remain subject to their selected subscription, entitlements, seat limits, and billing status.</p>
+          </section>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <>
