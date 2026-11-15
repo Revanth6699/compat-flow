@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.auth import AuthenticatedUser, get_current_user, require_roles
+from app.core.auth import AuthenticatedUser, get_current_user, is_platform_admin, require_roles
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import Payment, PaymentWebhookEvent, Subscription, SubscriptionPlan
@@ -65,6 +65,8 @@ def create_subscription(
     current: AuthenticatedUser = Depends(require_roles("owner")),
     db: Session = Depends(get_db),
 ):
+    if is_platform_admin(current):
+        raise HTTPException(status_code=403, detail="Platform administrator accounts are exempt from subscriptions.")
     if not settings.razorpay_key_id or not settings.razorpay_key_secret:
         raise HTTPException(status_code=503, detail="Razorpay API credentials are not configured.")
     if payload.billing_interval == "year" and payload.total_count > 10:
