@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.auth import AuthenticatedUser, get_active_plan, get_current_user, is_platform_admin, resolve_import_limits, require_verified_supabase_email
+from app.core.auth import AuthenticatedUser, get_current_user, is_platform_admin, resolve_import_limits, require_verified_supabase_email
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import DemoAccessRequest, Organization, Review, Subscription, User
