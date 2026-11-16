@@ -1,6 +1,14 @@
 # CompatFlow
 
-CompatFlow is an early-stage supplier catalog workflow product. This repository currently contains a **public demo build** focused on CSV structure and row validation.
+CompatFlow is an early-stage supplier catalog workflow product. The repository contains a stateless public demo and a separate authenticated backend development surface. They do not expose the same capabilities.
+
+## Repository implementation status
+
+The backend includes organization authentication and tenant isolation, five catalog record types, shared CSV/XLSX/XLS/JSON/XML parsing and validation, reviewed import commit endpoints, import history/lineage, and one-shot REST API, SFTP and SQL Server connector paths. The authenticated file page currently exposes validation and preview only; file persistence controls are not yet available in that UI.
+
+Connector code has mocked coverage but no REST, SFTP or SQL Server source has been live-verified. SQL Server additionally requires a dedicated SELECT-only login, trusted TLS certificate, Python `pyodbc`, and Microsoft ODBC Driver 18. Do not treat the connectors or multi-source workflow as generally available or production-ready.
+
+The public demo described below remains a separate stateless workflow. It does not expose the full authenticated backend implementation.
 
 ## What the public demo does
 
@@ -64,4 +72,4 @@ Production builds intentionally fail unless the public HTTPS API URL, website UR
 
 ## Project status
 
-This is not a production SaaS release. Authentication, tenant isolation, persistent import execution, supplier-specific catalog reconciliation, backups, monitoring, abuse controls and a formal security review are not implemented in this demo build.
+This is not a production SaaS release. The backend contains authentication, tenant-scoped catalog APIs and persistent import foundations, but production rollout still requires live connector verification, credential-vault and durable sync work, deployment/runtime verification, operational backups, monitoring, abuse-control review, and a formal security review. See [multi-source ingestion status](docs/multi-source-ingestion.md) for the format-by-format boundaries and known limitations.
