@@ -227,7 +227,7 @@ export default function CatalogImportPage() {
         {file && user && (
           <section className="panel result-section" aria-live="polite">
             <h3>AI record classification and field mapping</h3>
-            <p className="import-description">AI is optional. If enabled and a provider is configured, CompatFlow sends up to 80 source headers and the first five records to an external HTTPS provider. Header names longer than 128 characters are excluded from AI requests and each sample value is clipped to 120 characters. Confidence is model-reported and uncalibrated. Suggestions require your confirmation and never trigger persistence.</p>
+            <p className="import-description">AI is optional. If enabled and a provider is configured, CompatFlow sends up to 80 source headers and the first five records to an external HTTPS provider. AI requests reject source headers longer than 128 characters; each sample value is clipped to 120 characters. Confidence is model-reported and uncalibrated. Suggestions require your confirmation and never trigger persistence.</p>
             <label><input type="checkbox" checked={aiConsent} onChange={(event) => { setAiConsent(event.target.checked); setAiResult(null); }} /> I consent to sending this bounded sample evidence to the configured AI provider for record-type and field-mapping suggestions.</label>
             <button className="button button-secondary" type="button" onClick={handleSuggestMappings} disabled={!aiConsent || loading}>Suggest record type and mappings with AI</button>
             {aiResult && <>
