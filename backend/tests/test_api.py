@@ -56,6 +56,7 @@ def test_platform_owner_can_validate_more_than_ten_thousand_rows(monkeypatch):
     from app.api import routes
     from app.core.auth import AuthenticatedUser, SupabaseIdentity, get_current_user
     from app.core.config import settings
+    from app.core.database import get_db
 
     owner_email = settings.platform_admin_email.split(",")[0].strip().lower()
     owner = AuthenticatedUser(
@@ -65,6 +66,7 @@ def test_platform_owner_can_validate_more_than_ten_thousand_rows(monkeypatch):
         profile=SimpleNamespace(role="admin"),
     )
     app.dependency_overrides[get_current_user] = lambda: owner
+    app.dependency_overrides[get_db] = lambda: None
     monkeypatch.setattr(
         routes,
         "validate_industry_records",
