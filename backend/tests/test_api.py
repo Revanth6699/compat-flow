@@ -70,7 +70,7 @@ def test_platform_owner_can_validate_more_than_ten_thousand_rows(monkeypatch):
         "validate_industry_records",
         lambda headers, rows, profile_id=None: {"total_rows": len(rows)},
     )
-    csv_data = ("sku\\n" + "".join(f"SKU-{index}\\n" for index in range(10_001))).encode()
+    csv_data = ("sku\n" + "".join(f"SKU-{index}\n" for index in range(10_001))).encode()
 
     try:
         response = client.post(
