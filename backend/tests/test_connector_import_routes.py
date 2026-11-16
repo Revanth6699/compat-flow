@@ -276,3 +276,110 @@ def test_sql_watermark_checkpoint_is_recorded_without_connection_secrets():
         "strategy": "strictly_greater_than_unique_monotonic_key",
     }
     assert "secret" not in str(metadata) and "hidden" not in str(metadata)
+
+
+def test_connector_preview_returns_opt_in_ai_classification_and_mapping_without_credentials(monkeypatch):
+    _, _, _ = install_connector_auth(monkeypatch)
+    captured = {}
+
+    async def fake_load_source(payload):
+        captured["connector_secret"] = payload.api_headers.get("Authorization")
+        return (
+            b'[{"sku":"001","name":"Widget","manufacturer":"Acme","part_number":"A-1","category":"Parts"}]',
+            "supplier.json",
+        )
+
+    async def fake_suggest_field_mappings(**kwargs):
+        captured["ai_input"] = kwargs
+        return SimpleNamespace(
+            status="suggestions_ready",
+            message="Review suggestions before applying.",
+            classification=SimpleNamespace(
+                record_type="products",
+                confidence=0.9,
+                rationale="Product SKU and descriptive fields are present.",
+                evidence=["sku", "name"],
+            ),
+            suggestions=[
+                SimpleNamespace(
+                    source_header="sku",
+                    candidate_field="sku",
+                    confidence=0.99,
+                    rationale="Header matches the catalog SKU field.",
+                    evidence=["sku", "001"],
+                )
+            ],
+        )
+
+    monkeypatch.setattr(routes, "_load_source", fake_load_source)
+    monkeypatch.setattr(routes, "_enforce_connector_rate_limit", lambda organization_id: _async_noop())
+    monkeypatch.setattr(routes, "suggest_field_mappings", fake_suggest_field_mappings)
+    try:
+        response = TestClient(app).post(
+            "/api/v1/catalog/import/connectors/preview",
+            json={
+                "source_type": "rest_api",
+                "record_type": "products",
+                "api_url": "https://supplier.example/catalog",
+                "api_headers": {"Authorization": "Bearer connector-secret"},
+                "ai_opt_in": True,
+            },
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["ai"]["status"] == "suggestions_ready"
+        assert data["ai"]["source_data_sent"] is True
+        assert data["ai"]["confidence_calibration"] == "model_reported_uncalibrated"
+        assert data["ai"]["classification"]["record_type"] == "products"
+        assert data["ai"]["classification"]["requires_confirmation"] is True
+        assert data["ai"]["suggestions"][0]["candidate_field"] == "sku"
+        assert data["ai"]["suggestions"][0]["requires_confirmation"] is True
+        assert captured["connector_secret"] == "Bearer connector-secret"
+        assert captured["ai_input"]["headers"] == ["sku", "name", "manufacturer", "part_number", "category"]
+        assert captured["ai_input"]["sample_records"][0]["sku"] == "001"
+        assert "connector-secret" not in str(captured["ai_input"])
+    finally:
+        clear_connector_auth()
+
+
+def test_connector_preview_does_not_send_ai_evidence_without_opt_in(monkeypatch):
+    install_connector_auth(monkeypatch)
+    captured = {"called": False}
+
+    async def fake_load_source(payload):
+        return (
+            b'[{"sku":"001","name":"Widget","manufacturer":"Acme","part_number":"A-1","category":"Parts"}]',
+            "supplier.json",
+        )
+
+    async def fake_suggest_field_mappings(**kwargs):
+        captured["called"] = True
+        assert kwargs["user_opted_in"] is False
+        return SimpleNamespace(
+            status="consent_required",
+            message="AI suggestions are opt-in; no source data was sent.",
+            classification=None,
+            suggestions=[],
+        )
+
+    monkeypatch.setattr(routes, "_load_source", fake_load_source)
+    monkeypatch.setattr(routes, "_enforce_connector_rate_limit", lambda organization_id: _async_noop())
+    monkeypatch.setattr(routes, "suggest_field_mappings", fake_suggest_field_mappings)
+    try:
+        response = TestClient(app).post(
+            "/api/v1/catalog/import/connectors/preview",
+            json={
+                "source_type": "rest_api",
+                "record_type": "products",
+                "api_url": "https://supplier.example/catalog",
+                "ai_opt_in": False,
+            },
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["ai"]["status"] == "consent_required"
+        assert data["ai"]["source_data_sent"] is False
+        assert data["ai"]["classification"] is None
+        assert captured["called"] is True
+    finally:
+        clear_connector_auth()
