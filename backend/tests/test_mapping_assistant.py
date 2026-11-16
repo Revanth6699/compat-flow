@@ -152,7 +152,7 @@ def test_ai_rejects_hallucinated_evidence_and_mapping_fields(monkeypatch):
         "suggestions": [
             {
                 "source_header": "SKU",
-                "candidate_field": "supplier_id",
+                "candidate_field": "variant_sku",
                 "confidence": 0.99,
                 "rationale": "Wrong record-type field.",
                 "evidence": ["SKU"],
