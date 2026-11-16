@@ -210,6 +210,7 @@ async def decide_demo_request(
     if request is None:
         raise HTTPException(status_code=404, detail="Demo request not found.")
     now = datetime.now(timezone.utc)
+    requests_to_sync: list[tuple[DemoAccessRequest, str]] = []
     if decision == "revoke":
         active_approvals = db.scalars(
             select(DemoAccessRequest).where(
@@ -221,6 +222,12 @@ async def decide_demo_request(
             approval.status = "revoked"
             approval.reviewed_by = admin.identity.email
             approval.reviewed_at = now
+            requests_to_sync.append((approval, "revoke"))
+        if request not in active_approvals:
+            request.status = "revoked"
+            request.reviewed_by = admin.identity.email
+            request.reviewed_at = now
+            requests_to_sync.append((request, "revoke"))
     elif decision == "approve":
         previous_approvals = db.scalars(
             select(DemoAccessRequest).where(
@@ -233,16 +240,18 @@ async def decide_demo_request(
             approval.status = "revoked"
             approval.reviewed_by = admin.identity.email
             approval.reviewed_at = now
+            requests_to_sync.append((approval, "revoke"))
         request.status = "approved"
+        requests_to_sync.append((request, "approve"))
     else:
         request.status = "rejected"
-    if decision == "revoke":
-        request.status = "revoked"
+        requests_to_sync.append((request, "reject"))
     request.reviewed_by = admin.identity.email
     request.reviewed_at = now
     try:
         db.flush()
-        await sync_demo_request_to_supabase(request, decision, now)
+        for item, item_decision in requests_to_sync:
+            await sync_demo_request_to_supabase(item, item_decision, now)
         db.commit()
     except Exception:
         db.rollback()
