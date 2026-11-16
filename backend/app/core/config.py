@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
     platform_admin_email: str = "sarvasettyrevanth.66@gmail.com"
+    gmail_client_id: str = ""
+    gmail_client_secret: str = ""
+    gmail_refresh_token: str = ""
+    gmail_sender_email: str = "sarvasettyrevanth.66@gmail.com"
+    gmail_notification_to_email: str = "sarvasettyrevanth.66@gmail.com"
+    gmail_oauth_redirect_uri: str = ""
+    contact_notification_secret: str = ""
 
     database_url: str = (
         "postgresql+psycopg://compatflow_local:"

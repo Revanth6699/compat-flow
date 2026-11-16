@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,6 +11,9 @@ from app.core.auth import AuthenticatedUser, get_active_plan, get_current_user, 
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import DemoAccessRequest, Organization, Review, Subscription, User
+from app.api.gmail_notifications import notify_demo_request
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["demo access", "platform administration"])
 
@@ -51,7 +55,7 @@ def require_platform_admin(current: AuthenticatedUser = Depends(get_current_user
 
 
 @router.post("/demo-requests", response_model=DemoRequestResponse, status_code=201)
-def submit_demo_request(payload: DemoRequestPayload, db: Session = Depends(get_db)):
+async def submit_demo_request(payload: DemoRequestPayload, db: Session = Depends(get_db)):
     email = str(payload.email).strip().lower()
     pending = db.scalar(select(DemoAccessRequest).where(
         DemoAccessRequest.email == email,
@@ -67,6 +71,13 @@ def submit_demo_request(payload: DemoRequestPayload, db: Session = Depends(get_d
     db.add(request)
     db.commit()
     db.refresh(request)
+    try:
+        await notify_demo_request(
+            name=request.name, email=request.email, organization=request.organization,
+            role=request.role, message=request.message,
+        )
+    except Exception:
+        logger.exception("Demo request was saved, but its email notification failed.")
     return request
 
 
