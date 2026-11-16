@@ -52,7 +52,7 @@ def health():
     return HealthResponse(status="ok", service="compatflow-api")
 
 
-async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", column_mapping=None, max_bytes: int | None = None) -> ImportPreviewResponse:
+async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", column_mapping=None, max_bytes: int | None = settings.import_max_upload_bytes, max_rows: int | None = 10_000) -> ImportPreviewResponse:
     filename = (file.filename or "").strip()
     if not filename.lower().endswith(".csv"):
         await file.close()
@@ -61,13 +61,13 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
         await file.close()
         raise HTTPException(status_code=400, detail="Filename must not exceed 255 characters.")
 
-    upload_limit = max_bytes if max_bytes is not None else settings.import_max_upload_bytes
+    upload_limit = max_bytes
     try:
-        raw = await file.read(upload_limit + 1)
+        raw = await file.read(upload_limit + 1) if upload_limit is not None else await file.read()
     finally:
         await file.close()
 
-    if len(raw) > upload_limit:
+    if upload_limit is not None and len(raw) > upload_limit:
         raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded CSV is empty.")
@@ -77,7 +77,7 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
         raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded.") from None
 
     try:
-        result = parse_catalog_csv(content, profile_id=profile_id, column_mapping=column_mapping, allow_incomplete_mapping=column_mapping is None)
+        result = parse_catalog_csv(content, max_rows=max_rows, profile_id=profile_id, column_mapping=column_mapping, allow_incomplete_mapping=column_mapping is None)
         if not result.column_mappings:
             raise CatalogCSVValidationError(
                 "This file does not appear to contain product catalog columns. "
@@ -304,8 +304,10 @@ async def validate_paid_catalog_import(
     profile_id: str = Form("general"),
     column_mapping_json: str | None = Form(None),
     _plan: AuthenticatedUser = Depends(require_plan_feature("csv_validation")),
+    db: Session = Depends(get_db),
 ):
     """Authenticated, subscription-gated validation. Files are not persisted."""
+    limits = resolve_import_limits(_plan, db)
     if profile_id not in CATALOG_PROFILES:
         await file.close()
         raise HTTPException(status_code=422, detail="Unknown catalog profile.")
@@ -316,7 +318,7 @@ async def validate_paid_catalog_import(
     except (ValueError, TypeError):
         await file.close()
         raise HTTPException(status_code=422, detail="Manual mapping must be a JSON object of canonical fields to source headers.") from None
-    return await _validate_catalog_csv(file, profile_id, mapping)
+    return await _validate_catalog_csv(file, profile_id, mapping, max_bytes=limits["max_upload_bytes"], max_rows=limits["max_records"])
 
 
 @router.post("/catalog/import/preview", response_model=ImportPreviewResponse)
@@ -325,8 +327,10 @@ async def preview_catalog_import(
     profile_id: str = Form("general"),
     column_mapping_json: str | None = Form(None),
     _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
+    db: Session = Depends(get_db),
 ):
     """Approved-demo or subscribed stateless validation. Files are not persisted."""
+    limits = resolve_import_limits(_access, db)
     if profile_id not in CATALOG_PROFILES:
         await file.close()
         raise HTTPException(status_code=422, detail="Unknown catalog profile.")
@@ -337,7 +341,7 @@ async def preview_catalog_import(
     except (ValueError, TypeError):
         await file.close()
         raise HTTPException(status_code=422, detail="Manual mapping must be a JSON object of canonical fields to source headers.") from None
-    return await _validate_catalog_csv(file, profile_id, mapping, max_bytes=min(settings.import_max_upload_bytes, 5 * 1024 * 1024))
+    return await _validate_catalog_csv(file, profile_id, mapping, max_bytes=limits["max_upload_bytes"], max_rows=limits["max_records"])
 
 
 
