@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from app.core.auth import AuthenticatedUser, is_platform_admin, require_demo_or_paid_access, require_permission, require_plan_feature
+from app.core.auth import AuthenticatedUser, is_platform_admin, resolve_import_limits, require_demo_or_paid_access, require_permission, require_plan_feature
 from app.core.database import get_db
 from app.models import InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer
 from app.core.config import settings
@@ -236,17 +236,17 @@ async def profile_public_dataset(file: UploadFile = File(...), _access: Authenti
 
 
 async def _validate_industry_upload(
-    file: UploadFile, profile_id: str | None, max_bytes: int, *, max_records: int = 10_000
+    file: UploadFile, profile_id: str | None, max_bytes: int | None, *, max_records: int | None = 10_000
 ):
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
         await file.close()
         raise HTTPException(status_code=400, detail="A valid filename is required.")
     try:
-        raw = await file.read(max_bytes + 1)
+        raw = await file.read(max_bytes + 1) if max_bytes is not None else await file.read()
     finally:
         await file.close()
-    if len(raw) > max_bytes:
+    if max_bytes is not None and len(raw) > max_bytes:
         raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
@@ -270,13 +270,12 @@ async def validate_industry_catalog_import(
     file: UploadFile = File(...),
     profile_id: str | None = Form(None),
     _plan: AuthenticatedUser = Depends(require_plan_feature("csv_validation")),
+    db: Session = Depends(get_db),
 ):
-    """Authenticated industry-aware validation for every supported tabular input format."""
-    # Platform-owner imports remain bounded by the configured upload-byte limit.
-    # The elevated row ceiling applies only after backend verification of the owner identity.
-    record_limit = 2_147_483_647 if is_platform_admin(_plan) else 10_000
+    """Authenticated industry-aware validation using the active plan's upload limits."""
+    limits = resolve_import_limits(_plan, db)
     return await _validate_industry_upload(
-        file, profile_id, settings.import_max_upload_bytes, max_records=record_limit
+        file, profile_id, limits["max_upload_bytes"], max_records=limits["max_records"]
     )
 
 
@@ -285,10 +284,12 @@ async def preview_industry_catalog_import(
     file: UploadFile = File(...),
     profile_id: str | None = Form(None),
     _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
+    db: Session = Depends(get_db),
 ):
-    """Stateless industry-aware preview with the bounded public demo upload limit."""
+    """Stateless industry-aware preview using demo or active subscription limits."""
+    limits = resolve_import_limits(_access, db)
     return await _validate_industry_upload(
-        file, profile_id, min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
+        file, profile_id, limits["max_upload_bytes"], max_records=limits["max_records"]
     )
 
 
