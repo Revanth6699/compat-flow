@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.core.auth import AuthenticatedUser, get_active_plan, get_current_user, is_platform_admin, require_verified_supabase_email
+from app.core.auth import AuthenticatedUser, get_current_user, is_platform_admin, resolve_import_limits, require_verified_supabase_email
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import DemoAccessRequest, Organization, Review, Subscription, User
@@ -159,21 +159,13 @@ def resolve_demo_access(
     current: AuthenticatedUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    if is_platform_admin(current):
-        return {"allowed": True, "access_type": "subscription"}
-    subscription, plan = get_active_plan(current, db)
-    if subscription is not None and plan is not None and (
-        bool((plan.entitlements or {}).get("csv_validation", False))
-        or bool((plan.entitlements or {}).get("supplier_catalogs", False))
-    ):
-        return {"allowed": True, "access_type": "subscription"}
-    approved = db.scalar(
-        select(DemoAccessRequest.id).where(
-            DemoAccessRequest.email == current.identity.email,
-            DemoAccessRequest.status == "approved",
-        ).limit(1)
-    )
-    return {"allowed": approved is not None, "access_type": "demo" if approved is not None else "none"}
+    try:
+        limits = resolve_import_limits(current, db)
+    except HTTPException as exc:
+        if exc.status_code == 403:
+            return {"allowed": False, "access_type": "none"}
+        raise
+    return {"allowed": True, **limits}
 
 
 @router.get("/demo-requests/mine")

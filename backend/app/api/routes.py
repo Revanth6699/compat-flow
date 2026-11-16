@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from app.core.auth import AuthenticatedUser, require_demo_or_paid_access, require_permission, require_plan_feature
+from app.core.auth import AuthenticatedUser, resolve_import_limits, require_demo_or_paid_access, require_permission, require_plan_feature
 from app.core.database import get_db
 from app.models import InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer
 from app.core.config import settings
@@ -52,7 +52,7 @@ def health():
     return HealthResponse(status="ok", service="compatflow-api")
 
 
-async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", column_mapping=None, max_bytes: int | None = None) -> ImportPreviewResponse:
+async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", column_mapping=None, max_bytes: int | None = settings.import_max_upload_bytes, max_rows: int | None = 10_000) -> ImportPreviewResponse:
     filename = (file.filename or "").strip()
     if not filename.lower().endswith(".csv"):
         await file.close()
@@ -61,13 +61,13 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
         await file.close()
         raise HTTPException(status_code=400, detail="Filename must not exceed 255 characters.")
 
-    upload_limit = max_bytes if max_bytes is not None else settings.import_max_upload_bytes
+    upload_limit = max_bytes
     try:
-        raw = await file.read(upload_limit + 1)
+        raw = await file.read(upload_limit + 1) if upload_limit is not None else await file.read()
     finally:
         await file.close()
 
-    if len(raw) > upload_limit:
+    if upload_limit is not None and len(raw) > upload_limit:
         raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded CSV is empty.")
@@ -77,7 +77,7 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
         raise HTTPException(status_code=400, detail="CSV must be UTF-8 encoded.") from None
 
     try:
-        result = parse_catalog_csv(content, profile_id=profile_id, column_mapping=column_mapping, allow_incomplete_mapping=column_mapping is None)
+        result = parse_catalog_csv(content, max_rows=max_rows, profile_id=profile_id, column_mapping=column_mapping, allow_incomplete_mapping=column_mapping is None)
         if not result.column_mappings:
             raise CatalogCSVValidationError(
                 "This file does not appear to contain product catalog columns. "
@@ -148,8 +148,13 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
 
 
 @router.post("/catalog/import/profile")
-async def profile_public_dataset(file: UploadFile = File(...), _access: AuthenticatedUser = Depends(require_demo_or_paid_access())):
-    """Profile a bounded public-demo dataset without assuming it is a product catalog."""
+async def profile_public_dataset(
+    file: UploadFile = File(...),
+    _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
+    db: Session = Depends(get_db),
+):
+    """Profile a dataset using the authenticated account's upload limits."""
+    limits = resolve_import_limits(_access, db)
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
         await file.close()
@@ -158,17 +163,17 @@ async def profile_public_dataset(file: UploadFile = File(...), _access: Authenti
     if extension not in {"csv", "xls", "xlsx"}:
         await file.close()
         raise HTTPException(status_code=415, detail="The public dataset demo accepts CSV, XLS and XLSX files.")
-    limit = min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
+    limit = limits["max_upload_bytes"]
     try:
-        raw = await file.read(limit + 1)
+        raw = await file.read(limit + 1) if limit is not None else await file.read()
     finally:
         await file.close()
-    if len(raw) > limit:
-        raise HTTPException(status_code=413, detail="Public demo uploads cannot exceed 5 MB.")
+    if limit is not None and len(raw) > limit:
+        raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded dataset is empty.")
     try:
-        parsed = parse_source(raw, filename, max_records=10_000)
+        parsed = parse_source(raw, filename, max_records=limits["max_records"])
     except IngestionParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
 
@@ -235,21 +240,23 @@ async def profile_public_dataset(file: UploadFile = File(...), _access: Authenti
 
 
 
-async def _validate_industry_upload(file: UploadFile, profile_id: str | None, max_bytes: int):
+async def _validate_industry_upload(
+    file: UploadFile, profile_id: str | None, max_bytes: int | None, *, max_records: int | None = 10_000
+):
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
         await file.close()
         raise HTTPException(status_code=400, detail="A valid filename is required.")
     try:
-        raw = await file.read(max_bytes + 1)
+        raw = await file.read(max_bytes + 1) if max_bytes is not None else await file.read()
     finally:
         await file.close()
-    if len(raw) > max_bytes:
+    if max_bytes is not None and len(raw) > max_bytes:
         raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
     try:
-        parsed = parse_source(raw, filename, max_records=10_000)
+        parsed = parse_source(raw, filename, max_records=max_records)
         if not parsed.records:
             raise HTTPException(status_code=422, detail="No data rows were found in the uploaded file.")
         result = validate_industry_records(
@@ -268,9 +275,13 @@ async def validate_industry_catalog_import(
     file: UploadFile = File(...),
     profile_id: str | None = Form(None),
     _plan: AuthenticatedUser = Depends(require_plan_feature("csv_validation")),
+    db: Session = Depends(get_db),
 ):
-    """Authenticated industry-aware validation for every supported tabular input format."""
-    return await _validate_industry_upload(file, profile_id, settings.import_max_upload_bytes)
+    """Authenticated industry-aware validation using the active plan's upload limits."""
+    limits = resolve_import_limits(_plan, db)
+    return await _validate_industry_upload(
+        file, profile_id, limits["max_upload_bytes"], max_records=limits["max_records"]
+    )
 
 
 @router.post("/catalog/import/preview-industry")
@@ -278,10 +289,12 @@ async def preview_industry_catalog_import(
     file: UploadFile = File(...),
     profile_id: str | None = Form(None),
     _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
+    db: Session = Depends(get_db),
 ):
-    """Stateless industry-aware preview with the bounded public demo upload limit."""
+    """Stateless industry-aware preview using demo or active subscription limits."""
+    limits = resolve_import_limits(_access, db)
     return await _validate_industry_upload(
-        file, profile_id, min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
+        file, profile_id, limits["max_upload_bytes"], max_records=limits["max_records"]
     )
 
 
@@ -291,8 +304,10 @@ async def validate_paid_catalog_import(
     profile_id: str = Form("general"),
     column_mapping_json: str | None = Form(None),
     _plan: AuthenticatedUser = Depends(require_plan_feature("csv_validation")),
+    db: Session = Depends(get_db),
 ):
     """Authenticated, subscription-gated validation. Files are not persisted."""
+    limits = resolve_import_limits(_plan, db)
     if profile_id not in CATALOG_PROFILES:
         await file.close()
         raise HTTPException(status_code=422, detail="Unknown catalog profile.")
@@ -303,7 +318,7 @@ async def validate_paid_catalog_import(
     except (ValueError, TypeError):
         await file.close()
         raise HTTPException(status_code=422, detail="Manual mapping must be a JSON object of canonical fields to source headers.") from None
-    return await _validate_catalog_csv(file, profile_id, mapping)
+    return await _validate_catalog_csv(file, profile_id, mapping, max_bytes=limits["max_upload_bytes"], max_rows=limits["max_records"])
 
 
 @router.post("/catalog/import/preview", response_model=ImportPreviewResponse)
@@ -312,8 +327,10 @@ async def preview_catalog_import(
     profile_id: str = Form("general"),
     column_mapping_json: str | None = Form(None),
     _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
+    db: Session = Depends(get_db),
 ):
     """Approved-demo or subscribed stateless validation. Files are not persisted."""
+    limits = resolve_import_limits(_access, db)
     if profile_id not in CATALOG_PROFILES:
         await file.close()
         raise HTTPException(status_code=422, detail="Unknown catalog profile.")
@@ -324,13 +341,18 @@ async def preview_catalog_import(
     except (ValueError, TypeError):
         await file.close()
         raise HTTPException(status_code=422, detail="Manual mapping must be a JSON object of canonical fields to source headers.") from None
-    return await _validate_catalog_csv(file, profile_id, mapping, max_bytes=min(settings.import_max_upload_bytes, 5 * 1024 * 1024))
+    return await _validate_catalog_csv(file, profile_id, mapping, max_bytes=limits["max_upload_bytes"], max_rows=limits["max_records"])
 
 
 
 @router.post("/catalog/import/preview-records")
-async def preview_public_spreadsheet(file: UploadFile = File(...), _access: AuthenticatedUser = Depends(require_demo_or_paid_access())):
-    """Public, stateless XLS/XLSX product validation with the same small demo limits as CSV."""
+async def preview_public_spreadsheet(
+    file: UploadFile = File(...),
+    _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
+    db: Session = Depends(get_db),
+):
+    """Stateless XLS/XLSX product validation using the authenticated account's limits."""
+    limits = resolve_import_limits(_access, db)
     filename = (file.filename or "").strip()
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if extension not in {"xlsx", "xls"}:
@@ -339,15 +361,15 @@ async def preview_public_spreadsheet(file: UploadFile = File(...), _access: Auth
     if not filename or len(filename) > 255:
         await file.close()
         raise HTTPException(status_code=400, detail="A valid filename is required.")
-    upload_limit = min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
+    upload_limit = limits["max_upload_bytes"]
     try:
-        raw = await file.read(upload_limit + 1)
+        raw = await file.read(upload_limit + 1) if upload_limit is not None else await file.read()
     finally:
         await file.close()
-    if len(raw) > upload_limit:
-        raise HTTPException(status_code=413, detail="Public demo uploads cannot exceed 5 MB.")
+    if upload_limit is not None and len(raw) > upload_limit:
+        raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     try:
-        parsed = parse_source(raw, filename)
+        parsed = parse_source(raw, filename, max_records=limits["max_records"])
         result = validate_parsed_records(parsed, "products", None)
         if not result.mappings:
             raise RecordMappingError(
@@ -386,17 +408,19 @@ async def validate_multiformat_records(
     xml_record_tag: str | None = Form(None),
     _current: AuthenticatedUser = Depends(require_permission("catalog:read")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
 ):
     """Parse and deterministically validate one selected catalog record type; never persists."""
+    limits = resolve_import_limits(_plan, db)
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
         await file.close()
         raise HTTPException(status_code=400, detail="A valid filename is required.")
     try:
-        raw = await file.read(settings.import_max_upload_bytes + 1)
+        raw = await file.read(limits["max_upload_bytes"] + 1) if limits["max_upload_bytes"] is not None else await file.read()
     finally:
         await file.close()
-    if len(raw) > settings.import_max_upload_bytes:
+    if limits["max_upload_bytes"] is not None and len(raw) > limits["max_upload_bytes"]:
         raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
@@ -411,7 +435,7 @@ async def validate_multiformat_records(
         raise HTTPException(status_code=422, detail="Manual mapping must be a JSON object of canonical fields to source headers.") from None
     try:
         parsed = parse_source(
-            raw, filename, sheet_name=sheet_name, header_row=header_row,
+            raw, filename, sheet_name=sheet_name, max_records=limits["max_records"], header_row=header_row,
             json_record_path=json_record_path, xml_record_tag=xml_record_tag,
         )
         result = validate_parsed_records(parsed, record_type, mapping)
@@ -446,21 +470,23 @@ async def suggest_multiformat_mappings(
     xml_record_tag: str | None = Form(None),
     _current: AuthenticatedUser = Depends(require_permission("catalog:read")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
 ):
     """Return optional AI mapping suggestions; data leaves CompatFlow only after explicit opt-in."""
+    limits = resolve_import_limits(_plan, db)
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
         await file.close()
         raise HTTPException(status_code=400, detail="A valid filename is required.")
     try:
-        raw = await file.read(settings.import_max_upload_bytes + 1)
+        raw = await file.read(limits["max_upload_bytes"] + 1) if limits["max_upload_bytes"] is not None else await file.read()
     finally:
         await file.close()
-    if len(raw) > settings.import_max_upload_bytes:
+    if limits["max_upload_bytes"] is not None and len(raw) > limits["max_upload_bytes"]:
         raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     try:
         parsed = parse_source(
-            raw, filename, sheet_name=sheet_name, header_row=header_row,
+            raw, filename, sheet_name=sheet_name, max_records=limits["max_records"], header_row=header_row,
             json_record_path=json_record_path, xml_record_tag=xml_record_tag,
         )
         result = await suggest_field_mappings(
@@ -504,15 +530,16 @@ async def commit_multiformat_import(
     db: Session = Depends(get_db),
 ):
     """Persist a reviewed multi-format import with row-level errors and lineage."""
+    limits = resolve_import_limits(_plan, db)
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
         await file.close()
         raise HTTPException(status_code=400, detail="A valid filename is required.")
     try:
-        raw = await file.read(settings.import_max_upload_bytes + 1)
+        raw = await file.read(limits["max_upload_bytes"] + 1) if limits["max_upload_bytes"] is not None else await file.read()
     finally:
         await file.close()
-    if len(raw) > settings.import_max_upload_bytes:
+    if limits["max_upload_bytes"] is not None and len(raw) > limits["max_upload_bytes"]:
         raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
@@ -524,7 +551,7 @@ async def commit_multiformat_import(
         ):
             raise ValueError
         parsed = parse_source(
-            raw, filename, sheet_name=sheet_name, header_row=header_row,
+            raw, filename, sheet_name=sheet_name, max_records=limits["max_records"], header_row=header_row,
             json_record_path=json_record_path, xml_record_tag=xml_record_tag,
         )
         result = validate_parsed_records(parsed, record_type, mapping)

@@ -47,3 +47,39 @@ def test_preview_rejects_upload_over_configured_limit_before_auth():
         files={"file": ("large.csv", oversized, "text/csv")},
     )
     assert response.status_code == 413
+
+
+def test_platform_owner_can_validate_more_than_ten_thousand_rows(monkeypatch):
+    from types import SimpleNamespace
+    from uuid import uuid4
+
+    from app.api import routes
+    from app.core.auth import AuthenticatedUser, SupabaseIdentity, get_current_user
+    from app.core.config import settings
+    from app.core.database import get_db
+
+    owner_email = settings.platform_admin_email.split(",")[0].strip().lower()
+    owner = AuthenticatedUser(
+        identity=SupabaseIdentity(
+            auth_user_id=uuid4(), email=owner_email, access_token="test-owner-token"
+        ),
+        profile=SimpleNamespace(role="admin"),
+    )
+    app.dependency_overrides[get_current_user] = lambda: owner
+    app.dependency_overrides[get_db] = lambda: None
+    monkeypatch.setattr(
+        routes,
+        "validate_industry_records",
+        lambda headers, rows, profile_id=None: {"total_rows": len(rows)},
+    )
+    csv_data = ("sku\n" + "".join(f"SKU-{index}\n" for index in range(10_001))).encode()
+
+    try:
+        response = client.post(
+            "/api/v1/catalog/import/validate-industry",
+            files={"file": ("large-catalog.csv", csv_data, "text/csv")},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["total_rows"] == 10_001
+    finally:
+        app.dependency_overrides.clear()

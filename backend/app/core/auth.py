@@ -223,3 +223,43 @@ def require_demo_or_paid_access():
             raise HTTPException(status_code=403, detail="Approved demo access or an active CSV-validation subscription is required.")
         return current
     return dependency
+
+
+def resolve_import_limits(current: AuthenticatedUser, db: Session) -> dict:
+    """Resolve per-file upload limits from the authenticated account's actual access."""
+    if is_platform_admin(current):
+        return {"access_type": "subscription", "max_records": None, "max_upload_bytes": None}
+
+    subscription, plan = get_active_plan(current, db)
+    if subscription is not None and plan is not None and bool((plan.entitlements or {}).get("csv_validation", False)):
+        entitlements = plan.entitlements or {}
+        max_records = entitlements.get("upload_max_records")
+        max_upload_bytes = entitlements.get("upload_max_bytes")
+        if (
+            not isinstance(max_records, int) or isinstance(max_records, bool) or max_records < 1
+            or not isinstance(max_upload_bytes, int) or isinstance(max_upload_bytes, bool) or max_upload_bytes < 1
+        ):
+            raise HTTPException(
+                status_code=503,
+                detail="Upload limits are not configured for this subscription plan. Contact CompatFlow support.",
+            )
+        return {
+            "access_type": "subscription",
+            "plan_code": plan.code,
+            "max_records": max_records,
+            "max_upload_bytes": max_upload_bytes,
+        }
+
+    approved = db.scalar(
+        select(DemoAccessRequest.id).where(
+            DemoAccessRequest.email == current.identity.email,
+            DemoAccessRequest.status == "approved",
+        ).limit(1)
+    )
+    if approved is not None:
+        return {
+            "access_type": "demo",
+            "max_records": 10_000,
+            "max_upload_bytes": 5 * 1024 * 1024,
+        }
+    raise HTTPException(status_code=403, detail="Approved demo access or an active CSV-validation subscription is required.")

@@ -53,8 +53,8 @@ class Settings(BaseSettings):
         if self.import_max_upload_bytes <= 0:
             raise ValueError("IMPORT_MAX_UPLOAD_BYTES must be positive.")
 
-        if self.import_max_upload_bytes > 50 * 1024 * 1024:
-            raise ValueError("IMPORT_MAX_UPLOAD_BYTES cannot exceed 50 MB.")
+        if self.import_max_upload_bytes > 100 * 1024 * 1024:
+            raise ValueError("IMPORT_MAX_UPLOAD_BYTES cannot exceed 100 MB.")
         if self.connector_rate_limit_per_minute < 1 or self.connector_rate_limit_per_minute > 1000:
             raise ValueError("CONNECTOR_RATE_LIMIT_PER_MINUTE must be between 1 and 1000.")
 
