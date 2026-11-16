@@ -33,8 +33,12 @@ class ContactNotification(BaseModel):
 
 
 def _ready():
+    signing_key = settings.app_secret_key
     return all((settings.gmail_client_id, settings.gmail_client_secret,
-                settings.gmail_oauth_redirect_uri, settings.gmail_sender_email))
+                settings.gmail_oauth_redirect_uri, settings.gmail_sender_email)) and (
+        len(signing_key) >= 32
+        and signing_key not in {"local-development-only-change-me", "change-me", "secret"}
+    )
 
 
 def _state():
