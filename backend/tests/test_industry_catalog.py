@@ -113,3 +113,38 @@ def test_inventory_available_quantity_alias_is_distinct_and_checked():
     )
     assert mapped(result)["quantity_available"] == "quantity_available"
     assert any(issue["error_code"] == "INVENTORY_QUANTITY_MISMATCH" for issue in result["issues"])
+
+
+def test_gtin_check_digit_is_validated():
+    valid = validate_industry_csv("sku,title,gtin\\nS-1,Widget,4006381333931\\n", profile_id="ecommerce")
+    invalid = validate_industry_csv("sku,title,gtin\\nS-1,Widget,4006381333932\\n", profile_id="ecommerce")
+    assert not any(i["error_code"] == "INVALID_GTIN_CHECK_DIGIT" for i in valid["issues"])
+    assert any(i["error_code"] == "INVALID_GTIN_CHECK_DIGIT" for i in invalid["issues"])
+
+
+def test_urls_must_be_absolute_http_or_https():
+    result = validate_industry_csv("title,product_url\\nWidget,ftp://example.com/item\\n", profile_id="d2c")
+    assert any(i["error_code"] == "INVALID_HTTP_URL" for i in result["issues"])
+
+
+def test_reserved_inventory_cannot_exceed_on_hand():
+    result = validate_industry_csv("sku,title,quantity_on_hand,quantity_reserved\\nS-1,Widget,5,8\\n", profile_id="ecommerce")
+    assert any(i["error_code"] == "RESERVED_EXCEEDS_ON_HAND" for i in result["issues"])
+
+
+def test_declared_product_name_length_is_compared_with_actual_text():
+    result = validate_industry_csv("title,product_name_length\\nWidget,99\\n", profile_id="d2c")
+    assert any(i["error_code"] == "TEXT_LENGTH_MISMATCH" for i in result["issues"])
+    assert result["valid_rows"] == 1
+
+
+def test_invalid_date_range_is_reported():
+    result = validate_industry_csv("title,effective_date,expiry_date\\nWidget,2025-05-01,2025-04-01\\n", profile_id="d2c")
+    assert any(i["error_code"] == "DATE_RANGE_INVALID" for i in result["issues"])
+
+
+def test_measurements_must_be_positive_and_counts_whole_numbers():
+    result = validate_industry_csv("title,weight_g,image_count\\nWidget,0,1.5\\n", profile_id="d2c")
+    codes = {i["error_code"] for i in result["issues"]}
+    assert "MEASUREMENT_MUST_BE_POSITIVE" in codes
+    assert "INTEGER_VALUE_REQUIRED" in codes
