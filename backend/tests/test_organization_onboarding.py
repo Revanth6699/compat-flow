@@ -38,12 +38,12 @@ class OnboardingDB:
 def make_identity():
     return SupabaseIdentity(
         auth_user_id=uuid4(),
-        email="owner@example.com",
+        email="admin@example.com",
         access_token="verified-access-token",
     )
 
 
-def test_verified_first_user_creates_owner_and_organization(monkeypatch):
+def test_verified_first_user_creates_admin_and_organization(monkeypatch):
     identity = make_identity()
     db = OnboardingDB()
     monkeypatch.setattr(auth_routes, "require_verified_supabase_email", lambda _: None)
@@ -60,7 +60,7 @@ def test_verified_first_user_creates_owner_and_organization(monkeypatch):
     assert profile.organization_id == organization.id
     assert profile.auth_user_id == identity.auth_user_id
     assert profile.email == identity.email
-    assert profile.role == "owner"
+    assert profile.role == "admin"
     assert profile.is_active is True
     assert response.organization_id == organization.id
     assert db.committed is True
@@ -104,3 +104,30 @@ def test_database_uniqueness_race_rolls_back_on_duplicate_identity(monkeypatch):
 def test_organization_name_rejects_blank_or_too_short_values(name):
     with pytest.raises(ValueError):
         auth_routes.OrganizationCreateRequest(name=name)
+
+
+
+def test_same_email_after_deletion_creates_a_fresh_identity_and_organization(monkeypatch):
+    deleted_auth_user_id = uuid4()
+    new_identity = SupabaseIdentity(
+        auth_user_id=uuid4(),
+        email="admin@example.com",
+        access_token="new-verified-access-token",
+    )
+    assert new_identity.auth_user_id != deleted_auth_user_id
+    db = OnboardingDB()
+    monkeypatch.setattr(auth_routes, "require_verified_supabase_email", lambda _: None)
+
+    response = auth_routes.create_organization_for_current_user(
+        auth_routes.OrganizationCreateRequest(name="New Organization"),
+        new_identity,
+        db,
+    )
+
+    organization = next(item for item in db.added if isinstance(item, auth_routes.Organization))
+    profile = next(item for item in db.added if isinstance(item, auth_routes.User))
+    assert profile.auth_user_id == new_identity.auth_user_id
+    assert profile.auth_user_id != deleted_auth_user_id
+    assert profile.email == "admin@example.com"
+    assert organization.id == response.organization_id
+    assert db.committed is True

@@ -23,7 +23,18 @@ class FakeJwksClient:
 def signing_keys(monkeypatch):
     private_key = ec.generate_private_key(ec.SECP256R1())
     monkeypatch.setattr(auth.settings, "supabase_url", "https://project.supabase.co")
+    monkeypatch.setattr(auth.settings, "supabase_anon_key", "test-anon-key")
     monkeypatch.setattr(auth, "_jwks_client", lambda: FakeJwksClient(private_key.public_key()))
+
+    def live_user_lookup(*args, **kwargs):
+        token = kwargs["headers"]["Authorization"].split(" ", 1)[1]
+        claims = jwt.decode(token, options={"verify_signature": False}, algorithms=["ES256"])
+        return SimpleNamespace(
+            status_code=200,
+            json=lambda: {"id": claims["sub"], "email": claims["email"]},
+        )
+
+    monkeypatch.setattr(auth.httpx, "get", live_user_lookup)
     return private_key
 
 

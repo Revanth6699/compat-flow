@@ -90,7 +90,7 @@ function WorkspaceContent() {
           <section className="panel settings-panel">
             <span className="eyebrow">ONE-TIME SETUP</span>
             <h2>Create your company workspace</h2>
-            <p>Your account is authenticated, but it is not linked to an organization yet. Create your organization now. You will become its owner; you do not need an operator to provision it.</p>
+            <p>Your account is authenticated, but it is not linked to an organization yet. Create your organization now. You will become the organization admin; no separate account provisioning is required.</p>
             <form className="auth-form" onSubmit={createOrganization}>
               <label htmlFor="workspace-organization-name">Organization name</label>
               <input id="workspace-organization-name" minLength={2} maxLength={160} required value={organizationName} onChange={event => setOrganizationName(event.target.value)} placeholder="Your company name" />
@@ -112,18 +112,18 @@ function WorkspaceContent() {
               <dl>
                 <div><dt>Organization ID</dt><dd>{profile.organization_id}</dd></div>
                 <div><dt>Your account</dt><dd>{profile.email}</dd></div>
-                <div><dt>Subscription</dt><dd>{profile.is_platform_admin ? "Not required — platform owner" : profile.plan_code ? profile.plan_code.charAt(0).toUpperCase() + profile.plan_code.slice(1) : "No paid plan selected"}</dd></div>
+                <div><dt>Subscription</dt><dd>{profile.is_platform_admin ? "Not required — platform administrator" : profile.plan_code ? profile.plan_code.charAt(0).toUpperCase() + profile.plan_code.slice(1) : "No paid plan selected"}</dd></div>
                 <div><dt>Subscription status</dt><dd>{profile.is_platform_admin ? "Exempt" : profile.subscription_status || "Not subscribed"}</dd></div>
                 <div><dt>Workspace access</dt><dd>{profile.is_active ? "Active" : "Inactive"}</dd></div>
               </dl>
-              {!profile.plan_code && !profile.is_platform_admin && <div className="notice"><strong>Your organization is set up.</strong><p>Choose a subscription to unlock paid organization features. Your workspace and owner account remain available while you decide.</p><Link className="button" href="/pricing">Choose a plan</Link></div>}
-              {profile.is_platform_admin && <div className="notice"><strong>Platform-owner access is enabled.</strong><p>No subscription is required for your account. Customer subscription rules remain unchanged.</p></div>}
+              {!profile.plan_code && !profile.is_platform_admin && <div className="notice"><strong>Your organization is set up.</strong>{profile.role === "admin" ? <><p>Choose a subscription to unlock paid organization features. Your workspace remains available while you decide.</p><Link className="button" href="/pricing">Choose a plan</Link></> : <p>Your organization does not currently have a paid plan. Contact your organization admin about subscription access.</p>}</div>}
+              {profile.is_platform_admin && <div className="notice"><strong>Platform administrator access is enabled.</strong><p>No subscription is required for your account. Customer subscription rules remain unchanged.</p></div>}
             </section>
 
             <section className="pricing-grid" aria-label="Workspace areas">
               <article className="panel settings-panel"><span className="eyebrow">CATALOG OPERATIONS</span><h2>Catalog validation</h2><p>Run a validation preview with the file formats and limits available to your organization. Files are not saved or committed to the catalog in this workflow.</p><Link className="button button-secondary" href="/catalog/import">Open validation preview</Link></article>
               <article className="panel settings-panel"><span className="eyebrow">CONNECTED DATA</span><h2>Data sources</h2><p>Configure eligible REST API, SFTP and SQL Server source connections.</p><Link className="button button-secondary" href="/catalog/sources">Manage data sources</Link></article>
-              {(profile.role === "owner" || profile.role === "admin") && <article className="panel settings-panel"><span className="eyebrow">PEOPLE</span><h2>Team access</h2><p>Invite employees, review members and manage permitted access for this organization.</p><Link className="button button-secondary" href="/team">Manage team</Link></article>}
+              {(profile.role === "admin") && <article className="panel settings-panel"><span className="eyebrow">PEOPLE</span><h2>Team access</h2><p>Invite employees, review members and manage permitted access for this organization.</p><Link className="button button-secondary" href="/team">Manage team</Link></article>}
               {!profile.is_platform_admin && <article className="panel settings-panel"><span className="eyebrow">ORGANIZATION</span><h2>Billing</h2><p>Review subscription status and payment details for this organization.</p><Link className="button button-secondary" href="/billing">Manage subscription</Link></article>}
             </section>
           </>

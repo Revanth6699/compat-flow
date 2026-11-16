@@ -121,8 +121,8 @@ function TeamContent() {
     }
   }
 
-  const canManage = role === "owner" || role === "admin";
-  const canInviteAdmin = role === "owner";
+  const canManage = role === "admin";
+  const canInviteAdmin = false;
   const canInviteWithCurrentPlan = seats?.available_seats === null || (seats?.available_seats !== undefined && seats.available_seats > 0);
 
   return (
@@ -151,11 +151,11 @@ function TeamContent() {
               <h2>Organization members</h2>
               {members.length === 0 ? <p>No members are linked to this organization yet.</p> : <div className="table-wrap"><table><thead><tr><th>Employee</th><th>Role</th><th>Access</th><th>Joined</th><th>Action</th></tr></thead><tbody>
                 {members.map(member => {
-                  const canEdit = canManage && member.role !== "owner" && member.id !== currentUserId && !(role === "admin" && member.role === "admin");
+                  const canEdit = canManage && member.role !== "admin" && member.id !== currentUserId && !(role === "admin" && member.role === "admin");
                   return <tr key={member.id}>
                     <td>{member.email}{member.id === currentUserId ? " (you)" : ""}</td>
                     <td><select aria-label={`Role for ${member.email}`} value={member.role} disabled={!canEdit || busy} onChange={event => void updateMember(member.id, { role: event.target.value })}>
-                      {member.role === "owner" && <option value="owner">Owner</option>}
+                      
                       {(canInviteAdmin || member.role === "admin") && <option value="admin">Admin</option>}
                       <option value="member">Member</option><option value="viewer">Viewer</option>
                     </select></td>
@@ -165,11 +165,11 @@ function TeamContent() {
                   </tr>;
                 })}
               </tbody></table></div>}
-              <p className="settings-description">The owner account cannot be changed or deactivated. Administrators can manage members and viewers; only the owner can grant administrator access.</p>
+              <p className="settings-description">The organization admin account cannot be changed or deactivated. The organization admin role is assigned during organization setup and cannot be granted through invitations.</p>
             </section>
             {canManage && <section className="panel settings-panel">
               <h2>Invite an employee</h2>
-              <p className="settings-description">Invitations reserve a seat for 72 hours. Seat limits include the organization owner: Starter 3, Growth 10, Business 25; Enterprise limits are configured by contract.</p>
+              <p className="settings-description">Invitations reserve a seat for 72 hours. Seat limits include the organization admin: Starter 3, Growth 10, Business 25; Enterprise limits are configured by contract.</p>
               {!canInviteWithCurrentPlan && <p className="notice">Your organization has no available seats. Choose or upgrade a subscription before inviting employees.</p>}
               <form className="auth-form" onSubmit={createInvitation}>
                 <label htmlFor="team-email">Work email</label>

@@ -95,7 +95,7 @@ def test_postgres_razorpay_webhook_activates_once_and_ignores_stale_pending(monk
             organization_id=organization.id,
             auth_user_id=uuid4(),
             email=f"razorpay-{uuid4().hex[:8]}@example.com",
-            role="owner",
+            role="admin",
             is_active=True,
             account_type="subscriber",
         )

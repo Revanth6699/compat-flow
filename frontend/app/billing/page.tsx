@@ -157,7 +157,7 @@ function BillingContent() {
     }
   }
 
-  const isOwner = role === "owner";
+  const isAdmin = role === "admin";
   const subscriptionLocked = !!(subscription && ["active", "trialing", "pending", "past_due"].includes(subscription.status));
 
   if (!loading && isPlatformAdmin) {
@@ -165,12 +165,12 @@ function BillingContent() {
       <main id="main" className="page">
         <div className="container account-settings">
           <header className="workspace-heading">
-            <div><span className="eyebrow">PLATFORM ADMINISTRATOR</span><h1>Subscription exemption</h1><p>Your owner account does not require a customer subscription.</p></div>
+            <div><span className="eyebrow">PLATFORM ADMINISTRATOR</span><h1>Subscription exemption</h1><p>Your platform administrator account does not require a customer subscription.</p></div>
             <Link className="button button-secondary" href="/workspace">Back to workspace</Link>
           </header>
           <section className="panel settings-panel">
             <h2>Full platform testing access</h2>
-            <p>Your platform-owner account is exempt from plan selection, checkout, and subscription entitlement checks. You can test the platform without purchasing a plan.</p>
+            <p>Your platform administrator account is exempt from plan selection, checkout, and subscription entitlement checks. You can test the platform without purchasing a plan.</p>
             <p className="settings-description">Customer organizations remain subject to their selected subscription, entitlements, seat limits, and billing status.</p>
           </section>
         </div>
@@ -180,12 +180,12 @@ function BillingContent() {
 
   return (
     <>
-      <Script
+      {isAdmin && <Script
         src="https://checkout.razorpay.com/v1/checkout.js"
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}
         onError={() => setError("Razorpay Checkout could not be loaded. Check your network and content-security settings.")}
-      />
+      />}
       <main id="main" className="page">
         <div className="container account-settings">
           <header className="workspace-heading">
@@ -208,7 +208,7 @@ function BillingContent() {
                   <div><dt>Current period ends</dt><dd>{subscription.current_period_end ? new Date(subscription.current_period_end).toLocaleString() : "Not yet provided by provider"}</dd></div>
                   <div><dt>Cancellation at period end</dt><dd>{subscription.cancel_at_period_end ? "Requested" : "No"}</dd></div>
                 </dl>
-                {subscription.provider === "razorpay" && ["active", "pending", "past_due", "trialing"].includes(subscription.status) && !subscription.cancel_at_period_end && isOwner && (
+                {subscription.provider === "razorpay" && ["active", "pending", "past_due", "trialing"].includes(subscription.status) && !subscription.cancel_at_period_end && isAdmin && (
                   <button className="button button-secondary" disabled={busy} onClick={() => void cancelSubscription()}>
                     {busy ? "Processing…" : "Request cancellation"}
                   </button>
@@ -217,31 +217,38 @@ function BillingContent() {
             ) : <p>No subscription record is currently associated with this organization.</p>}
           </section>
 
-          <section className="panel settings-panel">
-            <h2>Choose a monthly plan</h2>
-            <p className="settings-description">Checkout is available to the organization owner only. Prices below are the current reference prices in USD; payment availability and final currency depend on your Razorpay merchant account and configured plan IDs.</p>
-            {!isOwner && <p className="notice">Only the organization owner can create or cancel a subscription. Contact your owner to manage billing.</p>}
-            {subscriptionLocked && <p className="notice">Your organization already has a subscription in progress. Self-service upgrades and downgrades are not enabled yet; plan selection is locked until the current subscription is resolved.</p>}
-            <div className="pricing-grid">
-              {plans.map((plan) => (
-                <button
-                  type="button"
-                  key={plan.code}
-                  className={selectedPlan === plan.code ? "pricing-card billing-plan selected" : "pricing-card billing-plan"}
-                  aria-pressed={selectedPlan === plan.code}
-                  onClick={() => setSelectedPlan(plan.code)}
-                  disabled={!isOwner || busy}
-                >
-                  <strong>{plan.name}</strong><span className="pricing-amount">{plan.price}<small> / month</small></span><span>{plan.description}</span>
-                </button>
-              ))}
-            </div>
-            <p className="settings-description">Enterprise remains a custom commercial plan and is not available through self-service checkout. Annual billing is not enabled until annual prices and provider plans are explicitly configured.</p>
-            <button className="button auth-submit" disabled={!isOwner || busy || loading || subscriptionLocked} onClick={() => void startCheckout()}>
-              {busy ? "Please wait…" : "Continue to secure checkout"}
-            </button>
-            <p className="settings-description">A successful checkout signature does not activate access by itself. CompatFlow waits for a verified Razorpay subscription webhook before treating the subscription as active.</p>
-          </section>
+          {isAdmin ? (
+            <section className="panel settings-panel">
+              <h2>Manage organization subscription</h2>
+              <p className="settings-description">The organization admin manages the subscription shared by all members.</p>
+              {subscriptionLocked && <p className="notice">Your organization already has a subscription in progress. Self-service upgrades and downgrades are not enabled yet; plan selection is locked until the current subscription is resolved.</p>}
+              <div className="pricing-grid">
+                {plans.map((plan) => (
+                  <button
+                    type="button"
+                    key={plan.code}
+                    className={selectedPlan === plan.code ? "pricing-card billing-plan selected" : "pricing-card billing-plan"}
+                    aria-pressed={selectedPlan === plan.code}
+                    onClick={() => setSelectedPlan(plan.code)}
+                    disabled={busy}
+                  >
+                    <strong>{plan.name}</strong><span className="pricing-amount">{plan.price}<small> / month</small></span><span>{plan.description}</span>
+                  </button>
+                ))}
+              </div>
+              <p className="settings-description">Enterprise remains a custom commercial plan and is not available through self-service checkout. Annual billing is not enabled until annual prices and provider plans are explicitly configured.</p>
+              <button className="button auth-submit" disabled={busy || loading || subscriptionLocked} onClick={() => void startCheckout()}>
+                {busy ? "Please wait…" : "Continue to secure checkout"}
+              </button>
+              <p className="settings-description">A successful checkout signature does not activate access by itself. CompatFlow waits for a verified Razorpay subscription webhook before treating the subscription as active.</p>
+            </section>
+          ) : (
+            <section className="panel settings-panel">
+              <h2>Organization plan</h2>
+              <p className="settings-description">Your account uses the organization&apos;s shared subscription. You do not need to select or purchase a separate plan.</p>
+              <p className="settings-description">Contact your organization admin if the organization needs a new subscription or billing changes.</p>
+            </section>
+          )}
         </div>
       </main>
     </>
