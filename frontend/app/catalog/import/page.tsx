@@ -189,7 +189,7 @@ export default function CatalogImportPage() {
           <h2>Catalog file validation</h2>
           <p className="import-description">Public demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file. Subscribed imports: up to 25 MB, subject to plan entitlements.</p>
           <div className="import-description">
-            The public demo validates CSV, XLS and XLSX product files. Authenticated ingestion supports CSV, XLSX, XLS, JSON and XML for the five catalog record types, subject to the existing plan entitlement.
+            The public demo validates CSV, XLS and XLSX product files. The authenticated backend has parser, preview and commit paths for CSV, XLSX, XLS, JSON and XML across the five catalog record types. This page currently exposes file validation and preview only; file persistence controls are not yet available here.
           </div>
           {user && <div className="auth-form">
             <label htmlFor="catalog-record-type">Catalog record type</label>
