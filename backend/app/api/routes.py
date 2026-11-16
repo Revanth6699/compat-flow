@@ -148,8 +148,13 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
 
 
 @router.post("/catalog/import/profile")
-async def profile_public_dataset(file: UploadFile = File(...), _access: AuthenticatedUser = Depends(require_demo_or_paid_access())):
-    """Profile a bounded public-demo dataset without assuming it is a product catalog."""
+async def profile_public_dataset(
+    file: UploadFile = File(...),
+    _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
+    db: Session = Depends(get_db),
+):
+    """Profile a dataset using the authenticated account's upload limits."""
+    limits = resolve_import_limits(_access, db)
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
         await file.close()
@@ -158,17 +163,17 @@ async def profile_public_dataset(file: UploadFile = File(...), _access: Authenti
     if extension not in {"csv", "xls", "xlsx"}:
         await file.close()
         raise HTTPException(status_code=415, detail="The public dataset demo accepts CSV, XLS and XLSX files.")
-    limit = min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
+    limit = limits["max_upload_bytes"]
     try:
-        raw = await file.read(limit + 1)
+        raw = await file.read(limit + 1) if limit is not None else await file.read()
     finally:
         await file.close()
-    if len(raw) > limit:
-        raise HTTPException(status_code=413, detail="Public demo uploads cannot exceed 5 MB.")
+    if limit is not None and len(raw) > limit:
+        raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded dataset is empty.")
     try:
-        parsed = parse_source(raw, filename, max_records=10_000)
+        parsed = parse_source(raw, filename, max_records=limits["max_records"])
     except IngestionParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
 
@@ -337,8 +342,13 @@ async def preview_catalog_import(
 
 
 @router.post("/catalog/import/preview-records")
-async def preview_public_spreadsheet(file: UploadFile = File(...), _access: AuthenticatedUser = Depends(require_demo_or_paid_access())):
-    """Public, stateless XLS/XLSX product validation with the same small demo limits as CSV."""
+async def preview_public_spreadsheet(
+    file: UploadFile = File(...),
+    _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
+    db: Session = Depends(get_db),
+):
+    """Stateless XLS/XLSX product validation using the authenticated account's limits."""
+    limits = resolve_import_limits(_access, db)
     filename = (file.filename or "").strip()
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if extension not in {"xlsx", "xls"}:
@@ -347,15 +357,15 @@ async def preview_public_spreadsheet(file: UploadFile = File(...), _access: Auth
     if not filename or len(filename) > 255:
         await file.close()
         raise HTTPException(status_code=400, detail="A valid filename is required.")
-    upload_limit = min(settings.import_max_upload_bytes, 5 * 1024 * 1024)
+    upload_limit = limits["max_upload_bytes"]
     try:
-        raw = await file.read(upload_limit + 1)
+        raw = await file.read(upload_limit + 1) if upload_limit is not None else await file.read()
     finally:
         await file.close()
-    if len(raw) > upload_limit:
-        raise HTTPException(status_code=413, detail="Public demo uploads cannot exceed 5 MB.")
+    if upload_limit is not None and len(raw) > upload_limit:
+        raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     try:
-        parsed = parse_source(raw, filename)
+        parsed = parse_source(raw, filename, max_records=limits["max_records"])
         result = validate_parsed_records(parsed, "products", None)
         if not result.mappings:
             raise RecordMappingError(
