@@ -24,7 +24,7 @@ class FakeDb:
 
     def get(self, model, key):
         if self.subscribed:
-            return SimpleNamespace(is_active=True, entitlements={"csv_validation": True, "upload_max_records": 20_000, "upload_max_bytes": 10 * 1024 * 1024})
+            return SimpleNamespace(code="starter", is_active=True, entitlements={"csv_validation": True, "upload_max_records": 20_000, "upload_max_bytes": 10 * 1024 * 1024})
         return None
 
 
