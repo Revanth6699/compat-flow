@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.auth import AuthenticatedUser, SupabaseIdentity, get_current_user
 from app.core.database import get_db
 from app.api import connector_import_routes as routes
+from app.api import routes as file_import_routes
 from app.api.connector_import_routes import ConnectorImportRequest, _prepare, _require_allowed_host
 
 client = TestClient(app)
@@ -381,5 +382,59 @@ def test_connector_preview_does_not_send_ai_evidence_without_opt_in(monkeypatch)
         assert data["ai"]["source_data_sent"] is False
         assert data["ai"]["classification"] is None
         assert captured["called"] is True
+    finally:
+        clear_connector_auth()
+
+
+def test_file_ai_endpoint_returns_record_classification_and_mapping(monkeypatch):
+    install_connector_auth(monkeypatch)
+    captured = {}
+
+    async def fake_suggest_field_mappings(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            status="suggestions_ready",
+            message="Review the classification and mappings.",
+            classification=SimpleNamespace(
+                record_type="product_identifiers",
+                confidence=0.88,
+                rationale="The sample contains a typed identifier value.",
+                evidence=["identifier_type", "value"],
+            ),
+            suggestions=[
+                SimpleNamespace(
+                    source_header="value",
+                    candidate_field="value",
+                    confidence=0.97,
+                    rationale="The source header is an identifier value.",
+                    evidence=["value", "00012345678905"],
+                )
+            ],
+        )
+
+    monkeypatch.setattr(file_import_routes, "suggest_field_mappings", fake_suggest_field_mappings)
+    try:
+        response = TestClient(app).post(
+            "/api/v1/catalog/import/suggest-mappings",
+            data={"record_type": "product_identifiers", "ai_opt_in": "true"},
+            files={
+                "file": (
+                    "identifiers.json",
+                    b'[{"identifier_type":"gtin","value":"00012345678905","product_id":"00000000-0000-0000-0000-000000000001"}]',
+                    "application/json",
+                )
+            },
+        )
+        assert response.status_code == 200, response.text
+        data = response.json()
+        assert data["classification"]["record_type"] == "product_identifiers"
+        assert data["classification"]["requires_confirmation"] is True
+        assert data["suggestions"][0]["candidate_field"] == "value"
+        assert data["suggestions"][0]["requires_confirmation"] is True
+        assert data["confidence_calibration"] == "model_reported_uncalibrated"
+        assert data["source_data_sent"] is True
+        assert captured["headers"] == ["identifier_type", "value", "product_id"]
+        assert captured["sample_records"][0]["value"] == "00012345678905"
+        assert captured["user_opted_in"] is True
     finally:
         clear_connector_auth()
