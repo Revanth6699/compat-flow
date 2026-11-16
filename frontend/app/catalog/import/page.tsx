@@ -233,7 +233,7 @@ export default function CatalogImportPage() {
           <p className="import-description">Files are validated in memory. This preview does not save files or commit records to your organization catalog.</p>
           {demoApproved && <p className="column-hint">Non-product datasets are profiled using their actual columns; CompatFlow will not label them as invalid product catalogs or invent a product quality score.</p>}
           {demoApproved && <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>}
-          <p className="import-description">CompatFlow identifies the most likely industry from the file's column evidence. If the file is not clearly a product catalog, it provides a structural dataset profile instead of asking you to choose an industry.</p>
+          <p className="import-description">CompatFlow identifies the most likely industry from the file&apos;s column evidence. If the file is not clearly a product catalog, it provides a structural dataset profile instead of asking you to choose an industry.</p>
           <label className="file-picker" htmlFor="catalog-file">
             <span className="file-picker-icon" aria-hidden="true">↥</span>
             <strong>{file ? file.name : "Choose a catalog file"}</strong>
