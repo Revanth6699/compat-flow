@@ -106,7 +106,7 @@ async def gmail_oauth_callback(code: str | None = Query(None), state: str | None
     return HTMLResponse(html, headers=headers)
 
 
-async def send_gmail_notification(subject: str, body: str):
+async def send_gmail_notification(subject: str, body: str, *, reply_to: str | None = None):
     required = (settings.gmail_client_id, settings.gmail_client_secret, settings.gmail_refresh_token,
                 settings.gmail_sender_email, settings.gmail_notification_to_email)
     if not all(required):
@@ -126,6 +126,8 @@ async def send_gmail_notification(subject: str, body: str):
         message["To"] = settings.gmail_notification_to_email
         message["From"] = settings.gmail_sender_email
         message["Subject"] = subject
+        if reply_to:
+            message["Reply-To"] = reply_to
         message.set_content(body)
         raw = base64.urlsafe_b64encode(message.as_bytes()).decode().rstrip("=")
         sent = await client.post(SEND_URL, headers={"Authorization": f"Bearer {access_token}"}, json={"raw": raw})
@@ -136,7 +138,7 @@ async def send_gmail_notification(subject: str, body: str):
 
 async def notify_demo_request(*, name: str, email: str, organization: str, role: str, message: str):
     body = f"A new CompatFlow demo access request was submitted.\n\nName: {name}\nEmail: {email}\nOrganization: {organization}\nRole: {role}\n\nMessage:\n{message}"
-    await send_gmail_notification("CompatFlow — New demo access request", body)
+    await send_gmail_notification("CompatFlow — New demo access request", body, reply_to=email)
 
 
 @router.post("/contact")
@@ -148,7 +150,7 @@ async def notify_contact_submission(payload: ContactNotification,
     subject = "CompatFlow — New demo request" if payload.intent == "demo" else "CompatFlow — New contact message"
     body = f"A new CompatFlow {payload.intent} form submission was received.\n\nName: {payload.name}\nEmail: {payload.email}\nOrganization: {payload.organization}\nRole: {payload.role}\n\nMessage:\n{payload.message}"
     try:
-        await send_gmail_notification(subject, body)
+        await send_gmail_notification(subject, body, reply_to=str(payload.email))
     except Exception:
         logger.exception("Contact notification delivery failed.")
         return {"ok": True, "email_sent": False}

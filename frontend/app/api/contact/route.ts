@@ -32,7 +32,14 @@ export async function POST(request:Request){
      headers:{"Content-Type":"application/json","X-Contact-Notification-Secret":notificationSecret},
      body:JSON.stringify({name,email,organization,role,message,intent:"general"})
     });
-    if(!notification.ok)console.error("CompatFlow contact email notification failed:",notification.status);
+    if(!notification.ok){
+     console.error("CompatFlow contact email notification endpoint failed:",notification.status);
+    }else{
+     const result=await notification.json().catch(()=>null);
+     if(result?.email_sent!==true){
+      console.error("CompatFlow contact email notification was not delivered:",result);
+     }
+    }
    }catch(error){console.error("CompatFlow contact email notification request failed:",error);}
   }else{
    console.error("CompatFlow contact email notification is not configured.");
