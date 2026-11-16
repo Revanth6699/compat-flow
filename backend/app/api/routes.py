@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from uuid import UUID
 
-from app.core.auth import AuthenticatedUser, require_demo_or_paid_access, require_permission, require_plan_feature
+from app.core.auth import AuthenticatedUser, is_platform_admin, require_demo_or_paid_access, require_permission, require_plan_feature
 from app.core.database import get_db
 from app.models import InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer
 from app.core.config import settings
@@ -168,7 +168,7 @@ async def profile_public_dataset(file: UploadFile = File(...), _access: Authenti
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded dataset is empty.")
     try:
-        parsed = parse_source(raw, filename, max_records=10_000)
+        parsed = parse_source(raw, filename, max_records=max_records)
     except IngestionParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
 
@@ -235,7 +235,7 @@ async def profile_public_dataset(file: UploadFile = File(...), _access: Authenti
 
 
 
-async def _validate_industry_upload(file: UploadFile, profile_id: str | None, max_bytes: int):
+async def _validate_industry_upload(\n    file: UploadFile, profile_id: str | None, max_bytes: int, *, max_records: int = 10_000\n):
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
         await file.close()
@@ -270,7 +270,12 @@ async def validate_industry_catalog_import(
     _plan: AuthenticatedUser = Depends(require_plan_feature("csv_validation")),
 ):
     """Authenticated industry-aware validation for every supported tabular input format."""
-    return await _validate_industry_upload(file, profile_id, settings.import_max_upload_bytes)
+    # Platform-owner imports remain bounded by the configured upload-byte limit.
+    # The elevated row ceiling applies only after backend verification of the owner identity.
+    record_limit = 2_147_483_647 if is_platform_admin(_plan) else 10_000
+    return await _validate_industry_upload(
+        file, profile_id, settings.import_max_upload_bytes, max_records=record_limit
+    )
 
 
 @router.post("/catalog/import/preview-industry")
