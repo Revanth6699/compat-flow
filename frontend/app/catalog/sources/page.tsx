@@ -223,7 +223,7 @@ function SourcesContent() {
       </div>}
       <div className="panel result-section">
         <h3>Optional AI suggestions</h3>
-        <p className="import-description">AI can suggest a catalog record type and field mappings. If enabled and a provider is configured, only up to 80 source headers and the first five records are sent to the external HTTPS provider; header names are clipped to 128 characters and each sample value to 120 characters. Connector credentials are not included. Confidence is model-reported and uncalibrated. Suggestions require your confirmation and never trigger an import.</p>
+        <p className="import-description">AI can suggest a catalog record type and field mappings. If enabled and a provider is configured, only up to 80 source headers and the first five records are sent to the external HTTPS provider; header names longer than 128 characters are excluded from AI requests and each sample value is clipped to 120 characters. Connector credentials are not included. Confidence is model-reported and uncalibrated. Suggestions require your confirmation and never trigger an import.</p>
         <label><input type="checkbox" checked={aiConsent} onChange={event => setAiConsent(event.target.checked)} /> I consent to sending this bounded sample evidence to the configured AI provider.</label>
       </div>
       <div className="import-actions">
