@@ -168,7 +168,7 @@ async def profile_public_dataset(file: UploadFile = File(...), _access: Authenti
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded dataset is empty.")
     try:
-        parsed = parse_source(raw, filename, max_records=max_records)
+        parsed = parse_source(raw, filename, max_records=10_000)
     except IngestionParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
 
@@ -235,7 +235,9 @@ async def profile_public_dataset(file: UploadFile = File(...), _access: Authenti
 
 
 
-async def _validate_industry_upload(\n    file: UploadFile, profile_id: str | None, max_bytes: int, *, max_records: int = 10_000\n):
+async def _validate_industry_upload(
+    file: UploadFile, profile_id: str | None, max_bytes: int, *, max_records: int = 10_000
+):
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
         await file.close()
@@ -249,7 +251,7 @@ async def _validate_industry_upload(\n    file: UploadFile, profile_id: str | No
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
     try:
-        parsed = parse_source(raw, filename, max_records=10_000)
+        parsed = parse_source(raw, filename, max_records=max_records)
         if not parsed.records:
             raise HTTPException(status_code=422, detail="No data rows were found in the uploaded file.")
         result = validate_industry_records(
