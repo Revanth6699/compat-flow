@@ -80,7 +80,6 @@ export default function CatalogImportPage() {
   const [aiResult, setAiResult] = useState<AiMappingResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [profileId, setProfileId] = useState("");
   const [manualMapping, setManualMapping] = useState<Record<string, string>>({});
   const canonicalFields = ["sku", "name", "manufacturer", "part_number", "category", "compatibility", "replacement_sku"];
 
@@ -110,14 +109,26 @@ export default function CatalogImportPage() {
       const extension = file.name.split(".").pop()?.toLowerCase();
 
       if (demoApproved) {
-        if (profileId) formData.append("profile_id", profileId);
         const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/preview-industry", { method: "POST", body: formData });
+        if (!data.profile_id) {
+          const profileForm = new FormData();
+          profileForm.append("file", file);
+          const profile = await apiRequest<DatasetProfile>("/api/v1/catalog/import/profile", { method: "POST", body: profileForm });
+          setDatasetResult(profile);
+          return;
+        }
         setIndustryResult(data);
         return;
       }
 
-      if (profileId) formData.append("profile_id", profileId);
       const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/validate-industry", { method: "POST", body: formData });
+      if (!data.profile_id) {
+        const profileForm = new FormData();
+        profileForm.append("file", file);
+        const profile = await apiRequest<DatasetProfile>("/api/v1/catalog/import/profile", { method: "POST", body: profileForm });
+        setDatasetResult(profile);
+        return;
+      }
       setIndustryResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong while validating the file.");
@@ -222,14 +233,7 @@ export default function CatalogImportPage() {
           <p className="import-description">Files are validated in memory. This preview does not save files or commit records to your organization catalog.</p>
           {demoApproved && <p className="column-hint">Non-product datasets are profiled using their actual columns; CompatFlow will not label them as invalid product catalogs or invent a product quality score.</p>}
           {demoApproved && <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>}
-          <label className="field-label" htmlFor="industry-profile">Industry profile</label>
-          <select id="industry-profile" className="form-control" value={profileId} onChange={(event) => { setProfileId(event.target.value); setIndustryResult(null); }}>
-            <option value="">Detect industry automatically</option>
-            <option value="d2c">D2C brands</option><option value="ecommerce">Ecommerce / marketplaces</option>
-            <option value="automotive">Automotive aftermarket</option><option value="electronics">Electronics</option>
-            <option value="industrial">Industrial / MRO</option><option value="wholesale">Wholesale / distribution</option>
-          </select>
-          <p className="import-description">CSV, XLS, XLSX, JSON and XML files use the same industry-specific mapping and validation pipeline. Select a profile or let CompatFlow infer one from the extracted column evidence.</p>
+          <p className="import-description">CompatFlow identifies the most likely industry from the file's column evidence. If the file is not clearly a product catalog, it provides a structural dataset profile instead of asking you to choose an industry.</p>
           <label className="file-picker" htmlFor="catalog-file">
             <span className="file-picker-icon" aria-hidden="true">↥</span>
             <strong>{file ? file.name : "Choose a catalog file"}</strong>
