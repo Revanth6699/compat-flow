@@ -78,7 +78,7 @@ function SourcesContent() {
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm(current => ({ ...current, [key]: value }));
-    setPreview(null); setCommitted(false); setNotice("");
+    setPreview(null); setColumnMapping({}); setMappingDirty(false); setCommitted(false); setNotice("");
   }
 
   function payload(aiOptIn = false) {
