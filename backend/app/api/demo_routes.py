@@ -55,35 +55,76 @@ def require_platform_admin(current: AuthenticatedUser = Depends(get_current_user
     return current
 
 
-async def sync_demo_access_to_supabase(email: str, status: str, *, invited_at: datetime | None = None) -> None:
-    """Mirror approved/revoked access into Supabase without changing the backend's access authority."""
+async def sync_demo_request_to_supabase(
+    request: DemoAccessRequest,
+    decision: str,
+    reviewed_at: datetime,
+) -> None:
+    """Idempotently mirror a demo request and its access decision into Supabase."""
     if not settings.supabase_url or not settings.supabase_service_role_key:
-        raise HTTPException(status_code=503, detail="Supabase demo-access synchronization is not configured.")
-    record: dict[str, str | None] = {"email": email, "status": status}
-    if invited_at is not None:
-        record["invited_at"] = invited_at.isoformat()
-        record["expires_at"] = None
-    url = f"{settings.supabase_url.rstrip('/')}/rest/v1/demo_access"
+        raise HTTPException(status_code=503, detail="Supabase demo-request synchronization is not configured.")
+    base_url = settings.supabase_url.rstrip("/") + "/rest/v1"
     headers = {
         "apikey": settings.supabase_service_role_key,
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates,return=minimal",
     }
+    contact_status = {
+        "approve": "approved",
+        "revoke": "declined",
+        "reject": "declined",
+    }[decision]
+    contact_record = {
+        "id": str(request.id),
+        "name": request.name,
+        "email": request.email,
+        "organization": request.organization,
+        "role": request.role,
+        "message": request.message,
+        "intent": "demo",
+        "status": contact_status,
+        "created_at": request.created_at.isoformat(),
+    }
     try:
         async with httpx.AsyncClient(timeout=12) as client:
-            response = await client.post(
-                url,
-                params={"on_conflict": "email"},
+            contact_response = await client.post(
+                f"{base_url}/contact_requests",
+                params={"on_conflict": "id"},
                 headers=headers,
-                json=record,
+                json=contact_record,
             )
-        if response.status_code not in (200, 201, 204):
-            logger.error("Supabase demo-access sync failed with status %s: %s", response.status_code, response.text[:500])
-            raise HTTPException(status_code=503, detail="Demo access could not be synchronized to Supabase. No approval change was saved; please retry.")
+            if contact_response.status_code not in (200, 201, 204):
+                logger.error(
+                    "Supabase demo-request mirror failed with status %s: %s",
+                    contact_response.status_code,
+                    contact_response.text[:500],
+                )
+                raise HTTPException(status_code=503, detail="Demo request history could not be synchronized to Supabase. Please retry.")
+            if decision in {"approve", "revoke"}:
+                access_record: dict[str, str | None] = {
+                    "email": request.email,
+                    "status": "approved" if decision == "approve" else "revoked",
+                }
+                if decision == "approve":
+                    access_record["invited_at"] = reviewed_at.isoformat()
+                    access_record["expires_at"] = None
+                access_response = await client.post(
+                    f"{base_url}/demo_access",
+                    params={"on_conflict": "email"},
+                    headers=headers,
+                    json=access_record,
+                )
+                if access_response.status_code not in (200, 201, 204):
+                    logger.error(
+                        "Supabase demo-access mirror failed with status %s: %s",
+                        access_response.status_code,
+                        access_response.text[:500],
+                    )
+                    raise HTTPException(status_code=503, detail="Demo access could not be synchronized to Supabase. Please retry.")
     except httpx.HTTPError:
-        logger.exception("Supabase demo-access synchronization request failed.")
-        raise HTTPException(status_code=503, detail="Supabase demo-access synchronization is temporarily unavailable. Please retry.")
+        logger.exception("Supabase demo workflow synchronization request failed.")
+        raise HTTPException(status_code=503, detail="Supabase synchronization is temporarily unavailable. Please retry.")
 
 
 @router.post("/demo-requests", response_model=DemoRequestResponse, status_code=201)
@@ -201,10 +242,7 @@ async def decide_demo_request(
     request.reviewed_at = now
     try:
         db.flush()
-        if decision == "approve":
-            await sync_demo_access_to_supabase(request.email, "approved", invited_at=now)
-        elif decision == "revoke":
-            await sync_demo_access_to_supabase(request.email, "revoked")
+        await sync_demo_request_to_supabase(request, decision, now)
         db.commit()
     except Exception:
         db.rollback()
