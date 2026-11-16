@@ -23,6 +23,20 @@ export async function POST(request:Request){
    body:JSON.stringify({name,email,organization,role,message,intent,status:"new"})
   });
   if(!response.ok)return NextResponse.json({error:"We could not save your message. Please try again later."},{status:502});
+  const apiBase=process.env.NEXT_PUBLIC_API_BASE_URL;
+  const notificationSecret=process.env.CONTACT_NOTIFICATION_SECRET;
+  if(apiBase?.startsWith("https://")&&notificationSecret){
+   try{
+    const notification=await fetch(`${apiBase.replace(/\/$/,"")}/api/v1/notifications/contact`,{
+     method:"POST",
+     headers:{"Content-Type":"application/json","X-Contact-Notification-Secret":notificationSecret},
+     body:JSON.stringify({name,email,organization,role,message,intent:"general"})
+    });
+    if(!notification.ok)console.error("CompatFlow contact email notification failed:",notification.status);
+   }catch(error){console.error("CompatFlow contact email notification request failed:",error);}
+  }else{
+   console.error("CompatFlow contact email notification is not configured.");
+  }
   return NextResponse.json({ok:true});
  }catch{return NextResponse.json({error:"Invalid request. Please check the form and try again."},{status:400});}
 }
