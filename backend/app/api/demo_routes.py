@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import logging
 from uuid import UUID, uuid4
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import func, select
@@ -54,6 +55,37 @@ def require_platform_admin(current: AuthenticatedUser = Depends(get_current_user
     return current
 
 
+async def sync_demo_access_to_supabase(email: str, status: str, *, invited_at: datetime | None = None) -> None:
+    """Mirror approved/revoked access into Supabase without changing the backend's access authority."""
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        raise HTTPException(status_code=503, detail="Supabase demo-access synchronization is not configured.")
+    record: dict[str, str | None] = {"email": email, "status": status}
+    if invited_at is not None:
+        record["invited_at"] = invited_at.isoformat()
+        record["expires_at"] = None
+    url = f"{settings.supabase_url.rstrip('/')}/rest/v1/demo_access"
+    headers = {
+        "apikey": settings.supabase_service_role_key,
+        "Authorization": f"Bearer {settings.supabase_service_role_key}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=12) as client:
+            response = await client.post(
+                url,
+                params={"on_conflict": "email"},
+                headers=headers,
+                json=record,
+            )
+        if response.status_code not in (200, 201, 204):
+            logger.error("Supabase demo-access sync failed with status %s: %s", response.status_code, response.text[:500])
+            raise HTTPException(status_code=503, detail="Demo access could not be synchronized to Supabase. No approval change was saved; please retry.")
+    except httpx.HTTPError:
+        logger.exception("Supabase demo-access synchronization request failed.")
+        raise HTTPException(status_code=503, detail="Supabase demo-access synchronization is temporarily unavailable. Please retry.")
+
+
 @router.post("/demo-requests", response_model=DemoRequestResponse, status_code=201)
 async def submit_demo_request(payload: DemoRequestPayload, db: Session = Depends(get_db)):
     email = str(payload.email).strip().lower()
@@ -79,8 +111,6 @@ async def submit_demo_request(payload: DemoRequestPayload, db: Session = Depends
     except Exception:
         logger.exception("Demo request was saved, but its email notification failed.")
     return request
-
-
 
 
 @router.get("/demo-access")
@@ -127,7 +157,7 @@ def list_demo_requests(
 
 
 @router.patch("/platform-admin/demo-requests/{request_id}/{decision}", response_model=DemoRequestResponse)
-def decide_demo_request(
+async def decide_demo_request(
     request_id: UUID,
     decision: str,
     admin: AuthenticatedUser = Depends(require_platform_admin),
@@ -169,7 +199,16 @@ def decide_demo_request(
         request.status = "revoked"
     request.reviewed_by = admin.identity.email
     request.reviewed_at = now
-    db.commit()
+    try:
+        db.flush()
+        if decision == "approve":
+            await sync_demo_access_to_supabase(request.email, "approved", invited_at=now)
+        elif decision == "revoke":
+            await sync_demo_access_to_supabase(request.email, "revoked")
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(request)
     return request
 
@@ -196,4 +235,3 @@ def platform_admin_overview(
         "subscription_usage": None,
         "subscription_usage_note": "Monthly validation/storage usage is not yet persisted as a usage ledger, so usage totals are unavailable.",
     }
-
