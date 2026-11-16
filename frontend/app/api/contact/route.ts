@@ -14,15 +14,15 @@ export async function POST(request:Request){
   if(intent==="demo"){
    const apiBase=process.env.NEXT_PUBLIC_API_BASE_URL;
    if(!apiBase?.startsWith("https://"))return NextResponse.json({error:"Demo requests are not configured. Please try again later."},{status:503});
-   const upstream=await fetch(\`\${apiBase.replace(/\/$/,"")}/api/v1/demo-requests\`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,email,organization,role,message})});
+   const upstream=await fetch(apiBase.replace(/\/$/,"")+"/api/v1/demo-requests",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name,email,organization,role,message})});
    if(!upstream.ok)return NextResponse.json({error:"We could not save your demo request. Please try again later."},{status:upstream.status===422?400:502});
    const saved=await upstream.json().catch(()=>null);
    if(!saved?.id)return NextResponse.json({error:"The demo request was accepted by the API, but its tracking record could not be confirmed. Please contact support before retrying."},{status:502});
    // Mirror the backend request into Supabase using the backend UUID as an idempotency key.
    // Omitting status on conflict preserves any admin review already recorded in Supabase.
-   const mirrored=await fetch(\`\${supabaseUrl.replace(/\/$/,"")}/rest/v1/contact_requests?on_conflict=id\`,{
+   const mirrored=await fetch(supabaseUrl.replace(/\/$/,"")+"/rest/v1/contact_requests?on_conflict=id",{
     method:"POST",
-    headers:{apikey:serviceKey,Authorization:\`Bearer \${serviceKey}\`,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},
+    headers:{apikey:serviceKey,Authorization:"Bearer "+serviceKey,"Content-Type":"application/json",Prefer:"resolution=merge-duplicates,return=minimal"},
     body:JSON.stringify({id:saved.id,name,email,organization,role,message,intent:"demo"})
    });
    if(!mirrored.ok){
@@ -31,8 +31,8 @@ export async function POST(request:Request){
    }
    return NextResponse.json({ok:true});
   }
-  const response=await fetch(\`\${supabaseUrl.replace(/\/$/,"")}/rest/v1/contact_requests\`,{
-   method:"POST",headers:{apikey:serviceKey,Authorization:\`Bearer \${serviceKey}\`,"Content-Type":"application/json",Prefer:"return=minimal"},
+  const response=await fetch(supabaseUrl.replace(/\/$/,"")+"/rest/v1/contact_requests",{
+   method:"POST",headers:{apikey:serviceKey,Authorization:"Bearer "+serviceKey,"Content-Type":"application/json",Prefer:"return=minimal"},
    body:JSON.stringify({name,email,organization,role,message,intent,status:"new"})
   });
   if(!response.ok)return NextResponse.json({error:"We could not save your message. Please try again later."},{status:502});
@@ -40,7 +40,7 @@ export async function POST(request:Request){
   const notificationSecret=process.env.CONTACT_NOTIFICATION_SECRET;
   if(apiBase?.startsWith("https://")&&notificationSecret){
    try{
-    const notification=await fetch(\`\${apiBase.replace(/\/$/,"")}/api/v1/notifications/contact\`,{
+    const notification=await fetch(apiBase.replace(/\/$/,"")+"/api/v1/notifications/contact",{
      method:"POST",
      headers:{"Content-Type":"application/json","X-Contact-Notification-Secret":notificationSecret},
      body:JSON.stringify({name,email,organization,role,message,intent:"general"})
