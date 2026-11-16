@@ -23,9 +23,10 @@ def test_contact_notification_sends_after_authorized_request(monkeypatch):
     monkeypatch.setattr(settings, "contact_notification_secret", "test-secret")
     sent = {}
 
-    async def fake_send(subject, body):
+    async def fake_send(subject, body, *, reply_to=None):
         sent["subject"] = subject
         sent["body"] = body
+        sent["reply_to"] = reply_to
 
     monkeypatch.setattr(gmail_notifications, "send_gmail_notification", fake_send)
     client = TestClient(app)
@@ -45,6 +46,7 @@ def test_contact_notification_sends_after_authorized_request(monkeypatch):
     assert response.json() == {"ok": True, "email_sent": True}
     assert "New contact message" in sent["subject"]
     assert "test@example.com" in sent["body"]
+    assert sent["reply_to"] == "test@example.com"
 
 
 def test_oauth_state_is_signed_and_time_limited(monkeypatch):
@@ -52,3 +54,22 @@ def test_oauth_state_is_signed_and_time_limited(monkeypatch):
     state = gmail_notifications._state()
     assert gmail_notifications._valid_state(state)
     assert not gmail_notifications._valid_state(state + "tampered")
+
+
+def test_demo_notification_uses_requester_as_reply_to(monkeypatch):
+    import asyncio
+
+    sent = {}
+
+    async def fake_send(subject, body, *, reply_to=None):
+        sent["subject"] = subject
+        sent["body"] = body
+        sent["reply_to"] = reply_to
+
+    monkeypatch.setattr(gmail_notifications, "send_gmail_notification", fake_send)
+    asyncio.run(gmail_notifications.notify_demo_request(
+        name="Test User", email="client@example.com", organization="Example Ltd",
+        role="Operations", message="Please arrange a product demo.",
+    ))
+    assert "New demo access request" in sent["subject"]
+    assert sent["reply_to"] == "client@example.com"
