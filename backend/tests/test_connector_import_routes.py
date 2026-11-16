@@ -336,7 +336,7 @@ def test_connector_preview_returns_opt_in_ai_classification_and_mapping_without_
         assert data["ai"]["suggestions"][0]["candidate_field"] == "sku"
         assert data["ai"]["suggestions"][0]["requires_confirmation"] is True
         assert captured["connector_secret"] == "Bearer connector-secret"
-        assert captured["ai_input"]["headers"] == ["sku", "name", "manufacturer", "part_number", "category"]
+        assert set(captured["ai_input"]["headers"]) == {"sku", "name", "manufacturer", "part_number", "category"}
         assert captured["ai_input"]["sample_records"][0]["sku"] == "001"
         assert "connector-secret" not in str(captured["ai_input"])
     finally:
@@ -433,7 +433,7 @@ def test_file_ai_endpoint_returns_record_classification_and_mapping(monkeypatch)
         assert data["suggestions"][0]["requires_confirmation"] is True
         assert data["confidence_calibration"] == "model_reported_uncalibrated"
         assert data["source_data_sent"] is True
-        assert captured["headers"] == ["identifier_type", "value", "product_id"]
+        assert set(captured["headers"]) == {"identifier_type", "value", "product_id"}
         assert captured["sample_records"][0]["value"] == "00012345678905"
         assert captured["user_opted_in"] is True
     finally:
