@@ -92,19 +92,25 @@ An optional incremental watermark is supported only for a selected single-column
 
 No real SQL Server connection or least-privilege permission test has passed. Do not label SQL Server operational until a live connection and permission test succeeds.
 
-## AI-assisted mapping
+## AI-assisted record classification and mapping
 
-POST /api/v1/catalog/import/suggest-mappings is an explicit opt-in suggestion endpoint. It sends headers and at most five bounded sample values per header to a configured HTTPS OpenAI-compatible provider. Candidate fields are allowlisted by record type; evidence must match the submitted headers or sample values; confidence is model-reported and uncalibrated; every suggestion requires human confirmation.
+The authenticated file endpoint `POST /api/v1/catalog/import/suggest-mappings` and authenticated connector preview endpoint `POST /api/v1/catalog/import/connectors/preview` use the same opt-in assistant. One provider request can return a record-type classification across all five catalog record types plus field-mapping suggestions restricted to the user's selected record type. This works after parsing CSV, XLSX, XLS, JSON, XML, REST API JSON, SFTP files, and SQL Server row projections into the shared source-record representation.
 
-Provider configuration uses MAPPING_AI_BASE_URL, MAPPING_AI_API_KEY, and MAPPING_AI_MODEL. No provider credentials are configured in the current environment, so live AI suggestions are not verified. Manual and deterministic mapping remain available. No model is trained.
+AI evidence is deliberately bounded before serialization: at most 80 source headers (each clipped to 128 characters), the first five records, and at most 120 characters per sample value. The aggregate evidence budget is 64,000 characters and provider responses are limited to 64 KiB. A request exceeding these limits receives a bounded-input error; deterministic/manual mapping remains available. Connector credentials, connection URLs, API authorization headers, SFTP passwords/private keys, and SQL connection secrets are not passed to the AI helper.
 
-The reviewed benchmark seed has 72 examples and is an evaluation seed, not a training corpus. Keep source families separated in any held-out evaluation; do not train on the seed or unconfirmed AI predictions.
+AI requests require explicit user opt-in. If the provider is not configured, no source evidence is sent and the endpoint reports `provider_unconfigured`. Provider configuration uses `MAPPING_AI_BASE_URL`, `MAPPING_AI_API_KEY`, and `MAPPING_AI_MODEL`; all three are required and the base URL must use HTTPS. No provider credentials are configured in the current environment, so live AI suggestions are not verified.
+
+The backend accepts only allowed record types and fields, verifies that each evidence item exactly matches a submitted header or bounded sample value, rejects duplicate source/target mapping suggestions, and marks every result as requiring confirmation. Classification and mapping confidence values are model-reported and uncalibrated; they are not data-quality metrics. The user must confirm a suggested record type or mapping before it is applied. Suggestions never authorize persistence, infer foreign-key relationships, or create catalog records.
+
+The reviewed benchmark seed has 72 examples and is an evaluation seed, not a training corpus. Keep source families separated in any held-out evaluation; do not train on the seed or unconfirmed AI predictions. No model is trained.
 
 ## UI and rollout boundary
 
-The file upload UI currently performs validation/preview; it does not expose the backend file commit endpoint. The connector UI exposes one-shot preview and commit, but does not expose all API pagination or SQL watermark settings yet. UI wording and controls must be updated before claiming complete multi-format or connector support.
+The authenticated file page exposes record-type selection and optional AI classification/mapping suggestions, but currently stops at validation and preview; it does not expose the backend file commit endpoint. The connector page exposes all five record types, one-shot preview and commit, optional AI suggestions, and reviewable field mappings. It still does not expose all API pagination or SQL watermark settings. Connector credentials remain request-scoped and are not saved as reusable source configurations.
 
-Do not change subscription entitlements or pricing as part of ingestion work. Multi-format and connector routes retain the existing supplier_catalogs feature gate; the legacy CSV validator retains its existing csv_validation gate. A plan gate is not a claim that an external integration is live-compatible.
+The UI must continue to distinguish public demo validation, authenticated parser/preview, backend commit paths, mock-tested connector primitives, and live-verified integrations. None of the REST API, SFTP, or SQL Server connectors is live-verified. Do not describe the full multi-source workflow as generally available.
+
+Do not change subscription entitlements or pricing as part of ingestion work. Multi-format and connector routes retain the existing `supplier_catalogs` feature gate; the legacy CSV validator retains its existing `csv_validation` gate. A plan gate is not a claim that an external integration is live-compatible.
 
 ## Remaining work
 
