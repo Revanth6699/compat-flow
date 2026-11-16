@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 import logging
 from uuid import UUID, uuid4
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy import func, select
@@ -54,6 +55,78 @@ def require_platform_admin(current: AuthenticatedUser = Depends(get_current_user
     return current
 
 
+async def sync_demo_request_to_supabase(
+    request: DemoAccessRequest,
+    decision: str,
+    reviewed_at: datetime,
+) -> None:
+    """Idempotently mirror a demo request and its access decision into Supabase."""
+    if not settings.supabase_url or not settings.supabase_service_role_key:
+        raise HTTPException(status_code=503, detail="Supabase demo-request synchronization is not configured.")
+    base_url = settings.supabase_url.rstrip("/") + "/rest/v1"
+    headers = {
+        "apikey": settings.supabase_service_role_key,
+        "Authorization": f"Bearer {settings.supabase_service_role_key}",
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal",
+    }
+    contact_status = {
+        "approve": "approved",
+        "revoke": "declined",
+        "reject": "declined",
+    }[decision]
+    contact_record = {
+        "id": str(request.id),
+        "name": request.name,
+        "email": request.email,
+        "organization": request.organization,
+        "role": request.role,
+        "message": request.message,
+        "intent": "demo",
+        "status": contact_status,
+        "created_at": request.created_at.isoformat(),
+    }
+    try:
+        async with httpx.AsyncClient(timeout=12) as client:
+            contact_response = await client.post(
+                f"{base_url}/contact_requests",
+                params={"on_conflict": "id"},
+                headers=headers,
+                json=contact_record,
+            )
+            if contact_response.status_code not in (200, 201, 204):
+                logger.error(
+                    "Supabase demo-request mirror failed with status %s: %s",
+                    contact_response.status_code,
+                    contact_response.text[:500],
+                )
+                raise HTTPException(status_code=503, detail="Demo request history could not be synchronized to Supabase. Please retry.")
+            if decision in {"approve", "revoke"}:
+                access_record: dict[str, str | None] = {
+                    "email": request.email,
+                    "status": "approved" if decision == "approve" else "revoked",
+                }
+                if decision == "approve":
+                    access_record["invited_at"] = reviewed_at.isoformat()
+                    access_record["expires_at"] = None
+                access_response = await client.post(
+                    f"{base_url}/demo_access",
+                    params={"on_conflict": "email"},
+                    headers=headers,
+                    json=access_record,
+                )
+                if access_response.status_code not in (200, 201, 204):
+                    logger.error(
+                        "Supabase demo-access mirror failed with status %s: %s",
+                        access_response.status_code,
+                        access_response.text[:500],
+                    )
+                    raise HTTPException(status_code=503, detail="Demo access could not be synchronized to Supabase. Please retry.")
+    except httpx.HTTPError:
+        logger.exception("Supabase demo workflow synchronization request failed.")
+        raise HTTPException(status_code=503, detail="Supabase synchronization is temporarily unavailable. Please retry.")
+
+
 @router.post("/demo-requests", response_model=DemoRequestResponse, status_code=201)
 async def submit_demo_request(payload: DemoRequestPayload, db: Session = Depends(get_db)):
     email = str(payload.email).strip().lower()
@@ -79,8 +152,6 @@ async def submit_demo_request(payload: DemoRequestPayload, db: Session = Depends
     except Exception:
         logger.exception("Demo request was saved, but its email notification failed.")
     return request
-
-
 
 
 @router.get("/demo-access")
@@ -127,7 +198,7 @@ def list_demo_requests(
 
 
 @router.patch("/platform-admin/demo-requests/{request_id}/{decision}", response_model=DemoRequestResponse)
-def decide_demo_request(
+async def decide_demo_request(
     request_id: UUID,
     decision: str,
     admin: AuthenticatedUser = Depends(require_platform_admin),
@@ -139,6 +210,7 @@ def decide_demo_request(
     if request is None:
         raise HTTPException(status_code=404, detail="Demo request not found.")
     now = datetime.now(timezone.utc)
+    requests_to_sync: list[tuple[DemoAccessRequest, str]] = []
     if decision == "revoke":
         active_approvals = db.scalars(
             select(DemoAccessRequest).where(
@@ -150,6 +222,12 @@ def decide_demo_request(
             approval.status = "revoked"
             approval.reviewed_by = admin.identity.email
             approval.reviewed_at = now
+            requests_to_sync.append((approval, "revoke"))
+        if request not in active_approvals:
+            request.status = "revoked"
+            request.reviewed_by = admin.identity.email
+            request.reviewed_at = now
+            requests_to_sync.append((request, "revoke"))
     elif decision == "approve":
         previous_approvals = db.scalars(
             select(DemoAccessRequest).where(
@@ -162,14 +240,22 @@ def decide_demo_request(
             approval.status = "revoked"
             approval.reviewed_by = admin.identity.email
             approval.reviewed_at = now
+            requests_to_sync.append((approval, "revoke"))
         request.status = "approved"
+        requests_to_sync.append((request, "approve"))
     else:
         request.status = "rejected"
-    if decision == "revoke":
-        request.status = "revoked"
+        requests_to_sync.append((request, "reject"))
     request.reviewed_by = admin.identity.email
     request.reviewed_at = now
-    db.commit()
+    try:
+        db.flush()
+        for item, item_decision in requests_to_sync:
+            await sync_demo_request_to_supabase(item, item_decision, now)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     db.refresh(request)
     return request
 
@@ -196,4 +282,3 @@ def platform_admin_overview(
         "subscription_usage": None,
         "subscription_usage_note": "Monthly validation/storage usage is not yet persisted as a usage ledger, so usage totals are unavailable.",
     }
-
