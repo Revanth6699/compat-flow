@@ -21,6 +21,7 @@ from app.models import ImportJob, ImportRowError, ImportRecordLineage
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
+from app.services.mapping_assistant import suggest_field_mappings
 from app.services.source_connectors import (
     SourceConnectorError,
     fetch_api_records,
@@ -38,6 +39,7 @@ class ConnectorImportRequest(BaseModel):
         "inventory_snapshots", "product_identifiers",
     ]
     column_mapping: dict[str, str] | None = None
+    ai_opt_in: bool = False
 
     # REST API: endpoint host must be in CONNECTOR_ALLOWED_HOSTS.
     api_url: str | None = None
@@ -259,7 +261,13 @@ async def preview_connector_import(
     try:
         raw, filename = await _load_source(payload)
         parsed, result = _prepare(payload, raw, filename)
-    except (SourceConnectorError, IngestionParseError, RecordMappingError) as exc:
+        ai_result = await suggest_field_mappings(
+            record_type=payload.record_type,
+            headers=parsed.headers,
+            sample_records=[record.values for record in parsed.records[:5]],
+            user_opted_in=payload.ai_opt_in,
+        )
+    except (SourceConnectorError, IngestionParseError, RecordMappingError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     return {
         "source_type": payload.source_type, "source_descriptor": _source_descriptor(payload), "filename": filename,
@@ -269,6 +277,36 @@ async def preview_connector_import(
         "unmapped_headers": result.unmapped_headers,
         "field_completeness": result.field_completeness,
         "errors": result.errors[:100], "preview": result.valid_records[:10],
+        "ai": {
+            "status": ai_result.status,
+            "message": ai_result.message,
+            "classification": (
+                {
+                    "record_type": ai_result.classification.record_type,
+                    "confidence": ai_result.classification.confidence,
+                    "rationale": ai_result.classification.rationale,
+                    "evidence": ai_result.classification.evidence,
+                    "requires_confirmation": True,
+                }
+                if ai_result.classification else None
+            ),
+            "suggestions": [
+                {
+                    "source_header": item.source_header,
+                    "candidate_field": item.candidate_field,
+                    "confidence": item.confidence,
+                    "rationale": item.rationale,
+                    "evidence": item.evidence,
+                    "requires_confirmation": True,
+                }
+                for item in ai_result.suggestions
+            ],
+            "confidence_calibration": "model_reported_uncalibrated",
+            "source_data_sent": (
+                payload.ai_opt_in
+                and ai_result.status not in {"provider_unconfigured", "consent_required"}
+            ),
+        },
         "persisted": False,
     }
 
