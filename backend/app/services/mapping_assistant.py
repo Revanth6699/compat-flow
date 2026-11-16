@@ -14,7 +14,7 @@ import httpx
 
 
 RECORD_FIELDS = {
-    "products": {"sku", "name", "manufacturer", "part_number", "category", "replacement_sku"},
+    "products": {"sku", "name", "manufacturer", "part_number", "category", "supplier_id", "replacement_sku"},
     "product_variants": {"product_id", "variant_sku", "attributes", "is_active"},
     "supplier_offers": {
         "supplier_id", "product_id", "supplier_sku", "supplier_product_id",
