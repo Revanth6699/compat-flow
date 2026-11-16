@@ -145,12 +145,12 @@ function SourcesContent() {
     setNotice("Record type changed. Preview the source again before committing.");
   }
 
-  function useClassification(suggestion: ClassificationSuggestion) {
+  function confirmClassification(suggestion: ClassificationSuggestion) {
     if (!suggestion.requires_confirmation) return;
     changeRecordType(suggestion.record_type);
   }
 
-  function useMappingSuggestion(suggestion: MappingSuggestion) {
+  function confirmMappingSuggestion(suggestion: MappingSuggestion) {
     if (!suggestion.requires_confirmation) return;
     setColumnMapping(current => ({ ...current, [suggestion.candidate_field]: suggestion.source_header }));
     setMappingDirty(true);
@@ -245,14 +245,14 @@ function SourcesContent() {
         <p><strong>{preview.ai.classification.record_type.replaceAll("_", " ")}</strong> — model-reported {Math.round(preview.ai.classification.confidence * 100)}% (uncalibrated)</p>
         <p>{preview.ai.classification.rationale}</p>
         <p className="import-description">Evidence: {preview.ai.classification.evidence.join("; ")}</p>
-        <button className="button button-secondary" type="button" onClick={() => useClassification(preview.ai.classification!)} disabled={!preview.ai.classification.requires_confirmation}>Use suggested record type</button>
+        <button className="button button-secondary" type="button" onClick={() => confirmClassification(preview.ai.classification!)} disabled={!preview.ai.classification.requires_confirmation}>Use suggested record type</button>
       </div>}
       {preview.ai.suggestions.length > 0 && <>
         <h3>AI field-mapping suggestions</h3>
         <ul className="error-list">{preview.ai.suggestions.map((item, index) => <li key={index}>
           <strong>{item.source_header} → {item.candidate_field}</strong> — model-reported {Math.round(item.confidence * 100)}% (uncalibrated): {item.rationale}
           <br />Evidence: {item.evidence.join("; ")}
-          <br /><button className="button button-secondary" type="button" onClick={() => useMappingSuggestion(item)} disabled={!item.requires_confirmation}>Confirm this mapping</button>
+          <br /><button className="button button-secondary" type="button" onClick={() => confirmMappingSuggestion(item)} disabled={!item.requires_confirmation}>Confirm this mapping</button>
         </li>)}</ul>
       </>}
       <h3>Review field mappings</h3>
