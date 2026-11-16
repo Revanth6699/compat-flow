@@ -109,6 +109,7 @@ function SourcesContent() {
         body: JSON.stringify(payload(requestAi)),
       });
       setPreview(result);
+      setColumnMapping(Object.fromEntries(result.mappings.map(item => [item.field, item.source_header])));
       setMappingDirty(false);
       setNotice("Source preview completed. Review record type, mappings and rejected rows before committing.");
     } catch (err) {
