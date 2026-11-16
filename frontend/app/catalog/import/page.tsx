@@ -58,16 +58,16 @@ type PreviewResponse = {
 
 export default function CatalogImportPage() {
   const { user, loading: authLoading } = useAuth();
-  const [accessResult, setAccessResult] = useState<{ email: string; type: "demo" | "subscription" | "none" } | null>(null);
+  const [accessResult, setAccessResult] = useState<{ email: string; type: "demo" | "subscription" | "none"; maxRecords: number | null; maxUploadBytes: number | null } | null>(null);
   const email = user?.email?.toLowerCase() || "";
   const accessType = !email ? "none" : accessResult?.email === email ? accessResult.type : "checking";
   const demoApproved = accessType === "demo";
   useEffect(() => {
     if (!email) return;
     let active = true;
-    apiRequest<{ allowed: boolean; access_type: "demo" | "subscription" | "none" }>("/api/v1/demo-access")
-      .then((data) => { if (active) setAccessResult({ email, type: data.allowed ? data.access_type : "none" }); })
-      .catch(() => { if (active) setAccessResult({ email, type: "none" }); });
+    apiRequest<{ allowed: boolean; access_type: "demo" | "subscription" | "none"; max_records?: number | null; max_upload_bytes?: number | null }>("/api/v1/demo-access")
+      .then((data) => { if (active) setAccessResult({ email, type: data.allowed ? data.access_type : "none", maxRecords: data.max_records ?? null, maxUploadBytes: data.max_upload_bytes ?? null }); })
+      .catch(() => { if (active) setAccessResult({ email, type: "none", maxRecords: null, maxUploadBytes: null }); });
     return () => { active = false; };
   }, [email]);
   const [file, setFile] = useState<File | null>(null);
@@ -94,9 +94,10 @@ export default function CatalogImportPage() {
       setError(demoApproved ? "Approved demo supports CSV, XLSX and XLS only." : "Supported formats: CSV, XLSX, XLS, JSON and XML. Your plan determines which formats you can process.");
       return;
     }
-    const limitMb = demoApproved ? 5 : 25;
-    if (selectedFile.size > limitMb * 1024 * 1024) {
-      setFile(null); setError(`The file exceeds the ${limitMb} MB limit for this access level.`);
+    const maxUploadBytes = accessResult?.email === email ? accessResult.maxUploadBytes : null;
+    if (maxUploadBytes !== null && selectedFile.size > maxUploadBytes) {
+      const limitMb = maxUploadBytes / (1024 * 1024);
+      setFile(null); setError(`The file exceeds the ${limitMb.toLocaleString()} MB limit for this access level.`);
     }
   }
 
@@ -214,7 +215,7 @@ export default function CatalogImportPage() {
 
         <section className="panel import-panel">
           <h2>Multi-industry catalog validation</h2>
-          <p className="import-description">{demoApproved ? "Approved demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file." : "Subscribed validation: file limits and formats are controlled by your active plan."}</p>
+          <p className="import-description">{demoApproved ? "Approved demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file." : accessResult?.maxRecords === null ? "Website owner: no plan-level record or file-size cap." : `Your plan: up to ${accessResult?.maxRecords?.toLocaleString() ?? "—"} records and ${((accessResult?.maxUploadBytes ?? 0) / (1024 * 1024)).toLocaleString()} MB per file.`}</p>
           <div className="import-description">
             {demoApproved ? "Approved demo access is stateless and does not save uploaded files." : "CompatFlow detects common supplier product fields and applies the validation features available on your plan."}
           </div>
