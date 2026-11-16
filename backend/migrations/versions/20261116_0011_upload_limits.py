@@ -3,6 +3,8 @@
 Revision ID: 20261116_0011
 Revises: 20261115_0010
 """
+import json
+
 from alembic import op
 import sqlalchemy as sa
 
@@ -29,7 +31,7 @@ def upgrade() -> None:
             plans.update()
             .where(plans.c.code == code)
             .values(entitlements=sa.text(
-                "entitlements || '" + __import__("json").dumps(values) + "'::jsonb"
+                "entitlements || '" + json.dumps(values) + "'::jsonb"
             ))
         )
     # Enterprise upload limits are intentionally not assigned a default.
