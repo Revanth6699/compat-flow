@@ -536,10 +536,10 @@ async def commit_multiformat_import(
         await file.close()
         raise HTTPException(status_code=400, detail="A valid filename is required.")
     try:
-        raw = await file.read(settings.import_max_upload_bytes + 1)
+        raw = await file.read(limits["max_upload_bytes"] + 1) if limits["max_upload_bytes"] is not None else await file.read()
     finally:
         await file.close()
-    if len(raw) > settings.import_max_upload_bytes:
+    if limits["max_upload_bytes"] is not None and len(raw) > limits["max_upload_bytes"]:
         raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
@@ -551,7 +551,7 @@ async def commit_multiformat_import(
         ):
             raise ValueError
         parsed = parse_source(
-            raw, filename, sheet_name=sheet_name, header_row=header_row,
+            raw, filename, sheet_name=sheet_name, max_records=limits["max_records"], header_row=header_row,
             json_record_path=json_record_path, xml_record_tag=xml_record_tag,
         )
         result = validate_parsed_records(parsed, record_type, mapping)
