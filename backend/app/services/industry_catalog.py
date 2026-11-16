@@ -117,15 +117,15 @@ def _valid_gtin(value: str) -> bool:
 
 
 def _valid_iso_date(value: str) -> bool:
+    normalized = value.strip()
     try:
-        date.fromisoformat(value.strip()[:10])
+        if len(normalized) == 10:
+            date.fromisoformat(normalized)
+            return True
+        datetime.fromisoformat(normalized.replace("Z", "+00:00"))
         return True
     except ValueError:
-        try:
-            datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
-            return True
-        except ValueError:
-            return False
+        return False
 
 
 class IndustryCSVError(ValueError):
