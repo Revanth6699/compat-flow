@@ -17,8 +17,8 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
-TOKEN_URL = "https://oauth2.googleapis.com/token"
-TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"
+TOKEN_URL = "https://oauth2.googleapis.com/token"  # nosec B105 - fixed Google OAuth endpoint, not a credential
+TOKEN_INFO_URL = "https://oauth2.googleapis.com/tokeninfo"  # nosec B105 - fixed Google token verification endpoint, not a credential
 SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
 SCOPE = "https://www.googleapis.com/auth/gmail.send"
 
