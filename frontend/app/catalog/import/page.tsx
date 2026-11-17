@@ -5,7 +5,18 @@ import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/auth-client";
 
 
-type DatasetProfile = { filename: string; format: string; total_records: number; total_columns: number; total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number; duplicate_rows: number; is_product_catalog: boolean; persisted: false; columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string; minimum: number | null; maximum: number | null; average: number | null }[]; preview: Record<string, unknown>[] };
+type DatasetProfile = {
+  filename: string; format: string; dataset_type: string; total_records: number; total_columns: number;
+  total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number;
+  complete_records: number; incomplete_records: number; complete_records_pct: number;
+  duplicate_rows: number; duplicate_rate_pct: number; is_product_catalog: boolean; persisted: false;
+  columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string; minimum: number | string | null; maximum: number | string | null; average: number | null; top_values: { value: string; count: number; pct: number }[] }[];
+  categorical_distributions: { name: string; values: { value: string; count: number; pct: number }[] }[];
+  date_columns: string[]; numeric_columns: string[];
+  relationship_checks: { name: string; from_column: string; to_column: string; matched_records: number; average_days: number | null; minimum_days: number | null; maximum_days: number | null; negative_duration_records: number }[];
+  findings: { severity: string; title: string; detail: string }[];
+  preview: Record<string, unknown>[];
+};
 type IndustryResult = {
   filename: string; profile_id: string | null; profile_detection: { profile_id: string | null; confidence: number; scores: Record<string, number>; needs_confirmation: boolean };
   requires_profile_confirmation: boolean; total_rows: number; valid_rows: number; invalid_rows: number;
@@ -158,40 +169,74 @@ export default function CatalogImportPage() {
     }));
   }
 
+  function saveBlob(filename: string, content: string, mimeType: string) {
+    const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
+    const anchor = document.createElement("a");
+    anchor.href = url; anchor.download = filename; anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
   function downloadReport() {
+    if (datasetResult) {
+      const rows: unknown[][] = [
+        ["CompatFlow Dataset Profile", datasetResult.filename],
+        ["Dataset type", datasetResult.dataset_type],
+        ["Records", datasetResult.total_records],
+        ["Columns", datasetResult.total_columns],
+        ["Completeness (%)", datasetResult.completeness_pct],
+        ["Complete records", datasetResult.complete_records],
+        ["Incomplete records", datasetResult.incomplete_records],
+        ["Duplicate rows", datasetResult.duplicate_rows],
+        ["Duplicate rate (%)", datasetResult.duplicate_rate_pct],
+        [],
+        ["Column", "Inferred type", "Populated", "Missing", "Completeness (%)", "Distinct values", "Minimum", "Maximum", "Average"],
+        ...datasetResult.columns.map(c => [c.name,c.inferred_type,c.populated,c.missing,c.completeness_pct,c.distinct_values,c.minimum ?? "",c.maximum ?? "",c.average ?? ""]),
+        [],
+        ["Categorical column", "Value", "Count", "Share (%)"],
+        ...datasetResult.categorical_distributions.flatMap(c => c.values.map(v => [c.name,v.value,v.count,v.pct])),
+        [],
+        ["Finding severity", "Finding", "Details"],
+        ...datasetResult.findings.map(f => [f.severity,f.title,f.detail]),
+        [],
+        ["Relationship check", "From", "To", "Matched records", "Average days", "Minimum days", "Maximum days", "Negative durations"],
+        ...datasetResult.relationship_checks.map(r => [r.name,r.from_column,r.to_column,r.matched_records,r.average_days ?? "",r.minimum_days ?? "",r.maximum_days ?? "",r.negative_duration_records]),
+      ];
+      const csv = rows.map(row => row.map(value => {
+        let cell = String(value ?? "");
+        if (/^[=+@-]/.test(cell)) cell = "'" + cell;
+        return '"' + cell.replace(/"/g, '""') + '"';
+      }).join(",")).join("\n");
+      saveBlob("compatflow-dataset-profile.csv", csv, "text/csv;charset=utf-8");
+      return;
+    }
     if (!result) return;
     const report = [
-      ["CompatFlow CSV Validation Report", result.filename],
-      ["Total records", result.total_rows],
-      ["Valid records", result.valid_rows],
-      ["Invalid records", result.invalid_rows],
-      ["Validation pass rate (%)", result.validation_pass_rate],
-      ["Data quality score (%)", result.data_quality_score],
-      ["Total issues", result.total_issues],
-      ["Critical issues", result.critical_issues],
-      ["Warnings", result.warning_issues],
-      ["Records with issues", result.records_with_issues],
-      ["Duplicate SKU count", result.duplicate_sku_count],
-      ["Duplicate SKU rate (%)", result.duplicate_rate],
-      ["Issue density (issues per record)", result.issue_density],
-      ["Critical record rate (%)", result.critical_record_rate],
-            ["Canonical field", "Detected source header", "Mapping confidence"],
-      ...result.column_mappings.map((m) => [m.field, m.source_header, m.confidence]),
-      [],
+      ["CompatFlow Catalog Validation Report", result.filename],
+      ["Total records", result.total_rows], ["Valid records", result.valid_rows],
+      ["Invalid records", result.invalid_rows], ["Validation pass rate (%)", result.validation_pass_rate],
+      ["Data quality score (%)", result.data_quality_score], ["Total issues", result.total_issues],
+      ["Critical issues", result.critical_issues], ["Warnings", result.warning_issues],
+      ["Records with issues", result.records_with_issues], ["Duplicate SKU count", result.duplicate_sku_count],
+      ["Duplicate SKU rate (%)", result.duplicate_rate], ["Issue density", result.issue_density],
+      ["Critical record rate (%)", result.critical_record_rate], [],
+      ["Canonical field", "Detected source header", "Mapping confidence"],
+      ...result.column_mappings.map(m => [m.field,m.source_header,m.confidence]), [],
       ["Field", "Populated", "Missing", "Completeness (%)"],
-      ...result.field_metrics.map((m) => [m.field, m.populated, m.missing, m.completeness_pct]),
-      [],
+      ...result.field_metrics.map(m => [m.field,m.populated,m.missing,m.completeness_pct]), [],
       ["Row", "Field", "Severity", "Category", "Issue", "Recommended action"],
-      ...result.row_errors.map((i) => [i.row_number, i.field ?? "General", i.severity, i.category, i.message, i.recommendation]),
+      ...result.row_errors.map(i => [i.row_number,i.field ?? "General",i.severity,i.category,i.message,i.recommendation]),
     ];
-    const csv = report.map((row) => row.map((v) => {
-      const value = String(v ?? "");
-      return `"${value.replace(/"/g, '""')}"`;
-    }).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const anchor = document.createElement("a");
-    anchor.href = url; anchor.download = "compatflow-validation-report.csv"; anchor.click();
-    URL.revokeObjectURL(url);
+    const csv = report.map(row => row.map(v => '"' + String(v ?? "").replace(/"/g, '""') + '"').join(",")).join("\n");
+    saveBlob("compatflow-validation-report.csv", csv, "text/csv;charset=utf-8");
+  }
+
+  function downloadProfileJson() {
+    if (!datasetResult) return;
+    saveBlob("compatflow-dataset-profile.json", JSON.stringify(datasetResult, null, 2), "application/json;charset=utf-8");
+  }
+
+  function printReport() {
+    window.print();
   }
 
   if (authLoading) return <main id="main" className="page"><div className="container"><p>Checking your account...</p></div></main>;
@@ -286,22 +331,59 @@ export default function CatalogImportPage() {
           </section>
         )}
         {datasetResult && (
-          <section className="import-results" aria-live="polite">
-            <div className="results-heading"><div><div className="eyebrow">Dataset profile complete</div><h2>Dataset statistics</h2><p>{datasetResult.filename} · {datasetResult.format.toUpperCase()} · Analysis only, not saved</p></div><span className="result-status success">Profile generated</span></div>
-            <div className="result-stats">
-              <div className="panel stat-card"><span>Total records</span><strong>{datasetResult.total_records.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Columns</span><strong>{datasetResult.total_columns.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Data completeness</span><strong>{datasetResult.completeness_pct.toFixed(2)}%</strong></div>
-              <div className="panel stat-card"><span>Missing cells</span><strong className={datasetResult.missing_cells ? "metric-invalid" : "metric-valid"}>{datasetResult.missing_cells.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Duplicate rows</span><strong className={datasetResult.duplicate_rows ? "metric-warning" : "metric-valid"}>{datasetResult.duplicate_rows.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Populated cells</span><strong>{datasetResult.populated_cells.toLocaleString()}</strong></div>
+          <section className="import-results premium-report" aria-live="polite">
+            <div className="results-heading">
+              <div><div className="eyebrow">DATA INTELLIGENCE REPORT</div><h2>{datasetResult.dataset_type} overview</h2><p>{datasetResult.filename} · {datasetResult.format.toUpperCase()} · Stateless analysis</p></div>
+              <span className="result-status success">Analysis complete</span>
             </div>
-            <div className="panel result-section"><h3>Dataset completeness</h3><div className="metric-bar"><span style={{ width: `${datasetResult.completeness_pct}%` }} /></div><p className="import-description">{datasetResult.populated_cells.toLocaleString()} populated of {datasetResult.total_cells.toLocaleString()} total cells.</p></div>
-            <div className="panel result-section"><h3>Column statistics</h3><div className="table-scroll"><table className="preview-table"><thead><tr><th>Column</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th><th>Distinct</th><th>Min</th><th>Max</th><th>Average</th></tr></thead><tbody>
-              {datasetResult.columns.map(column => <tr key={column.name}><td>{column.name}</td><td>{column.inferred_type}</td><td className="metric-valid">{column.populated.toLocaleString()}</td><td className={column.missing ? "metric-invalid" : "metric-valid"}>{column.missing.toLocaleString()}</td><td><div className="metric-bar metric-bar-small"><span style={{ width: `${column.completeness_pct}%` }} /></div>{column.completeness_pct.toFixed(1)}%</td><td>{column.distinct_values.toLocaleString()}</td><td>{column.minimum ?? "—"}</td><td>{column.maximum ?? "—"}</td><td>{column.average ?? "—"}</td></tr>)}
-            </tbody></table></div></div>
-            <div className="panel result-section"><h3>Record preview</h3><div className="table-scroll"><table className="preview-table"><thead><tr>{datasetResult.columns.map(column => <th key={column.name}>{column.name}</th>)}</tr></thead><tbody>{datasetResult.preview.map((row,index)=><tr key={index}>{datasetResult.columns.map(column=><td key={column.name}>{String(row[column.name] ?? "—")}</td>)}</tr>)}</tbody></table></div></div>
-            <p className="import-disclaimer">This is a structural data profile, not a product validation score. No file or record was saved.</p>
+            <div className="report-actions no-print">
+              <button className="button" type="button" onClick={downloadReport}>Download CSV report</button>
+              <button className="button button-secondary" type="button" onClick={downloadProfileJson}>Download JSON</button>
+              <button className="button button-secondary" type="button" onClick={printReport}>Print / Save PDF</button>
+            </div>
+            <div className="result-stats premium-kpis">
+              <div className="panel stat-card"><span>Total records</span><strong>{datasetResult.total_records.toLocaleString()}</strong><small>{datasetResult.total_columns} columns analysed</small></div>
+              <div className="panel stat-card"><span>Completeness</span><strong>{datasetResult.completeness_pct.toFixed(2)}%</strong><small>{datasetResult.populated_cells.toLocaleString()} populated cells</small></div>
+              <div className="panel stat-card"><span>Incomplete records</span><strong className={datasetResult.incomplete_records ? "metric-warning" : "metric-valid"}>{datasetResult.incomplete_records.toLocaleString()}</strong><small>{datasetResult.complete_records_pct.toFixed(1)}% fully populated</small></div>
+              <div className="panel stat-card"><span>Duplicate rows</span><strong className={datasetResult.duplicate_rows ? "metric-warning" : "metric-valid"}>{datasetResult.duplicate_rows.toLocaleString()}</strong><small>{datasetResult.duplicate_rate_pct.toFixed(2)}% duplicate rate</small></div>
+            </div>
+            <div className="premium-dashboard-grid">
+              <div className="panel result-section">
+                <div className="section-heading"><div><h3>Record health</h3><p>Completeness and exact duplicate checks</p></div></div>
+                <div className="health-row"><span>Complete records</span><strong>{datasetResult.complete_records.toLocaleString()}</strong></div>
+                <div className="metric-bar"><span style={{width: `${datasetResult.complete_records_pct}%`}} /></div>
+                <div className="health-row"><span>Incomplete records</span><strong>{datasetResult.incomplete_records.toLocaleString()}</strong></div>
+                <div className="metric-bar"><span className="bar-warning" style={{width: `${100-datasetResult.complete_records_pct}%`}} /></div>
+                <p className="import-description">{datasetResult.missing_cells.toLocaleString()} missing cells across {datasetResult.total_cells.toLocaleString()} possible cells.</p>
+              </div>
+              <div className="panel result-section">
+                <div className="section-heading"><div><h3>Key findings</h3><p>Prioritized observations from this file</p></div></div>
+                <div className="finding-list">{datasetResult.findings.map((finding,index)=><div className={`finding-item finding-${finding.severity}`} key={index}><span>{finding.severity.toUpperCase()}</span><div><strong>{finding.title}</strong><p>{finding.detail}</p></div></div>)}</div>
+              </div>
+            </div>
+            {datasetResult.categorical_distributions.length > 0 && (
+              <div className="panel result-section">
+                <div className="section-heading"><div><h3>Category distribution</h3><p>Most frequent values in categorical columns</p></div></div>
+                <div className="distribution-grid">{datasetResult.categorical_distributions.slice(0,6).map(group=><div className="distribution-card" key={group.name}><h4>{group.name}</h4>{group.values.slice(0,6).map(item=><div className="distribution-row" key={item.value}><div><span>{item.value}</span><strong>{item.count.toLocaleString()}</strong></div><div className="metric-bar"><span style={{width:`${item.pct}%`}} /></div><small>{item.pct.toFixed(1)}%</small></div>)}</div>)}</div>
+              </div>
+            )}
+            {datasetResult.relationship_checks.length > 0 && (
+              <div className="panel result-section">
+                <div className="section-heading"><div><h3>Relationship analysis</h3><p>Cross-column checks supported by detected date fields</p></div></div>
+                {datasetResult.relationship_checks.map(check=><div className="relationship-card" key={check.name}><h4>{check.name}</h4><p>{check.from_column} → {check.to_column}</p><div className="relationship-metrics"><div><span>Matched records</span><strong>{check.matched_records.toLocaleString()}</strong></div><div><span>Average duration</span><strong>{check.average_days === null ? "—" : `${check.average_days} days`}</strong></div><div><span>Range</span><strong>{check.minimum_days === null || check.maximum_days === null ? "—" : `${check.minimum_days}–${check.maximum_days} days`}</strong></div><div><span>Negative durations</span><strong className={check.negative_duration_records ? "metric-warning" : "metric-valid"}>{check.negative_duration_records.toLocaleString()}</strong></div></div></div>)}
+              </div>
+            )}
+            <div className="panel result-section">
+              <div className="section-heading"><div><h3>Column intelligence</h3><p>Inferred type, completeness, cardinality and distribution statistics</p></div></div>
+              <div className="table-scroll"><table className="preview-table"><thead><tr><th>Column</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th><th>Distinct</th><th>Min / start</th><th>Max / end</th><th>Average</th></tr></thead><tbody>
+                {datasetResult.columns.map(column=><tr key={column.name}><td>{column.name}</td><td>{column.inferred_type}</td><td>{column.populated.toLocaleString()}</td><td className={column.missing ? "metric-warning" : "metric-valid"}>{column.missing.toLocaleString()}</td><td><div className="metric-bar metric-bar-small"><span style={{width:`${column.completeness_pct}%`}} /></div>{column.completeness_pct.toFixed(1)}%</td><td>{column.distinct_values.toLocaleString()}</td><td>{column.minimum ?? "—"}</td><td>{column.maximum ?? "—"}</td><td>{column.average ?? "—"}</td></tr>)}
+              </tbody></table></div>
+            </div>
+            <div className="panel result-section">
+              <div className="section-heading"><div><h3>Record sample</h3><p>First 10 records from the uploaded file</p></div></div>
+              <div className="table-scroll"><table className="preview-table"><thead><tr>{datasetResult.columns.map(column=><th key={column.name}>{column.name}</th>)}</tr></thead><tbody>{datasetResult.preview.map((row,index)=><tr key={index}>{datasetResult.columns.map(column=><td key={column.name}>{String(row[column.name] ?? "—")}</td>)}</tr>)}</tbody></table></div>
+            </div>
+            <p className="import-disclaimer">This report measures structural completeness, exact duplicates, inferred types and supported column relationships. It does not claim business accuracy or apply product rules to non-product data. No file or record was saved.</p>
           </section>
         )}
         {multiResult && (
