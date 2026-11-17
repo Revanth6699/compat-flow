@@ -1072,3 +1072,48 @@ button:disabled, .button:disabled {
   .premium-report .result-section { margin-bottom: 14px; }
   body { background: #fff !important; color: #111 !important; }
 }
+
+
+/* Keep the intelligence report inside the viewport and isolate tables. */
+.premium-report,
+.premium-report > *,
+.premium-report .result-section,
+.premium-report .panel {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.premium-report .table-scroll {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+.premium-report .preview-table {
+  width: max-content;
+  min-width: 100%;
+}
+.premium-report .results-heading > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.premium-report .finding-item,
+.premium-report .relationship-card,
+.premium-report .distribution-card {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .premium-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .premium-dashboard-grid,
+  .distribution-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .premium-kpis { grid-template-columns: minmax(0, 1fr); }
+  .premium-report { gap: 14px; }
+  .premium-report .result-section { padding: 16px; }
+  .premium-report .results-heading h2 { font-size: 24px; overflow-wrap: anywhere; }
+  .premium-report .report-actions { align-items: stretch; flex-direction: column; }
+  .premium-report .report-actions .button { width: 100%; }
+}
