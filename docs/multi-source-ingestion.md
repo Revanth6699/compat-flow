@@ -64,13 +64,13 @@ Cursor-based pagination and vendor-specific next links are not implemented. Do n
 
 Connector preview and commit requests are authenticated, tenant-scoped, plan-gated, and rate-limited through Redis (20 operations per organization per minute by default). If Redis is unavailable, connector execution fails closed before contacting the source. Committed imports record the connector type and a sanitized host descriptor; credentials and query tokens are not stored.
 
-The hostname is checked against the allowlist and its DNS answers are checked for private/local addresses. The current HTTP client resolves the hostname again when connecting; DNS answers are not pinned to the validation result, so DNS-rebinding resistance is not complete. Keep the allowlist limited to operator-controlled, stable supplier hosts.
+The hostname is checked against the exact allowlist and resolved once per connector invocation. Every DNS answer must be globally routable; mixed public/private answers are rejected. The REST connector uses a pinned aiohttp resolver so TCP connects only to those validated IP addresses while TLS certificate verification, SNI, and the HTTP Host header continue to use the original hostname. Redirects and environment proxies are disabled. This closes the validation/connect DNS-rebinding gap for REST requests. Keep the allowlist limited to operator-controlled supplier hosts.
 
 ## SFTP connector
 
 SFTP requires an allowlisted host, absolute remote path, username, exactly one authentication method, and a managed SFTP_KNOWN_HOSTS_PATH. Paramiko strict reject policy is used; unknown host keys are rejected. The read is bounded to the configured upload limit plus one byte. Credentials are request-scoped and are not stored in CompatFlow.
 
-Only a single file is fetched per invocation. Directory polling, scheduled triggers, remote-file deduplication, retry/recovery orchestration, and durable background jobs are not implemented. A read-only SFTP account and directory-level permissions must be provisioned by the supplier/operator.
+The SFTP hostname is resolved once and every answer must be globally routable. CompatFlow opens the TCP socket directly to one of those validated IP addresses, then gives that socket to Paramiko while retaining the original hostname and port for known-host key verification. This avoids a second DNS lookup between validation and connection. Only a single file is fetched per invocation. Directory polling, scheduled triggers, remote-file deduplication, retry/recovery orchestration, and durable background jobs are not implemented. A read-only SFTP account and directory-level permissions must be provisioned by the supplier/operator.
 
 ## SQL Server connector
 
