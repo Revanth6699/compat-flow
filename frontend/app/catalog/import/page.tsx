@@ -8,7 +8,7 @@ import { apiRequest } from "@/lib/auth-client";
 type DatasetProfile = {
   filename: string; format: string; dataset_type: string; total_records: number; total_columns: number;
   total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number;
-  complete_records: number; incomplete_records: number; complete_records_pct: number;
+  complete_records: number | null; incomplete_records: number | null; complete_records_pct: number | null;
   duplicate_rows: number; duplicate_rate_pct: number; is_product_catalog: boolean; persisted: false;
   columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string; minimum: number | string | null; maximum: number | string | null; average: number | null; top_values: { value: string; count: number; pct: number }[] }[];
   categorical_distributions: { name: string; values: { value: string; count: number; pct: number }[] }[];
@@ -124,8 +124,26 @@ export default function CatalogImportPage() {
         if (!data.profile_id) {
           const profileForm = new FormData();
           profileForm.append("file", file);
-          const profile = await apiRequest<DatasetProfile>("/api/v1/catalog/import/profile", { method: "POST", body: profileForm });
-          setDatasetResult(profile);
+          const profile = await apiRequest<Partial<DatasetProfile>>("/api/v1/catalog/import/profile", { method: "POST", body: profileForm });
+          const columns = profile.columns ?? [];
+          const totalRecords = profile.total_records ?? 0;
+          const duplicateRows = profile.duplicate_rows ?? 0;
+          const missingCells = profile.missing_cells ?? 0;
+          const normalizedHeaders = columns.map((column) => column.name.toLowerCase().replace(/[^a-z0-9]+/g, "_"));
+          const datasetType = profile.dataset_type ?? (normalizedHeaders.some((header) => ["order_id", "order_status", "order_purchase_timestamp", "order_item_id"].includes(header)) ? "orders / transactions" : profile.is_product_catalog ? "product catalog" : "general dataset");
+          const findings = profile.findings ?? [
+            ...(missingCells > 0 ? [{ severity: "warning", title: "Missing values detected", detail: missingCells.toLocaleString() + " cells are empty." }] : []),
+            ...(duplicateRows > 0 ? [{ severity: "warning", title: "Duplicate records detected", detail: duplicateRows.toLocaleString() + " exact duplicate rows were found." }] : []),
+          ];
+          setDatasetResult({
+            ...profile, filename: profile.filename ?? file.name, format: profile.format ?? extension ?? "unknown", dataset_type: datasetType,
+            total_records: totalRecords, total_columns: profile.total_columns ?? columns.length, total_cells: profile.total_cells ?? totalRecords * columns.length,
+            populated_cells: profile.populated_cells ?? Math.max(0, totalRecords * columns.length - missingCells), missing_cells: missingCells, completeness_pct: profile.completeness_pct ?? 0,
+            complete_records: profile.complete_records ?? null, incomplete_records: profile.incomplete_records ?? null, complete_records_pct: profile.complete_records_pct ?? null,
+            duplicate_rows: duplicateRows, duplicate_rate_pct: profile.duplicate_rate_pct ?? (totalRecords ? duplicateRows / totalRecords * 100 : 0),
+            columns, categorical_distributions: profile.categorical_distributions ?? [], date_columns: profile.date_columns ?? [], numeric_columns: profile.numeric_columns ?? [],
+            relationship_checks: profile.relationship_checks ?? [], findings, preview: profile.preview ?? [], is_product_catalog: profile.is_product_catalog ?? false, persisted: false, quality_score: null,
+          } as DatasetProfile);
           return;
         }
         setIndustryResult(data);
@@ -136,8 +154,26 @@ export default function CatalogImportPage() {
       if (!data.profile_id) {
         const profileForm = new FormData();
         profileForm.append("file", file);
-        const profile = await apiRequest<DatasetProfile>("/api/v1/catalog/import/profile", { method: "POST", body: profileForm });
-        setDatasetResult(profile);
+        const profile = await apiRequest<Partial<DatasetProfile>>("/api/v1/catalog/import/profile", { method: "POST", body: profileForm });
+        const columns = profile.columns ?? [];
+        const totalRecords = profile.total_records ?? 0;
+        const duplicateRows = profile.duplicate_rows ?? 0;
+        const missingCells = profile.missing_cells ?? 0;
+        const normalizedHeaders = columns.map((column) => column.name.toLowerCase().replace(/[^a-z0-9]+/g, "_"));
+        const datasetType = profile.dataset_type ?? (normalizedHeaders.some((header) => ["order_id", "order_status", "order_purchase_timestamp", "order_item_id"].includes(header)) ? "orders / transactions" : profile.is_product_catalog ? "product catalog" : "general dataset");
+        const findings = profile.findings ?? [
+          ...(missingCells > 0 ? [{ severity: "warning", title: "Missing values detected", detail: missingCells.toLocaleString() + " cells are empty." }] : []),
+          ...(duplicateRows > 0 ? [{ severity: "warning", title: "Duplicate records detected", detail: duplicateRows.toLocaleString() + " exact duplicate rows were found." }] : []),
+        ];
+        setDatasetResult({
+          ...profile, filename: profile.filename ?? file.name, format: profile.format ?? extension ?? "unknown", dataset_type: datasetType,
+          total_records: totalRecords, total_columns: profile.total_columns ?? columns.length, total_cells: profile.total_cells ?? totalRecords * columns.length,
+          populated_cells: profile.populated_cells ?? Math.max(0, totalRecords * columns.length - missingCells), missing_cells: missingCells, completeness_pct: profile.completeness_pct ?? 0,
+          complete_records: profile.complete_records ?? null, incomplete_records: profile.incomplete_records ?? null, complete_records_pct: profile.complete_records_pct ?? null,
+          duplicate_rows: duplicateRows, duplicate_rate_pct: profile.duplicate_rate_pct ?? (totalRecords ? duplicateRows / totalRecords * 100 : 0),
+          columns, categorical_distributions: profile.categorical_distributions ?? [], date_columns: profile.date_columns ?? [], numeric_columns: profile.numeric_columns ?? [],
+          relationship_checks: profile.relationship_checks ?? [], findings, preview: profile.preview ?? [], is_product_catalog: profile.is_product_catalog ?? false, persisted: false, quality_score: null,
+        } as DatasetProfile);
         return;
       }
       setIndustryResult(data);
@@ -344,16 +380,20 @@ export default function CatalogImportPage() {
             <div className="result-stats premium-kpis">
               <div className="panel stat-card"><span>Total records</span><strong>{datasetResult.total_records.toLocaleString()}</strong><small>{datasetResult.total_columns} columns analysed</small></div>
               <div className="panel stat-card"><span>Completeness</span><strong>{datasetResult.completeness_pct.toFixed(2)}%</strong><small>{datasetResult.populated_cells.toLocaleString()} populated cells</small></div>
-              <div className="panel stat-card"><span>Incomplete records</span><strong className={datasetResult.incomplete_records ? "metric-warning" : "metric-valid"}>{datasetResult.incomplete_records.toLocaleString()}</strong><small>{datasetResult.complete_records_pct.toFixed(1)}% fully populated</small></div>
+              <div className="panel stat-card"><span>Incomplete records</span><strong className={datasetResult.incomplete_records ? "metric-warning" : "metric-valid"}>{datasetResult.incomplete_records === null ? "Not calculated" : datasetResult.incomplete_records.toLocaleString()}</strong><small>{datasetResult.complete_records_pct === null ? "Record-level completeness unavailable" : datasetResult.complete_records_pct.toFixed(1) + "% fully populated"}</small></div>
               <div className="panel stat-card"><span>Duplicate rows</span><strong className={datasetResult.duplicate_rows ? "metric-warning" : "metric-valid"}>{datasetResult.duplicate_rows.toLocaleString()}</strong><small>{datasetResult.duplicate_rate_pct.toFixed(2)}% duplicate rate</small></div>
             </div>
             <div className="premium-dashboard-grid">
               <div className="panel result-section">
                 <div className="section-heading"><div><h3>Record health</h3><p>Completeness and exact duplicate checks</p></div></div>
-                <div className="health-row"><span>Complete records</span><strong>{datasetResult.complete_records.toLocaleString()}</strong></div>
-                <div className="metric-bar"><span style={{width: `${datasetResult.complete_records_pct}%`}} /></div>
-                <div className="health-row"><span>Incomplete records</span><strong>{datasetResult.incomplete_records.toLocaleString()}</strong></div>
-                <div className="metric-bar"><span className="bar-warning" style={{width: `${100-datasetResult.complete_records_pct}%`}} /></div>
+                {datasetResult.complete_records === null || datasetResult.incomplete_records === null || datasetResult.complete_records_pct === null ? (
+                  <p className="import-description">Record-level completeness is not provided by the connected backend version. Cell-level completeness is shown below.</p>
+                ) : <>
+                  <div className="health-row"><span>Complete records</span><strong>{datasetResult.complete_records.toLocaleString()}</strong></div>
+                  <div className="metric-bar"><span style={{width: `${datasetResult.complete_records_pct}%`}} /></div>
+                  <div className="health-row"><span>Incomplete records</span><strong>{datasetResult.incomplete_records.toLocaleString()}</strong></div>
+                  <div className="metric-bar"><span className="bar-warning" style={{width: `${100-datasetResult.complete_records_pct}%`}} /></div>
+                </>}
                 <p className="import-description">{datasetResult.missing_cells.toLocaleString()} missing cells across {datasetResult.total_cells.toLocaleString()} possible cells.</p>
               </div>
               <div className="panel result-section">
