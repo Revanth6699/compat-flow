@@ -151,5 +151,5 @@ def test_measurements_must_be_positive_and_counts_whole_numbers():
 
 
 def test_malformed_datetime_is_not_accepted_as_valid_date():
-    result = validate_industry_csv("title,effective_date\\nWidget,2025-01-01Tnot-a-time\\n", profile_id="d2c")
+    result = validate_industry_csv("title,effective_date\nWidget,2025-01-01Tnot-a-time\n", profile_id="d2c")
     assert any(i["error_code"] == "INVALID_DATE_VALUE" for i in result["issues"])
