@@ -50,9 +50,46 @@ type CreateResponse = {
 };
 
 const plans = [
-  { code: "starter", name: "Starter", price: "$27", description: "For small teams validating supplier product data." },
-  { code: "growth", name: "Growth", price: "$64", description: "For recurring supplier catalog updates." },
-  { code: "business", name: "Business", price: "$153", description: "For teams coordinating catalog quality." },
+  {
+    code: "starter",
+    name: "Starter",
+    price: "$27",
+    description: "For small teams validating supplier product data.",
+    features: [
+      "CSV uploads up to 10 MB and 20,000 records",
+      "Catalog data-quality validations and issue details",
+      "Downloadable validation reports",
+      "Organization workspace",
+      "Up to 3 total team seats",
+    ],
+  },
+  {
+    code: "growth",
+    name: "Growth",
+    price: "$64",
+    description: "For teams working with multiple supplier feeds.",
+    features: [
+      "All Starter validation capabilities",
+      "CSV, XLS, XLSX, JSON and XML inputs",
+      "Uploads up to 20 MB and 40,000 records",
+      "REST API, SFTP and SQL Server connections",
+      "Multiple supplier catalog imports",
+      "Up to 10 total team seats",
+    ],
+  },
+  {
+    code: "business",
+    name: "Business",
+    price: "$153",
+    description: "For teams coordinating catalog quality across departments.",
+    features: [
+      "All Growth validation and import capabilities",
+      "Uploads up to 100 MB and 100,000 records",
+      "REST API, SFTP and SQL Server connections",
+      "Multiple supplier catalog imports",
+      "Up to 25 total team seats",
+    ],
+  },
 ];
 
 function BillingContent() {
@@ -232,11 +269,15 @@ function BillingContent() {
                   onClick={() => setSelectedPlan(plan.code)}
                   disabled={!isOwner || busy}
                 >
-                  <strong>{plan.name}</strong><span className="pricing-amount">{plan.price}<small> / month</small></span><span>{plan.description}</span>
+                  <strong>{plan.name}</strong>
+                  <span className="pricing-amount">{plan.price}<small> / month</small></span>
+                  <span>{plan.description}</span>
+                  <span className="billing-plan-features">
+                    {plan.features.map(feature => <span className="billing-plan-feature" key={feature}>✓ {feature}</span>)}
+                  </span>
                 </button>
               ))}
             </div>
-            <p className="settings-description">Enterprise remains a custom commercial plan and is not available through self-service checkout. Annual billing is not enabled until annual prices and provider plans are explicitly configured.</p>
             <button className="button auth-submit" disabled={!isOwner || busy || loading || subscriptionLocked} onClick={() => void startCheckout()}>
               {busy ? "Please wait…" : "Continue to secure checkout"}
             </button>
