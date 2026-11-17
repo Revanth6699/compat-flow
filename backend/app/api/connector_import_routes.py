@@ -13,6 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
+from starlette.concurrency import run_in_threadpool
 
 from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.config import settings
@@ -216,7 +217,8 @@ async def _load_source(payload: ConnectorImportRequest) -> tuple[bytes, str]:
         filename = payload.sftp_filename or payload.sftp_remote_path.rsplit("/", 1)[-1]
         if not filename or len(filename) > 255:
             raise HTTPException(status_code=422, detail="A valid SFTP filename is required.")
-        content = fetch_sftp_file(
+        content = await run_in_threadpool(
+            fetch_sftp_file,
             host=host, port=payload.sftp_port, username=payload.sftp_username,
             password=payload.sftp_password, private_key=payload.sftp_private_key,
             remote_path=payload.sftp_remote_path,
@@ -235,7 +237,8 @@ async def _load_source(payload: ConnectorImportRequest) -> tuple[bytes, str]:
     _require_allowed_host(parsed_url.host)
     if not payload.sql_columns:
         raise HTTPException(status_code=422, detail="At least one SQL Server column must be selected.")
-    rows = fetch_sql_server_rows(
+    rows = await run_in_threadpool(
+        fetch_sql_server_rows,
         payload.sql_server_url, schema=payload.sql_schema, table=payload.sql_table,
         columns=payload.sql_columns, limit=payload.sql_row_limit,
         max_bytes=settings.import_max_upload_bytes,
@@ -260,7 +263,7 @@ async def preview_connector_import(
     await _enforce_connector_rate_limit(_current.profile.organization_id)
     try:
         raw, filename = await _load_source(payload)
-        parsed, result = _prepare(payload, raw, filename)
+        parsed, result = await run_in_threadpool(_prepare, payload, raw, filename)
         ai_result = await suggest_field_mappings(
             record_type=payload.record_type,
             headers=parsed.headers,
@@ -321,7 +324,7 @@ async def commit_connector_import(
     await _enforce_connector_rate_limit(current.profile.organization_id)
     try:
         raw, filename = await _load_source(payload)
-        parsed, result = _prepare(payload, raw, filename)
+        parsed, result = await run_in_threadpool(_prepare, payload, raw, filename)
     except (SourceConnectorError, IngestionParseError, RecordMappingError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     return persist_validated_import(
