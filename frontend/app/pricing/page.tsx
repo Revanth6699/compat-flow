@@ -8,7 +8,6 @@ type Plan = {
   code?: string;
   price: string;
   description: string;
-  featured?: boolean;
   features: string[];
   action: string;
   href: string;
@@ -35,7 +34,6 @@ const plans: Plan[] = [
     code: "starter",
     price: "$27",
     description: "For small teams that need repeatable validation and shareable results.",
-    featured: true,
     features: [
       "CSV uploads up to 10 MB and 20,000 records",
       "Required-field, duplicate and catalog data-quality checks",
@@ -112,9 +110,9 @@ export default function PricingPage() {
               : plan.href;
             const action = plan.code && user ? "Select plan" : plan.action;
             return (
-              <article className={`pricing-card${plan.featured ? " pricing-card-featured" : ""}`} key={plan.name}>
+              <article className="pricing-card" key={plan.name}>
                 <div className="pricing-card-top">
-                  <div className="eyebrow">{plan.name === "Demo" ? "Approval required" : plan.featured ? "For small teams" : plan.name === "Growth" ? "For growing teams" : plan.custom ? "Custom requirements" : "For operations teams"}</div>
+                  <div className="eyebrow">{plan.name === "Demo" ? "Approval required" : plan.name === "Starter" ? "For small teams" : plan.name === "Growth" ? "For growing teams" : plan.custom ? "Custom requirements" : "For operations teams"}</div>
                   <h2>{plan.name}</h2><p>{plan.description}</p>
                   <div className="pricing-amount"><strong>{plan.price}</strong>{plan.price !== "Free" && plan.price !== "Custom" && <span>/ month</span>}</div>
                 </div>
@@ -127,7 +125,7 @@ export default function PricingPage() {
                   ))}
                 </ul>
                 <div className="pricing-card-action">
-                  <Link className={plan.featured ? "button" : "button button-secondary"} href={href} aria-disabled={loading && !!plan.code}>
+                  <Link className="button button-secondary" href={href} aria-disabled={loading && !!plan.code}>
                     {loading && plan.code ? "Checking account…" : action}
                   </Link>
                 </div>
