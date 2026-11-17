@@ -1,6 +1,7 @@
 import csv
 import json
 import re
+from datetime import datetime
 from collections import Counter
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -153,7 +154,7 @@ async def profile_public_dataset(
     _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
     db: Session = Depends(get_db),
 ):
-    """Profile a dataset using the authenticated account's upload limits."""
+    """Create a stateless, evidence-based profile for non-catalog datasets."""
     limits = resolve_import_limits(_access, db)
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
@@ -162,7 +163,7 @@ async def profile_public_dataset(
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if extension not in {"csv", "xls", "xlsx"}:
         await file.close()
-        raise HTTPException(status_code=415, detail="The public dataset demo accepts CSV, XLS and XLSX files.")
+        raise HTTPException(status_code=415, detail="The dataset profiler accepts CSV, XLS and XLSX files.")
     limit = limits["max_upload_bytes"]
     try:
         raw = await file.read(limit + 1) if limit is not None else await file.read()
@@ -179,16 +180,22 @@ async def profile_public_dataset(
 
     rows = [record.values for record in parsed.records]
     total = len(rows)
+    headers = parsed.headers
     columns = []
-    total_cells = total * len(parsed.headers)
+    total_cells = total * len(headers)
     populated_cells = 0
     duplicate_keys = Counter()
+    complete_records = 0
     for row in rows:
         key = json.dumps(row, sort_keys=True, default=str, separators=(",", ":"))
         duplicate_keys[key] += 1
+        if all(row.get(header) is not None and str(row.get(header)).strip() != "" for header in headers):
+            complete_records += 1
     duplicate_rows = sum(count - 1 for count in duplicate_keys.values() if count > 1)
-
-    for header in parsed.headers:
+    categorical = []
+    date_columns = []
+    numeric_columns = []
+    for header in headers:
         values = [row.get(header) for row in rows]
         present = [value for value in values if value is not None and str(value).strip() != ""]
         populated_cells += len(present)
@@ -199,45 +206,124 @@ async def profile_public_dataset(
             except (TypeError, ValueError):
                 numeric = []
                 break
+        parsed_dates = []
+        if present and not numeric:
+            for value in present:
+                try:
+                    parsed_dates.append(datetime.fromisoformat(str(value).strip().replace("Z", "+00:00")))
+                except (TypeError, ValueError):
+                    parsed_dates = []
+                    break
         if not present:
             inferred = "empty"
         elif numeric and len(numeric) == len(present):
             inferred = "numeric"
-        elif all(isinstance(value, bool) for value in present):
+            numeric_columns.append(header)
+        elif parsed_dates and len(parsed_dates) == len(present):
+            inferred = "datetime"
+            date_columns.append(header)
+        elif all(str(value).strip().casefold() in {"true", "false", "yes", "no", "0", "1"} for value in present):
             inferred = "boolean"
         else:
-            inferred = "text / mixed"
+            inferred = "categorical" if len({str(value) for value in present}) <= min(50, max(8, int(len(present) * 0.2))) else "text"
+        distinct = len({str(value) for value in present})
+        top_values = []
+        if inferred == "categorical":
+            counts = Counter(str(value) for value in present)
+            top_values = [{"value": value, "count": count, "pct": round(count / len(present) * 100, 2)} for value, count in counts.most_common(8)]
+            categorical.append({"name": header, "values": top_values})
         columns.append({
             "name": header,
             "populated": len(present),
             "missing": total - len(present),
             "completeness_pct": round((len(present) / total * 100) if total else 0, 2),
-            "distinct_values": len({str(value) for value in present}),
+            "distinct_values": distinct,
             "inferred_type": inferred,
-            "minimum": min(numeric) if numeric else None,
-            "maximum": max(numeric) if numeric else None,
+            "minimum": min(numeric) if numeric else (min(parsed_dates).isoformat() if parsed_dates else None),
+            "maximum": max(numeric) if numeric else (max(parsed_dates).isoformat() if parsed_dates else None),
             "average": round(sum(numeric) / len(numeric), 4) if numeric else None,
+            "top_values": top_values,
         })
-    normalized = {re.sub(r"[^a-z0-9]+", "_", header.casefold()).strip("_") for header in parsed.headers}
+    normalized = {re.sub(r"[^a-z0-9]+", "_", header.casefold()).strip("_") for header in headers}
     product_headers = {"sku", "product_sku", "item_sku", "product_code", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category"}
+    order_headers = {"order_id", "order_status", "order_purchase_timestamp", "customer_id", "order_item_id"}
+    if normalized & order_headers:
+        dataset_type = "orders / transactions"
+    elif normalized & product_headers:
+        dataset_type = "product catalog"
+    elif {"customer_id", "customer_unique_id", "customer_zip_code_prefix"} & normalized:
+        dataset_type = "customer records"
+    else:
+        dataset_type = "general dataset"
+
+    relationship_checks = []
+    purchase_header = next((h for h in headers if re.sub(r"[^a-z0-9]+", "_", h.casefold()).strip("_") in {"order_purchase_timestamp", "purchase_date", "created_at", "order_date"}), None)
+    delivery_header = next((h for h in headers if re.sub(r"[^a-z0-9]+", "_", h.casefold()).strip("_") in {"order_delivered_customer_date", "delivered_at", "delivery_date", "delivered_date"}), None)
+    if purchase_header and delivery_header:
+        durations = []
+        reversed_dates = 0
+        for row in rows:
+            try:
+                purchased = datetime.fromisoformat(str(row.get(purchase_header)).strip().replace("Z", "+00:00"))
+                delivered = datetime.fromisoformat(str(row.get(delivery_header)).strip().replace("Z", "+00:00"))
+                days = (delivered - purchased).total_seconds() / 86400
+                if days < 0:
+                    reversed_dates += 1
+                else:
+                    durations.append(days)
+            except (TypeError, ValueError):
+                continue
+        relationship_checks.append({
+            "name": "Purchase-to-delivery duration",
+            "from_column": purchase_header,
+            "to_column": delivery_header,
+            "matched_records": len(durations) + reversed_dates,
+            "average_days": round(sum(durations) / len(durations), 2) if durations else None,
+            "minimum_days": round(min(durations), 2) if durations else None,
+            "maximum_days": round(max(durations), 2) if durations else None,
+            "negative_duration_records": reversed_dates,
+        })
+
+    completeness = round((populated_cells / total_cells * 100) if total_cells else 0, 2)
+    missing_cells = total_cells - populated_cells
+    findings = []
+    if missing_cells:
+        findings.append({"severity": "warning", "title": "Missing values detected", "detail": f"{missing_cells:,} cells are empty ({round(missing_cells / total_cells * 100, 2) if total_cells else 0}% of the dataset)."})
+    if duplicate_rows:
+        findings.append({"severity": "warning", "title": "Duplicate records detected", "detail": f"{duplicate_rows:,} rows repeat an earlier complete row."})
+    if any(column["completeness_pct"] < 80 for column in columns):
+        low = sorted((column for column in columns if column["completeness_pct"] < 80), key=lambda c: c["completeness_pct"])
+        findings.append({"severity": "warning", "title": "Low-completeness columns", "detail": ", ".join(f"{c['name']} ({c['completeness_pct']}%)" for c in low[:5])})
+    if not findings:
+        findings.append({"severity": "info", "title": "No structural red flags detected", "detail": "No missing cells or exact duplicate rows were found in the uploaded sample."})
+
     return {
         "filename": filename,
         "format": parsed.format,
+        "dataset_type": dataset_type,
         "total_records": total,
-        "total_columns": len(parsed.headers),
+        "total_columns": len(headers),
         "total_cells": total_cells,
         "populated_cells": populated_cells,
-        "missing_cells": total_cells - populated_cells,
-        "completeness_pct": round((populated_cells / total_cells * 100) if total_cells else 0, 2),
+        "missing_cells": missing_cells,
+        "completeness_pct": completeness,
+        "complete_records": complete_records,
+        "incomplete_records": total - complete_records,
+        "complete_records_pct": round(complete_records / total * 100, 2) if total else 0,
         "duplicate_rows": duplicate_rows,
+        "duplicate_rate_pct": round(duplicate_rows / total * 100, 2) if total else 0,
         "columns": columns,
+        "categorical_distributions": categorical,
+        "date_columns": date_columns,
+        "numeric_columns": numeric_columns,
+        "relationship_checks": relationship_checks,
+        "findings": findings,
         "preview": rows[:10],
         "is_product_catalog": bool(normalized & product_headers),
         "persisted": False,
-        "profile_scope": "file_structure_completeness_duplicates_and_basic_types",
+        "profile_scope": "structural_completeness_exact_duplicates_inferred_types_numeric_and_date_ranges_categorical_distributions_and_supported_date_relationships",
+        "quality_score": None,
     }
-
-
 
 
 async def _validate_industry_upload(
