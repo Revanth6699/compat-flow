@@ -413,13 +413,13 @@ export default function CatalogImportPage() {
                 {datasetResult.relationship_checks.map(check=><div className="relationship-card" key={check.name}><h4>{check.name}</h4><p>{check.from_column} → {check.to_column}</p><div className="relationship-metrics"><div><span>Matched records</span><strong>{check.matched_records.toLocaleString()}</strong></div><div><span>Average duration</span><strong>{check.average_days === null ? "—" : `${check.average_days} days`}</strong></div><div><span>Range</span><strong>{check.minimum_days === null || check.maximum_days === null ? "—" : `${check.minimum_days}–${check.maximum_days} days`}</strong></div><div><span>Negative durations</span><strong className={check.negative_duration_records ? "metric-warning" : "metric-valid"}>{check.negative_duration_records.toLocaleString()}</strong></div></div></div>)}
               </div>
             )}
-            <div className="panel result-section">
+            <div className="panel result-section report-wide-page">
               <div className="section-heading"><div><h3>Column intelligence</h3><p>Inferred type, completeness, cardinality and distribution statistics</p></div></div>
               <div className="table-scroll"><table className="preview-table"><thead><tr><th>Column</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th><th>Distinct</th><th>Min / start</th><th>Max / end</th><th>Average</th></tr></thead><tbody>
                 {datasetResult.columns.map(column=><tr key={column.name}><td>{column.name}</td><td>{column.inferred_type}</td><td>{column.populated.toLocaleString()}</td><td className={column.missing ? "metric-warning" : "metric-valid"}>{column.missing.toLocaleString()}</td><td><div className="metric-bar metric-bar-small"><span style={{width:`${column.completeness_pct}%`}} /></div>{column.completeness_pct.toFixed(1)}%</td><td>{column.distinct_values.toLocaleString()}</td><td>{column.minimum ?? "—"}</td><td>{column.maximum ?? "—"}</td><td>{column.average ?? "—"}</td></tr>)}
               </tbody></table></div>
             </div>
-            <div className="panel result-section">
+            <div className="panel result-section report-wide-page">
               <div className="section-heading"><div><h3>Record sample</h3><p>First 10 records from the uploaded file</p></div></div>
               <div className="table-scroll"><table className="preview-table"><thead><tr>{datasetResult.columns.map(column=><th key={column.name}>{column.name}</th>)}</tr></thead><tbody>{datasetResult.preview.map((row,index)=><tr key={index}>{datasetResult.columns.map(column=><td key={column.name}>{String(row[column.name] ?? "—")}</td>)}</tr>)}</tbody></table></div>
             </div>
