@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/auth-client";
+import DatasetCharts from "@/components/dataset-charts";
 
 
 type DatasetProfile = {
@@ -401,6 +402,7 @@ export default function CatalogImportPage() {
                 <div className="finding-list">{datasetResult.findings.map((finding,index)=><div className={`finding-item finding-${finding.severity}`} key={index}><span>{finding.severity.toUpperCase()}</span><div><strong>{finding.title}</strong><p>{finding.detail}</p></div></div>)}</div>
               </div>
             </div>
+            <DatasetCharts profile={datasetResult} />
             {datasetResult.categorical_distributions.length > 0 && (
               <div className="panel result-section">
                 <div className="section-heading"><div><h3>Category distribution</h3><p>Most frequent values in categorical columns</p></div></div>
