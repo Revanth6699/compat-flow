@@ -336,7 +336,7 @@ export default function CatalogImportPage() {
         </section>
 
         {file && user && (
-          <section className="panel result-section" aria-live="polite">
+          <section className="panel result-section no-print" aria-live="polite">
             <h3>AI-assisted mapping suggestions</h3>
             <p className="import-description">AI is optional. If enabled and a provider is configured, CompatFlow sends the source headers and up to five bounded sample values per header to that external HTTPS provider. Suggestions are never applied automatically.</p>
             <label><input type="checkbox" checked={aiConsent} onChange={(event) => { setAiConsent(event.target.checked); setAiResult(null); }} /> I consent to sending this bounded sample evidence to the configured AI provider for mapping suggestions.</label>
