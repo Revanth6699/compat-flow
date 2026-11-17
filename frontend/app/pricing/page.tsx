@@ -114,7 +114,7 @@ export default function PricingPage() {
             return (
               <article className={`pricing-card${plan.featured ? " pricing-card-featured" : ""}`} key={plan.name}>
                 <div className="pricing-card-top">
-                  <div className="eyebrow">{plan.name === "Demo" ? "Approval required" : plan.featured ? "For small teams" : plan.custom ? "Custom requirements" : "For growing operations"}</div>
+                  <div className="eyebrow">{plan.name === "Demo" ? "Approval required" : plan.featured ? "For small teams" : plan.name === "Growth" ? "For growing teams" : plan.custom ? "Custom requirements" : "For operations teams"}</div>
                   <h2>{plan.name}</h2><p>{plan.description}</p>
                   <div className="pricing-amount"><strong>{plan.price}</strong>{plan.price !== "Free" && plan.price !== "Custom" && <span>/ month</span>}</div>
                 </div>
