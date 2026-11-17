@@ -7,6 +7,7 @@ protocols require a dedicated adapter rather than guessing response semantics.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import ipaddress
 import json
 import re
@@ -429,15 +430,11 @@ def fetch_sftp_file(
         ) from None
     finally:
         if client is not None:
-            try:
+            with contextlib.suppress(Exception):
                 client.close()
-            except Exception:
-                pass
         if connection is not None:
-            try:
+            with contextlib.suppress(OSError):
                 connection.close()
-            except OSError:
-                pass
 
 
 def _coerce_watermark(value: str, column: Any) -> Any:
