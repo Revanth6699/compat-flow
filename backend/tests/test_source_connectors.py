@@ -1,3 +1,4 @@
+import socket
 import sys
 from types import SimpleNamespace
 
@@ -189,11 +190,11 @@ def test_sftp_connector_downloads_with_known_host_verification(monkeypatch):
         "getaddrinfo",
         lambda *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 22))],
     )
-    monkeypatch.setattr(
-        connectors.socket,
-        "create_connection",
-        lambda address, timeout: (calls.setdefault("socket_target", address) or FakeSocket()),
-    )
+    def fake_create_connection(address, timeout):
+        calls["socket_target"] = address
+        return FakeSocket()
+
+    monkeypatch.setattr(connectors.socket, "create_connection", fake_create_connection)
     monkeypatch.setitem(sys.modules, "paramiko", Paramiko())
     result = fetch_sftp_file(
         host="sftp.supplier.example", port=22, username="reader",
@@ -210,6 +211,30 @@ def test_sftp_connector_downloads_with_known_host_verification(monkeypatch):
     assert calls["socket_target"] == ("93.184.216.34", 22)
     assert calls["socket_closed"] is True
     assert calls["closed"] is True
+
+
+def test_sftp_connector_rejects_private_dns_before_opening_socket(monkeypatch):
+    calls = {"connected": False}
+    monkeypatch.setattr(
+        connectors.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("127.0.0.1", 22))],
+    )
+    monkeypatch.setattr(
+        connectors.socket,
+        "create_connection",
+        lambda *args, **kwargs: calls.__setitem__("connected", True),
+    )
+    with pytest.raises(SourceConnectorError, match="Private and local"):
+        fetch_sftp_file(
+            host="sftp.supplier.example",
+            port=22,
+            username="reader",
+            password="secret",
+            remote_path="/catalog.csv",
+            known_hosts_path="/known_hosts",
+        )
+    assert calls["connected"] is False
 
 
 def test_sftp_connector_rejects_unknown_host_key(monkeypatch):
@@ -717,37 +742,9 @@ def test_sql_server_requires_read_only_application_intent():
 
 @pytest.mark.anyio
 async def test_api_connector_rejects_full_page_when_only_one_page_is_allowed(monkeypatch):
-    class Response:
-        status_code = 200
-        headers = {}
-
-        def raise_for_status(self):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        async def aiter_bytes(self):
-            yield b'[{"sku":"001"}]'
-
-    class Client:
-        def __init__(self, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        def stream(self, *args, **kwargs):
-            return Response()
-
-    monkeypatch.setattr(connectors, "_validate_https_url", lambda *args: None)
-    monkeypatch.setattr(connectors.httpx, "AsyncClient", Client)
+    calls, Response = _patch_api_http(
+        monkeypatch, lambda url: Response(200, b'[{"sku":"001"}]')
+    )
     with pytest.raises(SourceConnectorError, match="configure a larger max_pages"):
         await fetch_api_records(
             "https://supplier.example/catalog",
@@ -875,40 +872,13 @@ def test_sql_server_connector_rejects_potentially_truncated_row_limit(monkeypatc
 
 @pytest.mark.anyio
 async def test_api_connector_converts_json_recursion_errors_to_safe_connector_errors(monkeypatch):
-    class Response:
-        status_code = 200
-        headers = {}
-
-        def raise_for_status(self):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        async def aiter_bytes(self):
-            yield b"{}"
-
-    class Client:
-        def __init__(self, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        def stream(self, *args, **kwargs):
-            return Response()
+    calls, Response = _patch_api_http(
+        monkeypatch, lambda url: Response(200, b"{}")
+    )
 
     def reject_deep_json(*args, **kwargs):
         raise RecursionError("deeply nested JSON")
 
-    monkeypatch.setattr(connectors, "_validate_https_url", lambda *args: None)
-    monkeypatch.setattr(connectors.httpx, "AsyncClient", Client)
     monkeypatch.setattr(connectors.json, "loads", reject_deep_json)
 
     with pytest.raises(SourceConnectorError, match="nesting depth"):
