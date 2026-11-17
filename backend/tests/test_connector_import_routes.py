@@ -1,3 +1,5 @@
+import threading
+
 import pytest
 from fastapi.testclient import TestClient
 from types import SimpleNamespace
@@ -16,6 +18,54 @@ client = TestClient(app)
 
 async def _async_noop():
     return None
+
+
+@pytest.mark.anyio
+async def test_blocking_sftp_and_sql_reads_run_outside_the_event_loop(monkeypatch):
+    event_loop_thread = threading.get_ident()
+    calls = {}
+    monkeypatch.setattr(
+        settings,
+        "connector_allowed_hosts",
+        "sftp.supplier.example,sql.example",
+    )
+    monkeypatch.setattr(settings, "sftp_known_hosts_path", "/known_hosts")
+
+    def fake_sftp(**kwargs):
+        calls["sftp_thread"] = threading.get_ident()
+        return b"SKU,Name\n001,Widget"
+
+    def fake_sql(url, **kwargs):
+        calls["sql_thread"] = threading.get_ident()
+        return [{"sku": "001"}]
+
+    monkeypatch.setattr(routes, "fetch_sftp_file", fake_sftp)
+    sftp_payload = ConnectorImportRequest(
+        source_type="sftp",
+        record_type="products",
+        sftp_host="sftp.supplier.example",
+        sftp_username="reader",
+        sftp_password="request-scoped-secret",
+        sftp_remote_path="/exports/catalog.csv",
+    )
+    sftp_content, sftp_filename = await routes._load_source(sftp_payload)
+    assert sftp_content.startswith(b"SKU,Name")
+    assert sftp_filename == "catalog.csv"
+    assert calls["sftp_thread"] != event_loop_thread
+
+    monkeypatch.setattr(routes, "fetch_sql_server_rows", fake_sql)
+    sql_payload = ConnectorImportRequest(
+        source_type="sql_server",
+        record_type="products",
+        sql_server_url="mssql+pyodbc://reader:request-scoped-secret@sql.example/catalog",
+        sql_schema="dbo",
+        sql_table="Products",
+        sql_columns=["sku"],
+    )
+    sql_content, sql_filename = await routes._load_source(sql_payload)
+    assert sql_filename == "connector.json"
+    assert b'"sku": "001"' in sql_content
+    assert calls["sql_thread"] != event_loop_thread
 
 
 def test_connector_routes_require_authentication():
