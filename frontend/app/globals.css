@@ -1766,3 +1766,101 @@ button:disabled, .button:disabled {
   .home-page .home-hero-copy{min-height:600px;padding:48px 24px}
   .home-page .home-hero-actions .button{width:100%}
 }
+
+
+/* Alignment correction: constrain the hero content to the circle's true inner area. */
+.home-page .home-hero{
+  box-sizing:border-box;
+  min-height:calc(100svh - 82px);
+  padding:48px 20px;
+}
+.home-page .home-hero-grid{
+  box-sizing:border-box;
+  width:100%;
+  max-width:none;
+  min-width:0;
+  margin:0;
+  padding:0;
+}
+.home-page .home-hero-copy{
+  box-sizing:border-box;
+  flex:0 1 auto;
+  width:min(680px,76vw);
+  height:auto;
+  min-height:0;
+  aspect-ratio:1 / 1;
+  padding:clamp(42px,5.2vw,72px);
+  gap:0;
+  overflow:hidden;
+  border-radius:50%;
+}
+.home-page .home-hero-copy .eyebrow{
+  flex:0 0 auto;
+  margin:0 auto 18px;
+  max-width:100%;
+  white-space:nowrap;
+}
+.home-page .home-hero-copy h1{
+  width:100%;
+  max-width:470px;
+  margin:0 auto 16px;
+  font-size:clamp(2rem,3vw,3rem);
+  line-height:1.1;
+  overflow-wrap:normal;
+  hyphens:none;
+}
+.home-page .home-hero-description{
+  width:100%;
+  max-width:440px;
+  margin:0 auto 20px;
+  line-height:1.55;
+}
+.home-page .home-hero-actions{
+  width:100%;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:center;
+  align-items:center;
+  gap:10px;
+}
+.home-page .home-hero-actions .button{
+  display:inline-flex;
+  justify-content:center;
+  align-items:center;
+  min-height:44px;
+  padding:11px 18px;
+  white-space:normal;
+  text-align:center;
+}
+.home-page .home-hero-note{
+  width:100%;
+  max-width:390px;
+  margin:14px auto 0;
+  line-height:1.45;
+}
+@media(max-width:900px){
+  .home-page .home-hero{min-height:auto;padding:44px 18px 58px}
+  .home-page .home-hero-copy{
+    width:min(640px,88vw);
+    padding:clamp(40px,6vw,64px);
+  }
+  .home-page .home-hero-copy h1{font-size:clamp(1.9rem,4.5vw,2.65rem)}
+}
+@media(max-width:620px){
+  .home-page .home-hero{padding:30px 14px 44px}
+  .home-page .home-hero-copy{
+    width:min(94vw,520px);
+    aspect-ratio:auto;
+    min-height:0;
+    padding:54px 30px;
+    border-radius:42px;
+    overflow:visible;
+  }
+  .home-page .home-hero-copy h1{
+    max-width:420px;
+    font-size:clamp(1.85rem,7vw,2.35rem);
+    line-height:1.12;
+  }
+  .home-page .home-hero-description{max-width:390px}
+  .home-page .home-hero-note{max-width:350px}
+}
