@@ -210,8 +210,8 @@ function SourcesContent() {
         <label htmlFor="sftp-user">Username</label><input id="sftp-user" required value={form.sftp_username} onChange={e => update("sftp_username", e.target.value)} />
         <label htmlFor="sftp-path">Remote file path</label><input id="sftp-path" required value={form.sftp_remote_path} onChange={e => update("sftp_remote_path", e.target.value)} placeholder="/exports/products.csv" />
         <label htmlFor="sftp-password">Password (use only one authentication method)</label><input id="sftp-password" type="password" autoComplete="new-password" value={form.sftp_password} onChange={e => update("sftp_password", e.target.value)} />
-        <label htmlFor="sftp-key">Private key (alternative to password)</label><textarea id="sftp-key" rows={4} value={form.sftp_private_key} onChange={e => update("sftp_private_key", e.target.value)} placeholder="Paste the private key for this one-time connection" />
-        <p className="import-description">SFTP uses strict known-host verification. A read-only supplier account and operator-managed known-host entry are required. This is a one-file operation; polling and file deduplication are not available.</p>
+        <label htmlFor="sftp-key">Private key (unencrypted PEM/OpenSSH; alternative to password)</label><textarea id="sftp-key" rows={4} value={form.sftp_private_key} onChange={e => update("sftp_private_key", e.target.value)} placeholder="Paste an unencrypted PEM/OpenSSH private key" />
+        <p className="import-description">SFTP uses strict known-host verification. A read-only supplier account and operator-managed known-host entry are required. Paste private-key content, not a server file path; encrypted private keys are not supported yet. This is a one-file operation; polling and file deduplication are not available.</p>
       </div>}
       {sourceType === "sql_server" && <div className="auth-form">
         <label htmlFor="sql-url">SQL Server connection URL</label><input id="sql-url" type="password" autoComplete="off" required value={form.sql_server_url} onChange={e => update("sql_server_url", e.target.value)} placeholder="mssql+pyodbc://..." />
