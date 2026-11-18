@@ -49,7 +49,7 @@ export function SiteHeader() {
           {!loading && (user ? (
             <>
               <Link href="/settings">Profile</Link>
-              <Link className="button button-secondary signout-control" href="/" onClick={() => void signOut()}>Sign out</Link>
+              <Link href="/" onClick={() => void signOut()}>Sign out</Link>
             </>
           ) : (
             <>
