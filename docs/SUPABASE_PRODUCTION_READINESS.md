@@ -16,7 +16,7 @@ Supabase PostgreSQL is a viable candidate for the CompatFlow application databas
 - The current public application schema contains `contact_requests` and `demo_access`; both contain existing data and must be preserved.
 - The Supabase migration history query returned no recorded migrations. The repository contains a SQL migration for those two tables, so the live schema and migration history need reconciliation rather than blindly reapplying it.
 - The backend migration chain on the staging branch currently ends at `20261116_0011_upload_limits`.
-- GitHub Actions passed the full backend industry-ingestion regression workflow and full CI (frontend + backend) against PostgreSQL 17 on the corrected audit commit `ff5c819e47ca05cc32219a9508fc5a4552c9968f`.
+- GitHub Actions passed the full backend industry-ingestion regression workflow and full CI (frontend + backend) against PostgreSQL 17 on the corrected audit commit `5b7d874347436780a183dc422283cf74cdf3b273`.
 - `alembic check` now passes in both workflows. It previously detected a mismatch between the model's implicit unique constraint and the migration's named unique index on `users.auth_user_id`; the model was corrected to represent the same named unique index. This verifies metadata parity for the current clean CI database, not the live Supabase schema.
 
 ## Table ownership — preserve the three demo/contact concepts
@@ -92,7 +92,7 @@ The backend currently connects through a PostgreSQL database URL and uses server
 
 ### 6. Migration/model consistency and PostgreSQL version
 
-The backend migration chain and SQLAlchemy metadata need a complete comparison, including constraints, indexes, foreign keys, defaults, and nullability. The current audit branch runs the full migration and regression workflows against PostgreSQL 17 and runs `alembic check` afterward; both workflows passed on commit `e002a46627a064ff31fa71f1c2e79c9db53f6107`. This is a meaningful compatibility gate, but it does not prove compatibility with the live Supabase schema or existing data.
+The backend migration chain and SQLAlchemy metadata need a complete comparison, including constraints, indexes, foreign keys, defaults, and nullability. The current audit branch runs the full migration and regression workflows against PostgreSQL 17 and runs `alembic check` afterward; both workflows passed on commit `5b7d874347436780a183dc422283cf74cdf3b273`. This is a meaningful compatibility gate, but it does not prove compatibility with the live Supabase schema or existing data.
 
 The Supabase SQL migration for `contact_requests` and `demo_access` has not been recorded in the live Supabase migration history. Reconcile this carefully; do not reapply a create-table migration against tables that already exist.
 
