@@ -74,7 +74,7 @@ function WorkspaceContent() {
   }
 
   return (
-    <main id="main" className="page">
+    <main id="main" className="page workspace-page">
       <div className="container">
         <header className="workspace-heading">
           <div><span className="eyebrow">YOUR ORGANIZATION</span><h1>Workspace</h1><p>Signed in as {user?.email || "your account"}.</p></div>
