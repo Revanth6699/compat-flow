@@ -35,12 +35,12 @@ The demo request route writes the authoritative queue record to `demo_access_req
 
 ### 1. Organization roles do not match the product requirement
 
-Current backend code and migrations still support `owner`, `admin`, `member`, and `viewer`. First-user onboarding creates `owner`; invitations accept `admin`, `member`, or `viewer`; only an owner may invite another admin. This conflicts with the product decision of one Organization Admin role and invited employees as Members.
+Current backend code and migrations still support `owner`, `admin`, `member`, and `viewer`. First-user onboarding creates `owner`; invitations accept `admin`, `member`, or `viewer`; only an owner may invite another admin. Billing endpoints also authorize only `owner`. This conflicts with the product decision of one Organization Admin role and invited employees as Members, and with the requirement that customer Organization Admins must not manage subscriptions/billing.
 
 The refactor must cover:
-- onboarding role assignment;
-- invitation request validation and acceptance;
-- member management and authorization dependencies;
+- onboarding role assignment (first customer account becomes `admin`);
+- invitation request validation and acceptance (invited users become `member`; remove `viewer` if no read-only role is required);
+- member management and authorization dependencies (Organization Admin can manage members/settings, but not billing/subscription or platform settings);
 - permission seed rows and role check constraints;
 - deletion and organization lifecycle behavior;
 - frontend role labels and access controls;
@@ -54,11 +54,13 @@ The platform-admin allowlist is a separate, verified identity check. Keep the pl
 
 The backend config defaults Redis to localhost. Celery uses Redis for its broker and result backend, and connector rate limiting also uses Redis. Supabase PostgreSQL does not replace Redis. A production API configured only with a Supabase `DATABASE_URL` would not make these workflows operational.
 
-Before release, choose and test a zero-cost supported approach:
-- provision a free Redis-compatible service if one is genuinely available and within its limits; or
-- replace the Redis/Celery dependency with a PostgreSQL-backed queue and database-backed rate limiter, with explicit retry, locking, and failure semantics.
+Research found that Upstash documents a Celery integration over a TLS Redis URL. Its current free tier is explicitly positioned for prototypes/hobby projects and lists 256 MB data, 10 GB monthly bandwidth, and 500K monthly commands; the free tier does not include the advertised production SLA / multi-zone HA package. Upstash also specifically warns that Celery workers poll Redis while idle, which can consume request quota. This makes it a possible $0 staging/integration-test candidate, not an acceptable production reliability decision without measured workload and an explicit acceptance of the free-tier availability limits.
 
-Do not silently fall back to localhost or disable rate limiting.
+Before release, choose and test one of these approaches:
+- provision a Redis-compatible service with an appropriate production reliability commitment and cost; or
+- replace Redis/Celery with a PostgreSQL-backed queue and database-backed rate limiter, preserving explicit retry, locking, idempotency, and failure semantics.
+
+Do not silently fall back to localhost or disable rate limiting. Do not use Upstash's HTTP-only SDK as a drop-in Celery broker; the documented Celery integration uses the TLS Redis protocol.
 
 ### 3. Import files are stored on a local filesystem
 
@@ -108,7 +110,7 @@ The production entrypoint intentionally does not auto-run Alembic migrations. Pr
 - [ ] RLS and grants verified for every public table; no unintended anon/authenticated access.
 - [ ] Existing `contact_requests` and `demo_access` rows preserved and verified.
 - [ ] `demo_access_requests` queue, Supabase mirrors, and notification behavior tested independently.
-- [ ] Redis/Celery dependency replaced or provisioned and tested.
+- [ ] Redis/Celery dependency replaced or provisioned with an accepted reliability/cost profile and tested. Upstash Free is not accepted as production-ready solely because it is $0.
 - [ ] Import file storage works across API and worker processes.
 - [ ] Supabase backup restore test succeeds in a separate database/project.
 - [ ] Render connection pool sizing and TLS tested.
