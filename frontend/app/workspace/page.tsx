@@ -74,9 +74,9 @@ function WorkspaceContent() {
   }
 
   return (
-    <main id="main" className="page">
+    <main id="main" className="page workspace-page">
       <div className="container">
-        <header className="workspace-heading">
+        <header className="workspace-heading workspace-page-header">
           <div><span className="eyebrow">YOUR ORGANIZATION</span><h1>Workspace</h1><p>Signed in as {user?.email || "your account"}.</p></div>
           <div className="workspace-actions">
             {!profile?.is_platform_admin && <Link className="button button-secondary" href="/pricing">Plans</Link>}
@@ -104,8 +104,8 @@ function WorkspaceContent() {
 
         {!loading && profile && (
           <>
-            <section className="panel workspace-profile">
-              <div className="workspace-heading">
+            <section className="panel workspace-profile workspace-overview-card">
+              <div className="workspace-heading workspace-profile-heading">
                 <div><span className="eyebrow">ORGANIZATION ACCOUNT</span><h2>Organization overview</h2><p>Your organization owns the subscription, data and employee access. Members use the same plan.</p></div>
                 <span className="pricing-status available">{profile.role}</span>
               </div>
@@ -120,7 +120,7 @@ function WorkspaceContent() {
               {profile.is_platform_admin && <div className="notice"><strong>Platform-owner access is enabled.</strong><p>No subscription is required for your account. Customer subscription rules remain unchanged.</p></div>}
             </section>
 
-            <section className="pricing-grid" aria-label="Workspace areas">
+            <section className="workspace-area-grid" aria-label="Workspace areas">
               <article className="panel settings-panel"><span className="eyebrow">CATALOG OPERATIONS</span><h2>Catalog validation</h2><p>Run a validation preview with the file formats and limits available to your organization. Files are not saved or committed to the catalog in this workflow.</p><Link className="button button-secondary" href="/catalog/import">Open validation preview</Link></article>
               <article className="panel settings-panel"><span className="eyebrow">CONNECTED DATA</span><h2>Data sources</h2><p>Configure eligible REST API, SFTP and SQL Server source connections.</p><Link className="button button-secondary" href="/catalog/sources">Manage data sources</Link></article>
               {(profile.role === "owner" || profile.role === "admin") && <article className="panel settings-panel"><span className="eyebrow">PEOPLE</span><h2>Team access</h2><p>Invite employees, review members and manage permitted access for this organization.</p><Link className="button button-secondary" href="/team">Manage team</Link></article>}
