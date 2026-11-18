@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import ipaddress
+import io
 import json
 import re
 import socket
@@ -86,6 +87,18 @@ def _resolve_https_target(url: str, allowed_hosts: set[str]) -> tuple[str, int, 
         port = parsed.port or 443
     except ValueError:
         raise SourceConnectorError("Connector URL contains an invalid port.") from None
+    sensitive_query_names = {
+        "api_key", "apikey", "access_token", "token", "password",
+        "client_secret", "secret", "authorization", "signature", "auth",
+        "credential", "x_api_key",
+    }
+    if any(
+        name.casefold().replace("-", "_") in sensitive_query_names
+        for name, _ in parse_qsl(parsed.query, keep_blank_values=True)
+    ):
+        raise SourceConnectorError(
+            "Credentials in API query parameters are not allowed; use an Authorization or X-API-Key header."
+        )
     if (
         parsed.scheme != "https"
         or not parsed.hostname
@@ -354,6 +367,34 @@ async def fetch_api_records(
     return all_records
 
 
+def _load_sftp_private_key(private_key: str, paramiko: Any) -> Any:
+    """Parse pasted, unencrypted PEM/OpenSSH key material without using a file path."""
+    value = private_key.strip()
+    if len(value) > 64 * 1024:
+        raise SourceConnectorError("SFTP private key exceeds the supported size limit.")
+    first_line = value.splitlines()[0] if value else ""
+    if not first_line.startswith("-----BEGIN ") or "PRIVATE KEY-----" not in first_line:
+        raise SourceConnectorError(
+            "SFTP private-key authentication requires pasted PEM/OpenSSH private-key content."
+        )
+
+    key_types = (
+        getattr(paramiko, "Ed25519Key", None),
+        getattr(paramiko, "ECDSAKey", None),
+        getattr(paramiko, "RSAKey", None),
+    )
+    for key_type in key_types:
+        if key_type is None:
+            continue
+        try:
+            return key_type.from_private_key(io.StringIO(value))
+        except Exception:
+            continue
+    raise SourceConnectorError(
+        "SFTP private key is invalid, encrypted, or uses an unsupported key type."
+    )
+
+
 def fetch_sftp_file(
     *,
     host: str,
@@ -366,13 +407,15 @@ def fetch_sftp_file(
     max_bytes: int = 10 * 1024 * 1024,
 ) -> bytes:
     """Download one file over SSH using pinned public DNS and strict host keys."""
+    path_parts = remote_path.split("/")
     if (
         not known_hosts_path
         or not remote_path.startswith("/")
-        or "\x00" in remote_path
+        or "\\x00" in remote_path
+        or any(part in {".", ".."} for part in path_parts)
     ):
         raise SourceConnectorError(
-            "An absolute remote path and known-hosts file are required."
+            "An absolute remote path without dot segments and a known-hosts file are required."
         )
     if not username or bool(password) == bool(private_key):
         raise SourceConnectorError(
@@ -386,6 +429,7 @@ def fetch_sftp_file(
     try:
         import paramiko
 
+        parsed_key = _load_sftp_private_key(private_key, paramiko) if private_key else None
         last_connect_error: OSError | None = None
         for address in addresses:
             try:
@@ -407,7 +451,8 @@ def fetch_sftp_file(
             sock=connection,
             username=username,
             password=password,
-            key_filename=private_key,
+            pkey=parsed_key,
+            key_filename=None,
             look_for_keys=False,
             allow_agent=False,
             timeout=15,
