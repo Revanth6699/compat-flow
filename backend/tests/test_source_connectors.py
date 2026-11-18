@@ -146,7 +146,7 @@ def test_sftp_connector_downloads_with_known_host_verification(monkeypatch):
 
         def read(self, size):
             calls["read_size"] = size
-            return b"SKU,Name\\n001,Widget"
+            return b"SKU,Name\n001,Widget"
 
     class SFTP:
         def __enter__(self):
@@ -201,7 +201,7 @@ def test_sftp_connector_downloads_with_known_host_verification(monkeypatch):
         password="secret", remote_path="/exports/catalog.csv",
         known_hosts_path="/run/secrets/known_hosts", max_bytes=100,
     )
-    assert result == b"SKU,Name\\n001,Widget"
+    assert result == b"SKU,Name\n001,Widget"
     assert calls["known_hosts"] == "/run/secrets/known_hosts"
     assert calls["policy"] == "reject-unknown-host"
     assert calls["remote"] == ("/exports/catalog.csv", "rb")
@@ -225,8 +225,8 @@ def test_api_connector_rejects_credentials_in_query_parameters():
 def test_sftp_connector_parses_pasted_private_key_content(monkeypatch):
     calls = {}
     key_material = (
-        "-----BEGIN OPENSSH PRIVATE KEY-----\\n"
-        "test-private-key-material\\n"
+        "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+        "test-private-key-material\n"
         "-----END OPENSSH PRIVATE KEY-----"
     )
 
@@ -244,7 +244,7 @@ def test_sftp_connector_parses_pasted_private_key_content(monkeypatch):
             return None
 
         def read(self, size):
-            return b"SKU,Name\\n001,Widget"
+            return b"SKU,Name\n001,Widget"
 
     class SFTP:
         def __enter__(self):
@@ -308,7 +308,7 @@ def test_sftp_connector_parses_pasted_private_key_content(monkeypatch):
         max_bytes=100,
     )
 
-    assert result == b"SKU,Name\\n001,Widget"
+    assert result == b"SKU,Name\n001,Widget"
     assert calls["parsed_key_text"] == key_material
     assert calls["connect"]["pkey"] == "parsed-private-key"
     assert calls["connect"]["key_filename"] is None
@@ -342,6 +342,37 @@ def test_sftp_connector_rejects_key_paths_and_dot_segment_paths_before_network(m
             remote_path="/exports/../private.csv",
             known_hosts_path="/known_hosts",
         )
+
+
+def test_sftp_private_key_parse_errors_do_not_echo_key_material(monkeypatch):
+    secret = "private-key-secret-marker"
+
+    class FakeKey:
+        @classmethod
+        def from_private_key(cls, stream):
+            raise ValueError(f"invalid key: {secret}")
+
+    class Paramiko:
+        Ed25519Key = FakeKey
+        ECDSAKey = FakeKey
+        RSAKey = FakeKey
+
+    monkeypatch.setitem(sys.modules, "paramiko", Paramiko())
+    with pytest.raises(SourceConnectorError) as exc:
+        fetch_sftp_file(
+            host="sftp.supplier.example",
+            port=22,
+            username="reader",
+            private_key=(
+                "-----BEGIN OPENSSH PRIVATE KEY-----\\n"
+                f"{secret}\\n"
+                "-----END OPENSSH PRIVATE KEY-----"
+            ),
+            remote_path="/exports/catalog.csv",
+            known_hosts_path="/known_hosts",
+        )
+    assert secret not in str(exc.value)
+    assert "invalid, encrypted, or uses an unsupported key type" in str(exc.value)
 
 def test_sftp_connector_rejects_private_dns_before_opening_socket(monkeypatch):
     calls = {"connected": False}
