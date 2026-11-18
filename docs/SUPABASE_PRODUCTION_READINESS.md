@@ -48,7 +48,7 @@ The refactor must cover:
 
 Do not simply drop the `owner` role constraint: the existing code relies on it for organization deletion and privilege checks. The settings UI also branches on `owner` to choose between deleting the whole organization and deleting only an individual membership. Billing routes currently require `owner`, while the product requirement says the Organization Admin must not manage billing/subscriptions. Migrate the behavior, data model, UI, and tests together.
 
-A separate lifecycle risk was found in `DELETE /auth/account`: it deletes Supabase Auth identities before committing the relational organization deletion. If deletion of a later member identity fails, earlier identities may already be gone while the CompatFlow database transaction is still uncommitted. The replacement flow needs an explicit, recoverable deletion state/outbox or another idempotent orchestration design; a database transaction cannot roll back completed Supabase Auth API calls.
+A separate lifecycle risk was found in `DELETE /auth/account`: it deletes Supabase Auth identities before committing the relational organization deletion. If deletion of a later member identity fails, earlier identities may already be gone while the CompatFlow database transaction is still uncommitted. The replacement flow needs an explicit, recoverable deletion state/outbox or another idempotent orchestration design; a database transaction cannot roll back completed Supabase Auth API calls. Do not fix this by simply reversing the order: deleting PostgreSQL rows first and then failing to delete Auth identities creates orphaned sign-in identities.
 
 The platform-admin allowlist is a separate, verified identity check. Keep the platform-admin account subscription-free and unrestricted without granting platform-wide powers to customer Organization Admins.
 
@@ -70,7 +70,13 @@ The API saves import files under `IMPORT_STORAGE_DIR`; a separate Celery worker 
 
 Use private object storage (for example, a private Supabase Storage bucket accessed only by the backend) or another tested shared-storage design. Verify upload, worker read, cleanup, size limits, and access isolation. Do not expose the service-role key to the browser.
 
-### 4. Database security and tenant isolation
+### 4. Cross-system demo approval is not transactionally safe
+
+The platform-admin decision endpoint updates `demo_access_requests`, calls Supabase REST to mirror `contact_requests` and `demo_access`, and only then commits the backend PostgreSQL transaction. If the final commit fails, Supabase can show an approval/revocation that the authoritative backend queue did not commit. The operation needs an outbox/reconciliation design or a clearly defined authoritative commit followed by retryable idempotent synchronization. The UI must show synchronization status rather than implying the two systems are atomically updated.
+
+The demo submission endpoint has the opposite ordering: it commits the backend queue record, then sends Gmail notification (failure is logged). This is safer for persistence, but notification delivery is best-effort and currently has no durable retry record. Treat email as an independently retryable side effect.
+
+### 5. Database security and tenant isolation
 
 The existing two Supabase tables have RLS enabled and no anon/authenticated policies; their intended access is server-only. The new backend tables do not yet have an explicit Supabase security/grant plan.
 
@@ -84,13 +90,13 @@ Before production:
 
 The backend currently connects through a PostgreSQL database URL and uses server-side SQLAlchemy queries. RLS alone is not a substitute for its tenant-scoped query checks. Decide whether the runtime connection uses a restricted database role or the Supabase postgres role; do not assume the latter is protected by RLS.
 
-### 5. Migration/model consistency and PostgreSQL version
+### 6. Migration/model consistency and PostgreSQL version
 
 The backend migration chain and SQLAlchemy metadata need a complete comparison, including constraints, indexes, foreign keys, defaults, and nullability. The current audit branch runs the full migration and regression workflows against PostgreSQL 17 and runs `alembic check` afterward; both workflows passed on commit `e002a46627a064ff31fa71f1c2e79c9db53f6107`. This is a meaningful compatibility gate, but it does not prove compatibility with the live Supabase schema or existing data.
 
 The Supabase SQL migration for `contact_requests` and `demo_access` has not been recorded in the live Supabase migration history. Reconcile this carefully; do not reapply a create-table migration against tables that already exist.
 
-### 6. Connection pooling and runtime sizing
+### 7. Connection pooling and runtime sizing
 
 The backend SQLAlchemy engine uses a pool (5 connections plus 5 overflow per process). API and worker processes can multiply that demand. Before release:
 - use the Supabase Session Pooler for persistent Render services, with TLS required;
@@ -99,7 +105,7 @@ The backend SQLAlchemy engine uses a pool (5 connections plus 5 overflow per pro
 - test startup, reconnects, concurrent API requests, and worker jobs;
 - keep database credentials only in Render secret environment variables.
 
-### 7. Operational behavior
+### 8. Operational behavior
 
 The production entrypoint intentionally does not auto-run Alembic migrations. Preserve that safety. Migrations must be manually applied only after a verified backup and a successful PostgreSQL 17 rehearsal. Production rollback and restore steps must be written and tested.
 
@@ -107,6 +113,8 @@ The production entrypoint intentionally does not auto-run Alembic migrations. Pr
 
 - [ ] Role model aligned with one Organization Admin and regular Members; platform-admin bypass remains separate.
 - [ ] Organization/account deletion redesigned as a recoverable, idempotent workflow across Supabase Auth and PostgreSQL.
+- [ ] Demo approval/revocation synchronization made retryable and reconciled across the backend queue and Supabase mirrors.
+- [ ] Gmail notification failures have durable retry/reconciliation behavior, or are explicitly surfaced as best-effort.
 - [ ] SQLAlchemy models and Alembic migrations reconciled; one unambiguous Alembic head.
 - [ ] Full migrations run successfully on a clean PostgreSQL 17 database.
 - [ ] Full backend regression suite passes against PostgreSQL 17.
