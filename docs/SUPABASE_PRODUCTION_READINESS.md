@@ -16,7 +16,7 @@ Supabase PostgreSQL is a viable candidate for the CompatFlow application databas
 - The current public application schema contains `contact_requests` and `demo_access`; both contain existing data and must be preserved.
 - The Supabase migration history query returned no recorded migrations. The repository contains a SQL migration for those two tables, so the live schema and migration history need reconciliation rather than blindly reapplying it.
 - The backend migration chain on the staging branch currently ends at `20261116_0011_upload_limits`.
-- GitHub Actions passed the full backend industry-ingestion regression workflow and full CI (frontend + backend) against PostgreSQL 17 on commit `e002a46627a064ff31fa71f1c2e79c9db53f6107`.
+- GitHub Actions passed the full backend industry-ingestion regression workflow and full CI (frontend + backend) against PostgreSQL 17 on the corrected audit commit `ff5c819e47ca05cc32219a9508fc5a4552c9968f`.
 - `alembic check` now passes in both workflows. It previously detected a mismatch between the model's implicit unique constraint and the migration's named unique index on `users.auth_user_id`; the model was corrected to represent the same named unique index. This verifies metadata parity for the current clean CI database, not the live Supabase schema.
 
 ## Table ownership — preserve the three demo/contact concepts
@@ -46,7 +46,9 @@ The refactor must cover:
 - frontend role labels and access controls;
 - tests and operational documentation.
 
-Do not simply drop the `owner` role constraint: the existing code relies on it for organization deletion and privilege checks. Migrate the behavior and data model together.
+Do not simply drop the `owner` role constraint: the existing code relies on it for organization deletion and privilege checks. The settings UI also branches on `owner` to choose between deleting the whole organization and deleting only an individual membership. Billing routes currently require `owner`, while the product requirement says the Organization Admin must not manage billing/subscriptions. Migrate the behavior, data model, UI, and tests together.
+
+A separate lifecycle risk was found in `DELETE /auth/account`: it deletes Supabase Auth identities before committing the relational organization deletion. If deletion of a later member identity fails, earlier identities may already be gone while the CompatFlow database transaction is still uncommitted. The replacement flow needs an explicit, recoverable deletion state/outbox or another idempotent orchestration design; a database transaction cannot roll back completed Supabase Auth API calls.
 
 The platform-admin allowlist is a separate, verified identity check. Keep the platform-admin account subscription-free and unrestricted without granting platform-wide powers to customer Organization Admins.
 
@@ -104,6 +106,7 @@ The production entrypoint intentionally does not auto-run Alembic migrations. Pr
 ## Required release gates
 
 - [ ] Role model aligned with one Organization Admin and regular Members; platform-admin bypass remains separate.
+- [ ] Organization/account deletion redesigned as a recoverable, idempotent workflow across Supabase Auth and PostgreSQL.
 - [ ] SQLAlchemy models and Alembic migrations reconciled; one unambiguous Alembic head.
 - [ ] Full migrations run successfully on a clean PostgreSQL 17 database.
 - [ ] Full backend regression suite passes against PostgreSQL 17.
