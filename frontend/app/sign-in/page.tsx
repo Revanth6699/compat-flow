@@ -26,7 +26,7 @@ function SignInForm() {
       <button className="button auth-submit" disabled={busy}>{busy?"Signing in…":"Sign in"}</button>
     </form>
     <p className="auth-switch">New to CompatFlow? <Link href="/sign-up">Create an account</Link></p>
-  </section></main>;
+  </section><aside className="auth-welcome"><span className="auth-welcome-kicker">SUPPLIER DATA OPERATIONS</span><h2>Welcome back.</h2><p>Bring your supplier and product information into one reliable workspace. Review catalog quality before it reaches your systems.</p></aside></main>;
 }
 
 export default function SignInPage() { return <Suspense fallback={<main id="main" className="auth-shell">Loading…</main>}><SignInForm /></Suspense>; }
