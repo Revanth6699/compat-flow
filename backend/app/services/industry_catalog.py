@@ -10,8 +10,10 @@ import io
 import re
 import unicodedata
 from collections import Counter
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
+from urllib.parse import urlsplit
 
 MAX_ROWS = 10_000
 PREVIEW_LIMIT = 10
@@ -34,6 +36,11 @@ ALIASES: dict[str, set[str]] = {
     "mpn": {"mpn", "manufacturer_part_number", "mfr_part_number", "manufacturerpartnumber"},
     "model_number": {"model_number", "model_no", "model"},
     "gtin": {"gtin", "barcode", "ean", "upc", "gtin_8", "gtin_12", "gtin_13", "gtin_14"},
+    "product_url": {"product_url", "url", "canonical_url", "landing_page_url"},
+    "image_url": {"image_url", "image_link", "product_image_url", "main_image_url"},
+    "source_url": {"source_url", "supplier_url", "source_link"},
+    "effective_date": {"effective_date", "valid_from", "available_from", "start_date"},
+    "expiry_date": {"expiry_date", "valid_to", "available_to", "end_date"},
     "category": {"category", "product_category", "product_category_name", "category_name"},
     "product_type": {"product_type", "item_type"},
     "parent_product_id": {"parent_product_id", "parent_id", "item_group_id", "style_id"},
@@ -88,10 +95,37 @@ PROFILES: dict[str, dict[str, Any]] = {
 NUMERIC_NONNEGATIVE = {
     "name_length", "description_length", "image_count", "weight_g", "length_cm",
     "height_cm", "width_cm", "unit_price", "quantity", "quantity_on_hand",
-    "quantity_reserved", "moq", "order_multiple", "lead_time_days", "year",
+    "quantity_reserved", "quantity_available", "moq", "order_multiple", "lead_time_days", "year",
     "voltage", "power_w", "frequency_hz", "capacity", "diameter", "pressure_rating",
     "pack_size",
 }
+POSITIVE_MEASUREMENTS = {"weight_g", "length_cm", "height_cm", "width_cm", "diameter"}
+INTEGER_FIELDS = {"name_length", "description_length", "image_count", "quantity", "quantity_on_hand", "quantity_reserved", "quantity_available", "moq", "order_multiple", "lead_time_days", "year", "pack_size"}
+DATE_FIELDS = {"effective_date", "expiry_date"}
+URL_FIELDS = {"product_url", "image_url", "source_url"}
+
+
+def _valid_gtin(value: str) -> bool:
+    """Validate GTIN-8/12/13/14 check digits without altering leading zeroes."""
+    digits = value.strip()
+    if not digits.isdigit() or len(digits) not in {8, 12, 13, 14}:
+        return False
+    body, check_digit = digits[:-1], int(digits[-1])
+    weighted_sum = sum(int(digit) * (3 if offset % 2 == 0 else 1)
+                       for offset, digit in enumerate(reversed(body)))
+    return (10 - weighted_sum % 10) % 10 == check_digit
+
+
+def _valid_iso_date(value: str) -> bool:
+    normalized = value.strip()
+    try:
+        if len(normalized) == 10:
+            date.fromisoformat(normalized)
+            return True
+        datetime.fromisoformat(normalized.replace("Z", "+00:00"))
+        return True
+    except ValueError:
+        return False
 
 
 class IndustryCSVError(ValueError):
@@ -185,7 +219,8 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
 
     def add_issue(row_number: int, field: str | None, code: str, message: str, severity: str = "critical"):
         nonlocal row_invalid
-        row_invalid = True
+        if severity == "critical":
+            row_invalid = True
         if len(issues) < ERROR_LIMIT:
             issues.append({"row_number": row_number, "field": field, "error_code": code, "message": message, "severity": severity})
 
@@ -224,6 +259,54 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
             row["currency"] = str(row["currency"]).upper()
         if row.get("unit_price") is not None and row.get("currency") is None:
             add_issue(line_number, "currency", "PRICE_CURRENCY_MISSING", "A price cannot be interpreted without its currency.")
+        for field in INTEGER_FIELDS & row.keys():
+            value = row.get(field)
+            if value is None:
+                continue
+            try:
+                if Decimal(str(value).replace(",", "")) % 1 != 0:
+                    add_issue(line_number, field, "INTEGER_VALUE_REQUIRED", f"'{field}' must be a whole number.")
+            except (InvalidOperation, ValueError):
+                pass
+        for field in POSITIVE_MEASUREMENTS & row.keys():
+            value = row.get(field)
+            if value is not None:
+                try:
+                    if Decimal(str(value).replace(",", "")) <= 0:
+                        add_issue(line_number, field, "MEASUREMENT_MUST_BE_POSITIVE", f"'{field}' must be greater than zero.")
+                except (InvalidOperation, ValueError):
+                    pass
+        if row.get("gtin") is not None and not _valid_gtin(str(row["gtin"])):
+            add_issue(line_number, "gtin", "INVALID_GTIN_CHECK_DIGIT", "GTIN/EAN/UPC must contain 8, 12, 13 or 14 digits and have a valid check digit.")
+        for field in URL_FIELDS & row.keys():
+            value = row.get(field)
+            if value is None:
+                continue
+            try:
+                parsed_url = urlsplit(str(value).strip())
+                valid_url = parsed_url.scheme in {"http", "https"} and bool(parsed_url.netloc) and " " not in str(value)
+            except ValueError:
+                valid_url = False
+            if not valid_url:
+                add_issue(line_number, field, "INVALID_HTTP_URL", f"'{field}' must be a valid absolute HTTP or HTTPS URL.")
+        parsed_dates = {}
+        for field in DATE_FIELDS & row.keys():
+            value = row.get(field)
+            if value is not None:
+                if not _valid_iso_date(str(value)):
+                    add_issue(line_number, field, "INVALID_DATE_VALUE", f"'{field}' must contain a valid ISO date or datetime.")
+                else:
+                    parsed_dates[field] = date.fromisoformat(str(value).strip()[:10])
+        if parsed_dates.get("effective_date") and parsed_dates.get("expiry_date") and parsed_dates["expiry_date"] < parsed_dates["effective_date"]:
+            add_issue(line_number, "expiry_date", "DATE_RANGE_INVALID", "Expiry date must not be earlier than the effective date.")
+        for source_field, length_field in (("title", "name_length"), ("description", "description_length")):
+            if row.get(source_field) is not None and row.get(length_field) is not None:
+                try:
+                    declared_length = int(Decimal(str(row[length_field]).replace(",", "")))
+                    if declared_length != len(str(row[source_field])):
+                        add_issue(line_number, length_field, "TEXT_LENGTH_MISMATCH", f"Declared '{length_field}' does not match the actual {source_field} length.", "warning")
+                except (InvalidOperation, ValueError):
+                    pass
         for positive_field, code, message in (
             ("moq", "MOQ_MUST_BE_POSITIVE", "Minimum order quantity must be greater than zero."),
             ("order_multiple", "ORDER_MULTIPLE_MUST_BE_POSITIVE", "Order multiple must be greater than zero."),
@@ -234,12 +317,22 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
                         add_issue(line_number, positive_field, code, message)
                 except InvalidOperation:
                     pass  # The numeric validator above already reports the malformed value.
-        if row.get("quantity_on_hand") is not None and row.get("quantity_reserved") is not None and row.get("quantity_available") is not None:
+        if row.get("quantity_on_hand") is not None and row.get("quantity_reserved") is not None:
             try:
-                if Decimal(str(row["quantity_available"])) != Decimal(str(row["quantity_on_hand"])) - Decimal(str(row["quantity_reserved"])):
+                on_hand = Decimal(str(row["quantity_on_hand"]))
+                reserved = Decimal(str(row["quantity_reserved"]))
+                if reserved > on_hand:
+                    add_issue(line_number, "quantity_reserved", "RESERVED_EXCEEDS_ON_HAND", "Reserved quantity cannot exceed on-hand quantity.")
+                if row.get("quantity_available") is not None and Decimal(str(row["quantity_available"])) != on_hand - reserved:
                     add_issue(line_number, "quantity_available", "INVENTORY_QUANTITY_MISMATCH", "Available quantity does not equal on-hand minus reserved quantity.", "warning")
             except InvalidOperation:
                 pass
+        if row.get("gtin") is not None and _valid_gtin(str(row["gtin"])):
+            gtin_key = "gtin:" + str(row["gtin"]).strip()
+            if gtin_key in seen:
+                add_issue(line_number, "gtin", "DUPLICATE_GTIN", f"GTIN duplicates row {seen[gtin_key]['row']}.", "warning")
+            else:
+                seen[gtin_key] = {"row": line_number}
         unique_field = "sku" if row.get("sku") else "supplier_sku" if row.get("supplier_sku") else None
         if unique_field and row.get(unique_field):
             scope = str(row.get("supplier_id") or "default").casefold() if unique_field == "supplier_sku" else "seller"
