@@ -213,6 +213,136 @@ def test_sftp_connector_downloads_with_known_host_verification(monkeypatch):
     assert calls["closed"] is True
 
 
+
+def test_api_connector_rejects_credentials_in_query_parameters():
+    with pytest.raises(SourceConnectorError, match="query parameters"):
+        _validate_https_url(
+            "https://supplier.example/catalog?api_key=secret",
+            {"supplier.example"},
+        )
+
+
+def test_sftp_connector_parses_pasted_private_key_content(monkeypatch):
+    calls = {}
+    key_material = (
+        "-----BEGIN OPENSSH PRIVATE KEY-----\\n"
+        "test-private-key-material\\n"
+        "-----END OPENSSH PRIVATE KEY-----"
+    )
+
+    class FakeKey:
+        @classmethod
+        def from_private_key(cls, stream):
+            calls["parsed_key_text"] = stream.read()
+            return "parsed-private-key"
+
+    class RemoteFile:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self, size):
+            return b"SKU,Name\\n001,Widget"
+
+    class SFTP:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def open(self, path, mode):
+            calls["remote"] = (path, mode)
+            return RemoteFile()
+
+    class Client:
+        def load_host_keys(self, path):
+            calls["known_hosts"] = path
+
+        def set_missing_host_key_policy(self, policy):
+            calls["policy"] = policy
+
+        def connect(self, **kwargs):
+            calls["connect"] = kwargs
+
+        def open_sftp(self):
+            return SFTP()
+
+        def close(self):
+            calls["closed"] = True
+
+    class Paramiko:
+        Ed25519Key = FakeKey
+        ECDSAKey = FakeKey
+        RSAKey = FakeKey
+        SSHClient = Client
+
+        def RejectPolicy(self):
+            return "reject-unknown-host"
+
+    class FakeSocket:
+        def close(self):
+            calls["socket_closed"] = True
+
+    monkeypatch.setattr(
+        connectors.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 22))],
+    )
+    monkeypatch.setattr(
+        connectors.socket,
+        "create_connection",
+        lambda address, timeout: FakeSocket(),
+    )
+    monkeypatch.setitem(sys.modules, "paramiko", Paramiko())
+
+    result = fetch_sftp_file(
+        host="sftp.supplier.example",
+        port=22,
+        username="reader",
+        private_key=key_material,
+        remote_path="/exports/catalog.csv",
+        known_hosts_path="/run/secrets/known_hosts",
+        max_bytes=100,
+    )
+
+    assert result == b"SKU,Name\\n001,Widget"
+    assert calls["parsed_key_text"] == key_material
+    assert calls["connect"]["pkey"] == "parsed-private-key"
+    assert calls["connect"]["key_filename"] is None
+    assert calls["connect"]["hostname"] == "sftp.supplier.example"
+    assert key_material not in str(calls["connect"])
+    assert calls["closed"] is True
+    assert calls["socket_closed"] is True
+
+
+def test_sftp_connector_rejects_key_paths_and_dot_segment_paths_before_network(monkeypatch):
+    def unexpected_dns(*args, **kwargs):
+        raise AssertionError("invalid SFTP input must be rejected before DNS")
+
+    monkeypatch.setattr(connectors.socket, "getaddrinfo", unexpected_dns)
+    with pytest.raises(SourceConnectorError, match="pasted PEM/OpenSSH"):
+        fetch_sftp_file(
+            host="sftp.supplier.example",
+            port=22,
+            username="reader",
+            private_key="/run/secrets/id_rsa",
+            remote_path="/exports/catalog.csv",
+            known_hosts_path="/known_hosts",
+        )
+
+    with pytest.raises(SourceConnectorError, match="dot segments"):
+        fetch_sftp_file(
+            host="sftp.supplier.example",
+            port=22,
+            username="reader",
+            password="secret",
+            remote_path="/exports/../private.csv",
+            known_hosts_path="/known_hosts",
+        )
+
 def test_sftp_connector_rejects_private_dns_before_opening_socket(monkeypatch):
     calls = {"connected": False}
     monkeypatch.setattr(
