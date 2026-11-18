@@ -284,7 +284,7 @@ export default function CatalogImportPage() {
     window.print();
   }
 
-  if (authLoading) return <main id="main" className="page"><div className="container"><p>Checking your account...</p></div></main>;
+  if (authLoading) return <main id="main" className="page catalog-workspace"><div className="container"><p>Checking your account...</p></div></main>;
   if (!user) return (
     <main id="main" className="page"><div className="container">
       <section className="panel import-panel">
