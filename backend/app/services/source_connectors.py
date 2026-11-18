@@ -411,7 +411,7 @@ def fetch_sftp_file(
     if (
         not known_hosts_path
         or not remote_path.startswith("/")
-        or "\\x00" in remote_path
+        or "\x00" in remote_path
         or any(part in {".", ".."} for part in path_parts)
     ):
         raise SourceConnectorError(
@@ -423,13 +423,13 @@ def fetch_sftp_file(
         )
     if not 1 <= port <= 65535 or not 1 <= max_bytes <= 50 * 1024 * 1024:
         raise SourceConnectorError("SFTP port or file-size limit is invalid.")
-    addresses = _resolve_public_addresses(host, port)
     client = None
     connection = None
     try:
         import paramiko
 
         parsed_key = _load_sftp_private_key(private_key, paramiko) if private_key else None
+        addresses = _resolve_public_addresses(host, port)
         last_connect_error: OSError | None = None
         for address in addresses:
             try:
