@@ -74,14 +74,14 @@ function WorkspaceContent() {
   }
 
   return (
-    <main id="main" className="page workspace-page">
+    <main id="main" className="page">
       <div className="container">
         <header className="workspace-heading">
           <div><span className="eyebrow">YOUR ORGANIZATION</span><h1>Workspace</h1><p>Signed in as {user?.email || "your account"}.</p></div>
           <div className="workspace-actions">
             {!profile?.is_platform_admin && <Link className="button button-secondary" href="/pricing">Plans</Link>}
             <Link className="button button-secondary" href="/settings">Profile settings</Link>
-            <button className="button button-secondary signout-control" onClick={() => void signOut()}>Sign out</button>
+            <button className="button button-secondary" onClick={() => void signOut()}>Sign out</button>
           </div>
         </header>
 
