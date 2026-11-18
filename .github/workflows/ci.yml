@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -44,6 +44,8 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements-dev.txt
       - run: alembic upgrade head
+      - name: Detect SQLAlchemy model drift against the migrated schema
+        run: alembic check
       - run: python -m pytest
       - run: ruff check app tests
       - run: bandit -q -r app
