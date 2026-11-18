@@ -48,7 +48,7 @@ function SignUpForm() {
     } catch(e) { setError(e instanceof Error?e.message:"Could not create your account."); }
     finally { setBusy(false); }
   }
-  return <main id="main" className="auth-shell"><section className="auth-card">
+  return <main id="main" className="auth-shell auth-register"><section className="auth-card">
     <span className="eyebrow">GET STARTED</span><h1>{isInvitationFlow ? "Create your invited account" : "Create your account"}</h1><p className="auth-intro">{isInvitationFlow ? "Create an account using the email address that received the invitation. After confirming your email, you can join the inviting organization." : <>Create your account and company workspace. {selectedPlan ? `Your ${selectedPlan.charAt(0).toUpperCase()+selectedPlan.slice(1)} plan choice will be kept through registration.` : "You will be the organization owner and can invite employees after setup."} Your email must be verified before workspace access is activated.</>}</p>
     <form className="auth-form" onSubmit={submit}>
       <label htmlFor="signup-name">Full name</label><input id="signup-name" type="text" autoComplete="name" minLength={2} maxLength={100} required value={fullName} onChange={e=>setFullName(e.target.value)} />
@@ -66,7 +66,7 @@ function SignUpForm() {
       <button className="button auth-submit" disabled={busy}>{busy?"Creating account…":"Create account"}</button>
     </form>
     <p className="auth-switch">Already registered? <Link href={`/sign-in?next=${encodeURIComponent(next)}`}>Sign in</Link></p>
-  </section></main>;
+  </section><aside className="auth-welcome"><span className="auth-welcome-kicker">START WITH A CLEAN CATALOG</span><h2>Build a stronger product foundation.</h2><p>Set up your organization and prepare your team to validate supplier data with a consistent process.</p></aside></main>;
 }
 
 export default function SignUpPage() { return <Suspense fallback={<main id="main" className="auth-shell">Loading…</main>}><SignUpForm /></Suspense>; }
