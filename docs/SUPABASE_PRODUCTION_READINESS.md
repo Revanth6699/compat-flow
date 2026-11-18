@@ -19,6 +19,23 @@ Supabase PostgreSQL is a viable candidate for the CompatFlow application databas
 - GitHub Actions passed the full backend industry-ingestion regression workflow and full CI (frontend + backend) against PostgreSQL 17 on the corrected audit commit `5b7d874347436780a183dc422283cf74cdf3b273`.
 - `alembic check` now passes in both workflows. It previously detected a mismatch between the model's implicit unique constraint and the migration's named unique index on `users.auth_user_id`; the model was corrected to represent the same named unique index. This verifies metadata parity for the current clean CI database, not the live Supabase schema.
 
+## Confirmed product authority and access model
+
+The platform is operated by the platform administrator account configured as `sarvasettyrevanth.66@gmail.com`. This is a platform-level identity, not an organization role, and it remains separate from customer organization membership.
+
+The intended access boundaries are:
+
+| Account type | Authority |
+|---|---|
+| Platform Administrator | Operates the website and platform; manages customer organizations, demo approvals, subscription plans/assignments, billing operations, and platform-wide settings. The platform-admin account is subscription-exempt. |
+| Customer Organization Admin | Controls their own organization: organization profile/settings, member invitations and access, and organization workspaces/catalog operations allowed by its subscription. Cannot access platform administration or independently change subscription/billing. |
+| Organization Member | Uses the organization's permitted product workflows and data; cannot administer the organization, manage members, billing, or platform settings. |
+| Demo account/requester | Has limited demo access only; no customer organization administration or subscription/billing controls. Demo entitlements must enforce the demo limits (10,000 records and 5 MB) server-side. |
+
+Subscription plans remain the source of customer feature entitlements and upload limits. The platform administrator owns subscription administration and billing operations; customer Organization Admins can see their current plan/entitlements and use the features granted by it, but cannot change the plan or billing state. Do not remove the public pricing/plan comparison experience or weaken plan-based entitlements while enforcing this boundary.
+
+Invited users must be regular Members by default. Do not expose an Owner role or allow a customer to promote an invited Member into Organization Admin through the existing legacy role flow. Existing legacy `owner` and `admin` records must be safely mapped to the single Organization Admin concept during a reviewed migration; existing `member` and `viewer` records require an explicit compatibility decision so read-only access is not accidentally widened.
+
 ## Table ownership — preserve the three demo/contact concepts
 
 These tables are distinct and must not be renamed, merged, or dropped:
@@ -35,12 +52,12 @@ The demo request route writes the authoritative queue record to `demo_access_req
 
 ### 1. Organization roles do not match the product requirement
 
-Current backend code and migrations still support `owner`, `admin`, `member`, and `viewer`. First-user onboarding creates `owner`; invitations accept `admin`, `member`, or `viewer`; only an owner may invite another admin. Billing endpoints also authorize only `owner`. This conflicts with the product decision of one Organization Admin role and invited employees as Members, and with the requirement that customer Organization Admins must not manage subscriptions/billing.
+Current backend code and migrations still support `owner`, `admin`, `member`, and `viewer`. First-user onboarding creates `owner`; invitations accept `admin`, `member`, or `viewer`; only an owner may invite another admin. Billing endpoints also authorize only `owner`. This conflicts with the confirmed authority model above: one customer Organization Admin role, invited employees as Members, and platform-admin-only subscription/billing administration.
 
 The refactor must cover:
-- onboarding role assignment (first customer account becomes `admin`);
-- invitation request validation and acceptance (invited users become `member`; remove `viewer` if no read-only role is required);
-- member management and authorization dependencies (Organization Admin can manage members/settings, but not billing/subscription or platform settings);
+- onboarding role assignment (first customer account becomes the single Organization Admin role, with no Owner/Administrator split);
+- invitation request validation and acceptance (invited users become `member` by default; preserve or explicitly migrate existing read-only `viewer` behavior rather than silently granting extra permissions);
+- member management and authorization dependencies (Organization Admin can manage their own organization/members/settings, but not billing/subscription or platform settings);
 - permission seed rows and role check constraints;
 - deletion and organization lifecycle behavior;
 - frontend role labels and access controls;
