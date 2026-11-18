@@ -383,16 +383,17 @@ def _load_sftp_private_key(private_key: str, paramiko: Any) -> Any:
         getattr(paramiko, "ECDSAKey", None),
         getattr(paramiko, "RSAKey", None),
     )
+    parse_error: Exception | None = None
     for key_type in key_types:
         if key_type is None:
             continue
         try:
             return key_type.from_private_key(io.StringIO(value))
-        except Exception:
-            continue
+        except (paramiko.SSHException, ValueError, TypeError) as exc:
+            parse_error = exc
     raise SourceConnectorError(
         "SFTP private key is invalid, encrypted, or uses an unsupported key type."
-    )
+    ) from parse_error
 
 
 def fetch_sftp_file(
