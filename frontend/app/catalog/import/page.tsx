@@ -83,7 +83,6 @@ export default function CatalogImportPage() {
     return () => { active = false; };
   }, [email]);
   const [file, setFile] = useState<File | null>(null);
-  const [downloadAnimating, setDownloadAnimating] = useState(false);
   const [result, setResult] = useState<PreviewResponse | null>(null);
   const [datasetResult, setDatasetResult] = useState<DatasetProfile | null>(null);
   const [multiResult, setMultiResult] = useState<MultiResult | null>(null);
@@ -214,13 +213,6 @@ export default function CatalogImportPage() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  function triggerDownloadReport() {
-    if (downloadAnimating) return;
-    setDownloadAnimating(true);
-    downloadReport();
-    window.setTimeout(() => setDownloadAnimating(false), 900);
-  }
-
   function downloadReport() {
     if (datasetResult) {
       const rows: unknown[][] = [
@@ -284,7 +276,7 @@ export default function CatalogImportPage() {
     window.print();
   }
 
-  if (authLoading) return <main id="main" className="page catalog-workspace"><div className="container"><p>Checking your account...</p></div></main>;
+  if (authLoading) return <main id="main" className="page"><div className="container"><p>Checking your account...</p></div></main>;
   if (!user) return (
     <main id="main" className="page"><div className="container">
       <section className="panel import-panel">
@@ -382,7 +374,7 @@ export default function CatalogImportPage() {
               <span className="result-status success">Analysis complete</span>
             </div>
             <div className="report-actions no-print">
-              <button type="button" onClick={triggerDownloadReport} className={`button button-secondary report-download-button${downloadAnimating ? " is-downloading" : ""}`}>Download CSV report</button>
+              <button className="button" type="button" onClick={downloadReport}>Download CSV report</button>
               <button className="button button-secondary" type="button" onClick={downloadProfileJson}>Download JSON</button>
               <button className="button button-secondary" type="button" onClick={printReport}>Print / Save PDF</button>
             </div>
@@ -521,7 +513,7 @@ export default function CatalogImportPage() {
 
             <div className="panel result-section">
               <div className="results-heading"><div><h3>Issue overview</h3><p className="import-description">Critical: blocks the record from passing. Warning: requires review but does not block it.</p></div>
-                {user ? <button type="button" onClick={triggerDownloadReport} className={`button button-secondary report-download-button${downloadAnimating ? " is-downloading" : ""}`}>Download report</button> : <span className="import-description">Report downloads are available with a Starter subscription.</span>}
+                {user ? <button className="button button-secondary" type="button" onClick={downloadReport}>Download report</button> : <span className="import-description">Report downloads are available with a Starter subscription.</span>}
               </div>
               <div className="result-stats">
                 <div className="stat-card"><span>Records with issues</span><strong>{result.records_with_issues}</strong></div>
