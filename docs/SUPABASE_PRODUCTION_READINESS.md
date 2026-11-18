@@ -70,11 +70,13 @@ The API saves import files under `IMPORT_STORAGE_DIR`; a separate Celery worker 
 
 Use private object storage (for example, a private Supabase Storage bucket accessed only by the backend) or another tested shared-storage design. Verify upload, worker read, cleanup, size limits, and access isolation. Do not expose the service-role key to the browser.
 
+The current Celery task has late acknowledgements and a prefetch multiplier of one, but no explicit retry/backoff or dead-letter policy. It marks a job failed when processing raises. Before enabling retries, make processing idempotent across attempts and define how duplicate row errors, partial commits, worker crashes, and stale `processing` jobs are reconciled. A retry must not silently double-count or leave an import permanently stuck.
+
 ### 4. Cross-system demo approval is not transactionally safe
 
 The platform-admin decision endpoint updates `demo_access_requests`, calls Supabase REST to mirror `contact_requests` and `demo_access`, and only then commits the backend PostgreSQL transaction. If the final commit fails, Supabase can show an approval/revocation that the authoritative backend queue did not commit. The operation needs an outbox/reconciliation design or a clearly defined authoritative commit followed by retryable idempotent synchronization. The UI must show synchronization status rather than implying the two systems are atomically updated.
 
-The demo submission endpoint has the opposite ordering: it commits the backend queue record, then sends Gmail notification (failure is logged). This is safer for persistence, but notification delivery is best-effort and currently has no durable retry record. Treat email as an independently retryable side effect.
+The demo submission endpoint has the opposite ordering: it commits the backend queue record, then sends Gmail notification (failure is logged). This is safer for persistence, but notification delivery is best-effort and currently has no durable retry record. Treat email as an independently retryable side effect. The general contact endpoint currently writes the contact row first and then calls Gmail; the notification endpoint reports `email_sent: false` on delivery failure, but there is no durable notification record or retry worker. The demo backend endpoint similarly saves the queue row and attempts Gmail afterward. Add a persisted notification outbox with bounded retries, backoff, delivery timestamps, and visible failure state; do not make a successful contact/demo submission depend on Gmail being available.
 
 ### 5. Database security and tenant isolation
 
