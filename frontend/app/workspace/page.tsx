@@ -81,7 +81,7 @@ function WorkspaceContent() {
           <div className="workspace-actions">
             {!profile?.is_platform_admin && <Link className="button button-secondary" href="/pricing">Plans</Link>}
             <Link className="button button-secondary" href="/settings">Profile settings</Link>
-            <button className="button button-secondary" onClick={() => void signOut()}>Sign out</button>
+            <button className="button button-secondary signout-control" onClick={() => void signOut()}>Sign out</button>
           </div>
         </header>
 
