@@ -35,7 +35,7 @@ const plans: Plan[] = [
     price: "$27",
     description: "For small teams that need repeatable validation and shareable results.",
     features: [
-      "CSV uploads up to 10 MB and 20,000 records",
+      "CSV, XLS and XLSX uploads up to 10 MB and 20,000 records",
       "Required-field, duplicate and catalog data-quality checks",
       "Validation metrics, issue details and recommendations",
       "Downloadable validation reports",
@@ -52,7 +52,7 @@ const plans: Plan[] = [
     description: "For teams working with multiple supplier feeds and connected data sources.",
     features: [
       "All Starter validation capabilities",
-      "CSV, XLS, XLSX, JSON and XML inputs",
+      "JSON and XML inputs, in addition to all Starter formats",
       "Uploads up to 20 MB and 40,000 records",
       "REST API, SFTP and SQL Server connections",
       "Multiple supplier catalog imports",
