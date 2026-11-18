@@ -274,6 +274,7 @@ def test_sftp_connector_parses_pasted_private_key_content(monkeypatch):
             calls["closed"] = True
 
     class Paramiko:
+        SSHException = RuntimeError
         Ed25519Key = FakeKey
         ECDSAKey = FakeKey
         RSAKey = FakeKey
@@ -353,6 +354,7 @@ def test_sftp_private_key_parse_errors_do_not_echo_key_material(monkeypatch):
             raise ValueError(f"invalid key: {secret}")
 
     class Paramiko:
+        SSHException = RuntimeError
         Ed25519Key = FakeKey
         ECDSAKey = FakeKey
         RSAKey = FakeKey
