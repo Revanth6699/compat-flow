@@ -1189,7 +1189,7 @@ button:disabled, .button:disabled {
 .workspace-page {
   min-height: calc(100vh - 76px);
   padding: 30px 0 36px;
-  background: #fff;
+  background: #F1F5F9;
 }
 .workspace-page > .container {
   width: min(1280px, calc(100% - 56px));
