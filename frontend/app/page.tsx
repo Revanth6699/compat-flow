@@ -37,8 +37,8 @@ export default function HomePage() {
       <section className="home-hero">
         <div className="container home-hero-grid">
           <div className="home-hero-copy">
-            <div className="eyebrow"><span className="home-eyebrow-mark"/> SUPPLIER DATA / CATALOG CONTROL</div>
-            <h1>Catch catalog issues before they become operational problems.</h1>
+            <div className="eyebrow">Supplier catalog operations</div>
+            <h1>Make supplier product data reliable before it reaches your catalog.</h1>
             <p className="home-hero-description">
               CompatFlow gives commerce and operations teams a structured way
               to validate supplier files, identify data-quality problems and
@@ -50,24 +50,22 @@ export default function HomePage() {
             </div>
             <p className="home-hero-note">{user ? "You are signed in. Open your workspace to manage your organization and catalog operations." : "Request demo access. Demo access is reviewed and granted individually."}</p>
           </div>
-          <div className="home-visual" aria-label="Illustrative supplier catalog workflow">
+          <div className="home-visual" aria-label="CompatFlow workflow overview">
             <div className="home-visual-top">
-              <span className="home-visual-title">CF / OPERATIONS VIEW</span>
-              <span className="home-visual-live"><span className="home-visual-dot" />WORKFLOW MODEL</span>
+              <span className="home-visual-title">COMPATFLOW / WORKFLOW</span>
+              <span className="home-visual-live"><span className="home-visual-dot" />Data quality operations</span>
             </div>
             <div className="home-visual-body">
-              <div className="home-visual-kicker">THE CATALOG CONTROL LOOP</div>
-              <h2 className="home-visual-metric">From supplier file<br/>to confident review.</h2>
-              <p className="home-visual-caption">A clear sequence for every incoming product-data change.</p>
-              <div className="home-flow-list">
-                <div className="home-flow-row"><span className="home-flow-index">01</span><span className="home-flow-symbol">↗</span><div><strong>Receive</strong><small>CSV files · APIs · SQL sources</small></div><span className="home-flow-state">INPUT</span></div>
-                <div className="home-flow-connector"><span/></div>
-                <div className="home-flow-row"><span className="home-flow-index">02</span><span className="home-flow-symbol">⌕</span><div><strong>Validate</strong><small>Fields · formats · duplicates</small></div><span className="home-flow-state">CHECK</span></div>
-                <div className="home-flow-connector"><span/></div>
-                <div className="home-flow-row"><span className="home-flow-index">03</span><span className="home-flow-symbol">✓</span><div><strong>Review</strong><small>Findings · corrections · next steps</small></div><span className="home-flow-state">DECIDE</span></div>
+              <div className="eyebrow">Supplier data lifecycle</div>
+              <h2 className="home-visual-metric">From source to review</h2>
+              <p className="home-visual-caption">One controlled workflow for incoming catalog data.</p>
+              <div className="home-steps-grid">
+                <article className="home-step"><div className="home-card-number">01 / INPUT</div><h3>Supplier sources</h3><p>Files, APIs and databases</p></article>
+                <article className="home-step"><div className="home-card-number">02 / CHECK</div><h3>Validation</h3><p>Structure and data quality</p></article>
+                <article className="home-step"><div className="home-card-number">03 / REVIEW</div><h3>Clear outcomes</h3><p>Issues and next actions</p></article>
               </div>
             </div>
-            <div className="home-visual-footer"><span>ILLUSTRATIVE WORKFLOW</span><span>Supplier data operations</span></div>
+            <div className="home-visual-footer"><span>Built for product-data operations</span><span>Access depends on plan</span></div>
           </div>
         </div>
       </section>
@@ -80,7 +78,7 @@ export default function HomePage() {
         <div className="container">
           <div className="home-section-heading">
             <div className="eyebrow">Platform capabilities</div>
-            <h2>A clearer standard for every supplier feed.</h2>
+            <h2>Control the quality of catalog inputs.</h2>
             <p>CompatFlow is organized around the practical work required to receive, validate and review supplier product data.</p>
           </div>
           <div className="home-capability-grid">
@@ -100,7 +98,7 @@ export default function HomePage() {
         <div className="container">
           <div className="home-section-heading">
             <div className="eyebrow">How it works</div>
-            <h2>Three deliberate steps. One accountable workflow.</h2>
+            <h2>A consistent process for every supplier input.</h2>
           </div>
           <div className="home-steps-grid">
             {steps.map(([number, title, description]) => (
