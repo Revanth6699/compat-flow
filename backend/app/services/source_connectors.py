@@ -383,17 +383,19 @@ def _load_sftp_private_key(private_key: str, paramiko: Any) -> Any:
         getattr(paramiko, "ECDSAKey", None),
         getattr(paramiko, "RSAKey", None),
     )
-    parse_error: Exception | None = None
+    parse_failures = 0
     for key_type in key_types:
         if key_type is None:
             continue
         try:
             return key_type.from_private_key(io.StringIO(value))
-        except (paramiko.SSHException, ValueError, TypeError) as exc:
-            parse_error = exc
+        except (paramiko.SSHException, ValueError, TypeError):
+            parse_failures += 1
+    if parse_failures == 0:
+        raise SourceConnectorError("SFTP private-key parsing is unavailable.")
     raise SourceConnectorError(
         "SFTP private key is invalid, encrypted, or uses an unsupported key type."
-    ) from parse_error
+    ) from None
 
 
 def fetch_sftp_file(
