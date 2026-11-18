@@ -382,7 +382,7 @@ export default function CatalogImportPage() {
               <span className="result-status success">Analysis complete</span>
             </div>
             <div className="report-actions no-print">
-              <button className="button" type="button" onClick={triggerDownloadReport} className={`button button-secondary report-download-button${downloadAnimating ? " is-downloading" : ""}`}>Download CSV report</button>
+              <button type="button" onClick={triggerDownloadReport} className={`button button-secondary report-download-button${downloadAnimating ? " is-downloading" : ""}`}>Download CSV report</button>
               <button className="button button-secondary" type="button" onClick={downloadProfileJson}>Download JSON</button>
               <button className="button button-secondary" type="button" onClick={printReport}>Print / Save PDF</button>
             </div>
@@ -521,7 +521,7 @@ export default function CatalogImportPage() {
 
             <div className="panel result-section">
               <div className="results-heading"><div><h3>Issue overview</h3><p className="import-description">Critical: blocks the record from passing. Warning: requires review but does not block it.</p></div>
-                {user ? <button className="button button-secondary" type="button" onClick={triggerDownloadReport} className={`button button-secondary report-download-button${downloadAnimating ? " is-downloading" : ""}`}>Download report</button> : <span className="import-description">Report downloads are available with a Starter subscription.</span>}
+                {user ? <button type="button" onClick={triggerDownloadReport} className={`button button-secondary report-download-button${downloadAnimating ? " is-downloading" : ""}`}>Download report</button> : <span className="import-description">Report downloads are available with a Starter subscription.</span>}
               </div>
               <div className="result-stats">
                 <div className="stat-card"><span>Records with issues</span><strong>{result.records_with_issues}</strong></div>
