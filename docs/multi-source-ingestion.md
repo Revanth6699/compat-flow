@@ -118,6 +118,6 @@ Do not change subscription entitlements or pricing as part of ingestion work. Mu
 - Add API cursor/next-link adapters where supplier contracts require them, with source-specific pagination tests.
 - Add SFTP polling/trigger, remote-file deduplication, and retry/recovery orchestration.
 - Add durable SQL Server watermark checkpoint management. Composite-key watermark pagination is deliberately unsupported until a safe tie-breaking cursor is designed.
-- Verify DNS pinning/connection-level SSRF controls for API destinations.
+
 - Run live, least-privilege tests against approved REST, SFTP, and SQL Server test sources before enabling broader product claims.
 - Update UI controls and labels so preview-only, mock-tested, live-verified, and generally available capabilities cannot be confused.
