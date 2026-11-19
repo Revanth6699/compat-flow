@@ -1183,3 +1183,174 @@ button:disabled, .button:disabled {
 
 /* Data visualization and report presentation refresh */
 .report-chart-section{display:grid;gap:16px}.report-section-title>span{color:#64748b;font-size:.7rem;font-weight:800;letter-spacing:.12em}.report-section-title h3{margin:7px 0 4px;color:#172b45;font-size:1.45rem}.report-section-title p{margin:0;color:#64748b;font-size:.84rem}.report-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.report-chart-card{min-width:0;padding:20px;border:1px solid #dbe3ec;border-radius:10px;background:#fff}.report-chart-card h4{margin:0 0 4px;color:#183b60;font-size:1rem;text-transform:capitalize}.report-chart-card>p{margin:0 0 18px;color:#64748b;font-size:.78rem}.viz-rows{display:grid;gap:13px}.viz-row{display:grid;gap:6px;min-width:0}.viz-row-label{display:flex;justify-content:space-between;gap:12px;font-size:.78rem}.viz-row-label span{min-width:0;overflow-wrap:anywhere;color:#475569}.viz-row-label strong{flex:none;color:#243b53;font-variant-numeric:tabular-nums;font-size:.75rem}.viz-track{height:12px;overflow:hidden;border-radius:3px;background:#edf2f7}.viz-track span{display:block;height:100%;min-width:2px;border-radius:3px;background:#2875a8}@media(max-width:760px){.report-chart-grid{grid-template-columns:1fr}.report-chart-card{padding:16px}}@media print{@page{size:A4 portrait;margin:14mm 13mm 16mm}.premium-report .report-chart-grid,.premium-report .premium-dashboard-grid,.premium-report .distribution-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8pt!important}.premium-report .report-wide-page{page:auto!important;break-before:page!important}.premium-report .report-wide-page .preview-table{table-layout:auto!important;width:100%!important;font-size:7.5pt!important}.premium-report .report-wide-page .preview-table th,.premium-report .report-wide-page .preview-table td{font-size:7.5pt!important;padding:5pt 4pt!important;overflow-wrap:anywhere!important}.premium-report .report-chart-card,.premium-report .result-section{break-inside:avoid-page}.premium-report .report-chart-card{padding:10pt!important}.premium-report .viz-track{height:7pt!important}}
+
+
+/* Billing page layout: wider content, readable plan cards, and responsive spacing. */
+.billing-page {
+  width: min(100% - 40px, 1160px);
+  max-width: 1160px;
+  padding-top: 48px;
+  padding-bottom: 88px;
+}
+.billing-page .workspace-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+.billing-page .workspace-heading > div { min-width: 0; }
+.billing-page .workspace-heading h1 {
+  margin: 8px 0 10px;
+  color: var(--navy);
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  line-height: 1.12;
+  letter-spacing: -.035em;
+}
+.billing-page .workspace-heading p {
+  max-width: 620px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+.billing-page .settings-panel {
+  width: 100%;
+  max-width: none;
+  margin: 0 0 22px;
+  padding: clamp(22px, 3vw, 32px);
+  border: 1px solid #dfe6ee;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 28px rgba(24, 48, 75, .045);
+}
+.billing-page .billing-section-heading { margin-bottom: 18px; }
+.billing-page .billing-section-heading .eyebrow { color: #68788b; }
+.billing-page .billing-section-heading h2 {
+  margin: 6px 0 0;
+  color: var(--navy);
+  font-size: 1.3rem;
+  line-height: 1.3;
+}
+.billing-page .settings-description {
+  max-width: 850px;
+  margin: 0 0 20px;
+  line-height: 1.7;
+}
+.billing-page .pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 18px;
+  padding: 10px 0 24px;
+}
+.billing-page .billing-plan {
+  display: flex;
+  min-width: 0;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  padding: 24px 22px;
+  border: 1px solid #dce4ed;
+  border-top: 4px solid #aab8c8;
+  border-radius: 12px;
+  background: #fff;
+  text-align: left;
+  white-space: normal;
+}
+.billing-page .billing-plan:hover:not(:disabled) {
+  border-color: #8ba8bf;
+  box-shadow: 0 10px 26px rgba(24, 48, 75, .08);
+  transform: translateY(-2px);
+}
+.billing-page .billing-plan.selected {
+  border-color: #176b98;
+  border-top-color: #176b98;
+  background: #f7fbfe;
+  box-shadow: 0 0 0 2px rgba(23, 107, 152, .12);
+}
+.billing-page .billing-plan > strong {
+  color: #183b5b;
+  font-size: 1.12rem;
+  line-height: 1.3;
+}
+.billing-page .billing-plan .pricing-amount {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  color: #172f48;
+  font-size: clamp(1.8rem, 2.8vw, 2.2rem);
+  font-weight: 750;
+  letter-spacing: -.04em;
+  line-height: 1.1;
+}
+.billing-page .billing-plan .pricing-amount small {
+  color: #718096;
+  font-size: .82rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.billing-page .billing-plan > span:not(.pricing-amount):not(.billing-plan-features) {
+  color: #617185;
+  font-size: .88rem;
+  line-height: 1.55;
+}
+.billing-page .billing-plan-features {
+  display: grid;
+  gap: 11px;
+  width: 100%;
+  margin-top: 4px;
+}
+.billing-page .billing-plan-feature {
+  display: block;
+  color: #34465a;
+  font-size: .82rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.billing-page .auth-submit { min-width: 240px; margin: 4px 0 14px; }
+.billing-page .notice,
+.billing-page .auth-error,
+.billing-page .auth-success {
+  padding: 13px 16px;
+  border-radius: 9px;
+  line-height: 1.55;
+}
+.billing-page .workspace-profile {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+  margin: 0;
+}
+.billing-page .workspace-profile > div {
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid #e6ebf1;
+  border-radius: 9px;
+  background: #fbfcfd;
+}
+.billing-page .workspace-profile dt {
+  margin-bottom: 5px;
+  color: #6a7889;
+  font-size: .76rem;
+  font-weight: 650;
+}
+.billing-page .workspace-profile dd {
+  margin: 0;
+  color: #23384e;
+  font-size: .9rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .billing-page .pricing-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .billing-page { width: min(100% - 28px, 1160px); padding-top: 30px; }
+  .billing-page .workspace-heading { align-items: flex-start; flex-direction: column; gap: 16px; }
+  .billing-page .workspace-heading .button { width: 100%; }
+  .billing-page .pricing-grid { grid-template-columns: 1fr; gap: 12px; }
+  .billing-page .billing-plan { padding: 22px; }
+  .billing-page .workspace-profile { grid-template-columns: 1fr; }
+  .billing-page .auth-submit { width: 100%; }
+}
