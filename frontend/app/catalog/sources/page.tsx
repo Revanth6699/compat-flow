@@ -301,7 +301,8 @@ function SourcesContent() {
       </select>
       {!selectedConfigurationId && sourceType === "rest_api" && <div className="auth-form">
         <label htmlFor="api-url">API endpoint URL</label><input id="api-url" type="url" required value={form.api_url} onChange={e => update("api_url", e.target.value)} placeholder="https://supplier.example.com/products" />
-        <label htmlFor="api-auth-type">API authentication header</label><select id="api-auth-type" value={form.api_auth_type} onChange={e => update("api_auth_type", e.target.value as FormState["api_auth_type"])}><option value="bearer">Authorization: Bearer</option><option value="x_api_key">X-API-Key</option></select>\n        <label htmlFor="api-token">API token or key value</label><input id="api-token" type="password" autoComplete="off" value={form.api_token} onChange={e => update("api_token", e.target.value)} placeholder="Credential for this request" />
+        <label htmlFor="api-auth-type">API authentication header</label><select id="api-auth-type" value={form.api_auth_type} onChange={e => update("api_auth_type", e.target.value as FormState["api_auth_type"])}><option value="bearer">Authorization: Bearer</option><option value="x_api_key">X-API-Key</option></select>
+        <label htmlFor="api-token">API token or key value</label><input id="api-token" type="password" autoComplete="off" value={form.api_token} onChange={e => update("api_token", e.target.value)} placeholder="Credential for this request" />
         <label htmlFor="api-record-path">Records path (optional)</label><input id="api-record-path" value={form.api_records_path} onChange={e => update("api_records_path", e.target.value)} placeholder="e.g. data.items" />
         <p className="import-description">The current connector supports one response or explicitly configured page-number pagination. Cursor and next-link pagination are not supported.</p>
       </div>}
