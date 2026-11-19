@@ -19,6 +19,11 @@ export const metadata: Metadata = {
   description:
     "Import, normalize, reconcile and prepare supplier catalog changes for ecommerce product data workflows.",
   applicationName: "CompatFlow",
+  icons: {
+    icon: "/compatflow-logo.svg",
+    shortcut: "/compatflow-logo.svg",
+    apple: "/compatflow-logo.svg",
+  },
   openGraph: {
     type: "website",
     siteName: "CompatFlow",
