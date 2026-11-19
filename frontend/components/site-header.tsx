@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/auth-client";
 import { useEffect, useState } from "react";
@@ -22,7 +23,7 @@ export function SiteHeader() {
     <header className="site-header">
       <div className="container header-inner">
         <Link className="brand" href="/" aria-label="CompatFlow home">
-          compat<span className="brand-mark">flow</span>
+          <Image src="/compatflow-logo.svg" alt="CompatFlow" width={104} height={72} priority />
         </Link>
         <nav className="nav header-main-nav" aria-label="Main navigation">
           {user ? (
