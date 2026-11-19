@@ -112,6 +112,7 @@ export default function HomePage() {
         </div>
       </section>
 
+      {!user && (
       <section className="home-section">
         <div className="container">
           <div className="home-demo-cta">
@@ -124,6 +125,7 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+      )}
 
       <section className="home-final-cta">
         <div className="container">
@@ -132,7 +134,7 @@ export default function HomePage() {
           <p>Compare plan access or tell us about the catalog workflow you need to support.</p>
           <div className="home-hero-actions">
             <Link className="button" href="/pricing">Compare plans</Link>
-            <Link className="button button-secondary" href="/contact?intent=demo">Request a guided demo</Link>
+            {!user && <Link className="button button-secondary" href="/contact?intent=demo">Request a guided demo</Link>}
           </div>
         </div>
       </section>
