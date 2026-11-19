@@ -39,7 +39,7 @@ Invitation roles are limited to admin, member, and viewer. Only an owner can inv
 
 See the multi-source ingestion guide for the format matrix, API pagination and retry limits, SQL Server watermark requirements, security boundaries, and incomplete capabilities.
 
-Connector preview and commit routes require the existing supplier_catalogs plan entitlement and a database-backed catalog:read or catalog:write permission. Redis enforces a fixed-window per-organization request limit; if Redis is unavailable, connector execution fails closed. Import history stores source type, a sanitized source descriptor, non-secret source metadata, row errors, and record lineage. API tokens, SFTP passwords/private keys, and SQL Server connection URLs are request-scoped and must not be written to logs or persisted.
+Connector preview and commit routes require the existing supplier_catalogs plan entitlement and a database-backed catalog:read or catalog:write permission. PostgreSQL enforces an atomic fixed-window per-organization request limit through `connector_rate_limits`; if the database is unavailable, connector execution fails closed. Import history stores source type, a sanitized source descriptor, non-secret source metadata, row errors, and record lineage. API tokens, SFTP passwords/private keys, and SQL Server connection URLs are request-scoped and must not be written to logs or persisted.
 
 ### SQL Server runtime requirement
 
