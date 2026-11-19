@@ -224,7 +224,7 @@ function BillingContent() {
         onError={() => setError("Razorpay Checkout could not be loaded. Check your network and content-security settings.")}
       />
       <main id="main" className="page">
-        <div className="container account-settings">
+        <div className="container account-settings billing-page">
           <header className="workspace-heading">
             <div><span className="eyebrow">ORGANIZATION</span><h1>Billing and subscription</h1><p>Review your organization subscription and billing status.</p></div>
             <Link className="button button-secondary" href="/workspace">Back to workspace</Link>
