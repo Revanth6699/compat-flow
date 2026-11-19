@@ -5,8 +5,8 @@ from datetime import datetime
 from collections import Counter
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -50,7 +50,18 @@ router = APIRouter()
 
 @router.get("/health", response_model=HealthResponse)
 def health():
+    """Liveness only: confirms the API process is responding."""
     return HealthResponse(status="ok", service="compatflow-api")
+
+
+@router.get("/health/ready")
+def readiness(db: Session = Depends(get_db)):
+    """Readiness check: confirms the API can execute a query on its configured database."""
+    try:
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        raise HTTPException(status_code=503, detail="Database is unavailable.") from None
+    return {"status": "ready", "database": "ok"}
 
 
 async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", column_mapping=None, max_bytes: int | None = settings.import_max_upload_bytes, max_rows: int | None = 10_000) -> ImportPreviewResponse:
