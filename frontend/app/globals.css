@@ -1751,3 +1751,34 @@ h1, h2, h3, h4, .editorial-heading {
   .team-page .auth-form select,
   .team-page .auth-form .auth-submit { grid-column: 1; grid-row: auto; width: 100%; min-width: 0; }
 }
+
+/* CompatFlow brand logo integration */
+.brand {
+  align-items: center;
+  width: max-content;
+  line-height: 0;
+}
+.brand img {
+  display: block;
+  width: 92px;
+  height: 64px;
+  object-fit: contain;
+}
+.footer-logo-link {
+  display: inline-flex;
+  width: max-content;
+  padding: 5px 8px;
+  border-radius: 7px;
+  background: #fff;
+}
+.footer-logo-link img {
+  display: block;
+  width: 112px;
+  height: 77px;
+  object-fit: contain;
+}
+.footer-brand { align-items: flex-start; }
+@media (max-width: 760px) {
+  .brand img { width: 76px; height: 53px; }
+  .header-inner { min-height: 68px; gap: 12px; }
+}

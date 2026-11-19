@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" role="img" aria-labelledby="title">
+<title id="title">CompatFlow</title>
+<g transform="translate(0 0)">
+  <path fill="#2582c5" fill-rule="evenodd" d="M337 18h48l7 47 30 13 36-29 34 34-29 36 13 30 47 7v48l-47 7-13 30 29 36-34 34-36-29-30 13-7 47h-48l-7-47-30-13-36 29-34-34 29-36-13-30-47-7v-48l47-7 13-30-29-36 34-34 36 29 30-13z M361 111a68 68 0 1 0 0 136a68 68 0 1 0 0-136"/>
+  <path fill="#0a2e49" d="M215 482h58v110h-58zM315 450q28-7 58-18v160h-58zM415 416q30-14 58-32v208h-58zM515 349q30-27 58-60v303h-58z"/>
+  <path d="M198 430C380 445 536 364 650 110" fill="none" stroke="#2582c5" stroke-width="43" stroke-linecap="round"/>
+  <path d="M633 88l61-31 9 69" fill="none" stroke="#2582c5" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
+  <path fill="#2582c5" d="M690 52l-3 78-64-38z"/>
+</g>
+<text x="0" y="608" font-family="Arial, Helvetica, sans-serif" font-size="142" font-weight="900" font-style="italic" letter-spacing="-9" fill="#000">Compat</text>
+<text x="570" y="608" font-family="Arial, Helvetica, sans-serif" font-size="142" font-weight="900" font-style="italic" letter-spacing="-9" fill="#2582c5">flow</text>
+</svg>
