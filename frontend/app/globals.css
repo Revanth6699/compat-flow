@@ -1496,3 +1496,60 @@ button:disabled, .button:disabled {
   .workspace-page .pricing-grid { grid-template-columns: 1fr; gap: 12px; }
   .workspace-page .pricing-grid > .panel { padding: 20px; }
 }
+
+
+/* Site-wide layout and typography refinement (Nov 2026)
+   Keep content readable without constraining dashboard panels unnecessarily. */
+.workspace-page .workspace-profile {
+  width: 100%;
+  max-width: none;
+}
+.workspace-page > .workspace-container > .settings-panel {
+  width: 100%;
+  max-width: none;
+}
+.workspace-page .pricing-grid > .settings-panel {
+  width: 100%;
+  max-width: none;
+}
+
+/* Use a calmer hierarchy: reserve the heaviest weights for the brand and key metrics. */
+h1, h2, h3, h4, .editorial-heading {
+  font-weight: 650;
+}
+.eyebrow {
+  font-weight: 700;
+}
+.button, button.button {
+  font-weight: 650;
+}
+.nav a {
+  font-weight: 600;
+}
+.status, .workspace-profile dt, .workspace-profile .pricing-status {
+  font-weight: 650;
+}
+
+/* Reduce oversized vertical gaps on standard content pages. */
+.page {
+  padding-block: 48px;
+}
+.home-hero {
+  padding-block: 64px 56px;
+}
+.home-section {
+  padding-block: 64px;
+}
+.home-final-cta {
+  padding-block: 60px;
+}
+.home-problem-card, .home-capability-card, .home-step, .home-pricing-card {
+  padding: 22px;
+}
+
+@media (max-width: 760px) {
+  .page { padding-block: 32px; }
+  .home-hero { padding-block: 44px 38px; }
+  .home-section { padding-block: 46px; }
+  .home-final-cta { padding-block: 44px; }
+}
