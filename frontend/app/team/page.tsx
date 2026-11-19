@@ -126,7 +126,7 @@ function TeamContent() {
   const canInviteWithCurrentPlan = seats?.available_seats === null || (seats?.available_seats !== undefined && seats.available_seats > 0);
 
   return (
-    <main id="main" className="page">
+    <main id="main" className="page team-page">
       <div className="container account-settings">
         <header className="workspace-heading">
           <div><span className="eyebrow">ORGANIZATION</span><h1>Team access</h1><p>Manage access to this company&apos;s CompatFlow workspace.</p></div>
