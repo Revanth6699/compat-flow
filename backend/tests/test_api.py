@@ -11,6 +11,40 @@ def test_health():
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
 
+def test_readiness_returns_ok_when_database_query_succeeds():
+    from app.core.database import get_db
+
+    class HealthyDatabase:
+        def execute(self, statement):
+            assert str(statement) == "SELECT 1"
+
+    app.dependency_overrides[get_db] = lambda: HealthyDatabase()
+    try:
+        response = client.get("/api/v1/health/ready")
+        assert response.status_code == 200
+        assert response.json() == {"status": "ready", "database": "ok"}
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_readiness_returns_503_when_database_query_fails():
+    from sqlalchemy.exc import SQLAlchemyError
+
+    from app.core.database import get_db
+
+    class UnavailableDatabase:
+        def execute(self, statement):
+            raise SQLAlchemyError("connection failed")
+
+    app.dependency_overrides[get_db] = lambda: UnavailableDatabase()
+    try:
+        response = client.get("/api/v1/health/ready")
+        assert response.status_code == 503
+        assert response.json()["detail"] == "Database is unavailable."
+    finally:
+        app.dependency_overrides.clear()
+
+
 
 @pytest.mark.parametrize(
     ("path", "filename", "payload", "content_type"),
