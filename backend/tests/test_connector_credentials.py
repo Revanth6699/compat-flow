@@ -280,14 +280,14 @@ def test_saved_configuration_is_resolved_only_for_its_tenant(monkeypatch):
         configuration_id=CONFIG,
     )
     db = FakeDB(item)
-    resolved = _resolve_connector_request(payload, db, ORG)
+    resolved = _resolve_connector_request(payload, db, ORG, "admin")
     assert resolved.api_url == "https://supplier.example.com/v1"
     assert resolved.api_headers == {"Authorization": "Bearer saved-secret"}
     assert "connector_configurations.organization_id" in db.statement
 
     other_tenant_db = FakeDB(None)
     with pytest.raises(HTTPException) as exc:
-        _resolve_connector_request(payload, other_tenant_db, uuid4())
+        _resolve_connector_request(payload, other_tenant_db, uuid4(), "admin")
     assert exc.value.status_code == 404
     assert "connector_configurations.organization_id" in other_tenant_db.statement
 
@@ -314,7 +314,7 @@ def test_saved_configuration_cannot_be_mixed_with_inline_credentials():
         api_url="https://attacker.example/override",
     )
     with pytest.raises(HTTPException) as exc:
-        _resolve_connector_request(payload, SimpleNamespace(), ORG)
+        _resolve_connector_request(payload, SimpleNamespace(), ORG, "admin")
     assert exc.value.status_code == 422
 
 
@@ -349,6 +349,17 @@ def test_saved_configuration_decryption_fails_closed_for_wrong_key(monkeypatch):
         source_type="rest_api", record_type="products", configuration_id=CONFIG
     )
     with pytest.raises(HTTPException) as exc:
-        _resolve_connector_request(payload, FakeDB(), ORG)
+        _resolve_connector_request(payload, FakeDB(), ORG, "admin")
     assert exc.value.status_code == 503
     assert "saved-secret" not in str(exc.value.detail)
+
+
+def test_signed_url_query_credentials_are_rejected():
+    with pytest.raises(CredentialVaultError, match="query parameters"):
+        validate_connector_configuration(
+            "rest_api",
+            {"api_url": "https://supplier.example.com/v1?sig=signed-token"},
+            {"api_headers": {}},
+            allowed_hosts={"supplier.example.com"},
+            sftp_known_hosts_configured=False,
+        )
