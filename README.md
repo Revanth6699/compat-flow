@@ -74,4 +74,4 @@ Production builds intentionally fail unless the public HTTPS API URL, website UR
 
 ## Project status
 
-This is not a production SaaS release. The backend contains authentication, tenant-scoped catalog APIs and persistent import foundations, but production rollout still requires live connector verification, credential-vault and durable sync work, deployment/runtime verification, operational backups, monitoring, abuse-control review, and a formal security review. See [multi-source ingestion status](docs/multi-source-ingestion.md) for the format-by-format boundaries and known limitations.
+This is not a production SaaS release. The backend contains authentication, tenant-scoped catalog APIs and persistent import foundations, but production rollout still requires live connector verification, credential-key rotation and frontend saved-connection management, durable sync, deployment/runtime verification, operational backups, monitoring, abuse-control review, and a formal security review. See [multi-source ingestion status](docs/multi-source-ingestion.md) for the format-by-format boundaries and known limitations.

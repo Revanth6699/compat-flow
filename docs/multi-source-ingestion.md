@@ -120,7 +120,7 @@ The reviewed benchmark seed has 72 examples and is an evaluation seed, not a tra
 
 ## UI and rollout boundary
 
-The authenticated file page exposes record-type selection and optional AI classification/mapping suggestions, but currently stops at validation and preview; it does not expose the backend file commit endpoint. The connector page exposes all five record types, one-shot preview and commit, optional AI suggestions, and reviewable field mappings. It still does not expose all API pagination or SQL watermark settings. Connector credentials remain request-scoped and are not saved as reusable source configurations.
+The authenticated file page exposes record-type selection and optional AI classification/mapping suggestions, but currently stops at validation and preview; it does not expose the backend file commit endpoint. The connector page exposes all five record types, one-shot preview and commit, optional AI suggestions, and reviewable field mappings. It still does not expose all API pagination or SQL watermark settings. The UI continues to send request-scoped credentials; backend saved-configuration create/list/delete endpoints exist, but the frontend does not yet expose saved-connection management or selection. Saved configurations fail closed until CONNECTOR_CREDENTIAL_ENCRYPTION_KEY is configured, and using a saved credential requires catalog:write permission.
 
 The UI must continue to distinguish public demo validation, authenticated parser/preview, backend commit paths, mock-tested connector primitives, and live-verified integrations. None of the REST API, SFTP, or SQL Server connectors is live-verified. Do not describe the full multi-source workflow as generally available.
 
