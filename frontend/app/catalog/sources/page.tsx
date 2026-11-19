@@ -61,12 +61,12 @@ type Preview = {
   persisted: boolean;
 };
 type FormState = {
-  api_url: string; api_token: string; api_records_path: string;
+  api_url: string; api_token: string; api_auth_type: "bearer" | "x_api_key"; api_records_path: string;
   sftp_host: string; sftp_port: string; sftp_username: string; sftp_password: string; sftp_private_key: string; sftp_remote_path: string;
   sql_server_url: string; sql_schema: string; sql_table: string; sql_columns: string; sql_row_limit: string;
 };
 const initialForm: FormState = {
-  api_url: "", api_token: "", api_records_path: "",
+  api_url: "", api_token: "", api_auth_type: "bearer", api_records_path: "",
   sftp_host: "", sftp_port: "22", sftp_username: "", sftp_password: "", sftp_private_key: "", sftp_remote_path: "",
   sql_server_url: "", sql_schema: "dbo", sql_table: "", sql_columns: "", sql_row_limit: "1000",
 };
@@ -114,7 +114,7 @@ function SourcesContent() {
     if (selectedConfigurationId) return { ...common, configuration_id: selectedConfigurationId };
     if (sourceType === "rest_api") {
       return { ...common, api_url: form.api_url.trim(), api_records_path: form.api_records_path.trim() || null,
-        api_headers: form.api_token.trim() ? { Authorization: form.api_token.trim().startsWith("Bearer ") ? form.api_token.trim() : `Bearer ${form.api_token.trim()}` } : {} };
+        api_headers: form.api_token.trim() ? (form.api_auth_type === "x_api_key" ? { "X-API-Key": form.api_token.trim() } : { Authorization: form.api_token.trim().startsWith("Bearer ") ? form.api_token.trim() : `Bearer ${form.api_token.trim()}` }) : {} };
     }
     if (sourceType === "sftp") {
       return { ...common, sftp_host: form.sftp_host.trim(), sftp_port: Number(form.sftp_port), sftp_username: form.sftp_username.trim(),
@@ -133,7 +133,7 @@ function SourcesContent() {
       if (sourceType === "rest_api") {
         const token = form.api_token.trim();
         source_settings = { api_url: form.api_url.trim(), api_records_path: form.api_records_path.trim() || null };
-        credentials = { api_headers: token ? { Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}` } : {} };
+        credentials = { api_headers: token ? (form.api_auth_type === "x_api_key" ? { "X-API-Key": token } : { Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}` }) : {} };
       } else if (sourceType === "sftp") {
         source_settings = { sftp_host: form.sftp_host.trim(), sftp_port: Number(form.sftp_port), sftp_username: form.sftp_username.trim(), sftp_remote_path: form.sftp_remote_path.trim() };
         credentials = form.sftp_password ? { password: form.sftp_password } : { private_key: form.sftp_private_key };
@@ -301,7 +301,7 @@ function SourcesContent() {
       </select>
       {!selectedConfigurationId && sourceType === "rest_api" && <div className="auth-form">
         <label htmlFor="api-url">API endpoint URL</label><input id="api-url" type="url" required value={form.api_url} onChange={e => update("api_url", e.target.value)} placeholder="https://supplier.example.com/products" />
-        <label htmlFor="api-token">API bearer token or API key</label><input id="api-token" type="password" autoComplete="off" value={form.api_token} onChange={e => update("api_token", e.target.value)} placeholder="Credential for this request" />
+        <label htmlFor="api-auth-type">API authentication header</label><select id="api-auth-type" value={form.api_auth_type} onChange={e => update("api_auth_type", e.target.value as FormState["api_auth_type"])}><option value="bearer">Authorization: Bearer</option><option value="x_api_key">X-API-Key</option></select>\n        <label htmlFor="api-token">API token or key value</label><input id="api-token" type="password" autoComplete="off" value={form.api_token} onChange={e => update("api_token", e.target.value)} placeholder="Credential for this request" />
         <label htmlFor="api-record-path">Records path (optional)</label><input id="api-record-path" value={form.api_records_path} onChange={e => update("api_records_path", e.target.value)} placeholder="e.g. data.items" />
         <p className="import-description">The current connector supports one response or explicitly configured page-number pagination. Cursor and next-link pagination are not supported.</p>
       </div>}
