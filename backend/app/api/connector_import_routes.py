@@ -3,14 +3,15 @@ from __future__ import annotations
 
 import json
 import time
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import urlsplit
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from starlette.concurrency import run_in_threadpool
@@ -18,11 +19,17 @@ from starlette.concurrency import run_in_threadpool
 from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import ImportJob, ImportRowError, ImportRecordLineage
+from app.models import ConnectorConfiguration, ImportJob, ImportRowError, ImportRecordLineage
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
 from app.services.mapping_assistant import suggest_field_mappings
+from app.services.connector_credentials import (
+    CredentialVaultError,
+    decrypt_credentials,
+    encrypt_credentials,
+    validate_connector_configuration,
+)
 from app.services.source_connectors import (
     SourceConnectorError,
     fetch_api_records,
@@ -41,6 +48,7 @@ class ConnectorImportRequest(BaseModel):
     ]
     column_mapping: dict[str, str] | None = None
     ai_opt_in: bool = False
+    configuration_id: UUID | None = None
 
     # REST API: endpoint host must be in CONNECTOR_ALLOWED_HOSTS.
     api_url: str | None = None
@@ -71,6 +79,196 @@ class ConnectorImportRequest(BaseModel):
     sql_watermark_column: str | None = None
     sql_watermark_after: str | None = None
 
+
+
+class ConnectorConfigurationCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    source_type: Literal["rest_api", "sftp", "sql_server"]
+    source_settings: dict[str, Any] = Field(default_factory=dict)
+    credentials: dict[str, Any] = Field(default_factory=dict)
+
+
+def _configuration_public(item: ConnectorConfiguration) -> dict:
+    """Never include encrypted_credentials or decrypted secret material in API output."""
+    return {
+        "id": str(item.id),
+        "name": item.name,
+        "source_type": item.source_type,
+        "source_descriptor": item.source_descriptor,
+        "source_settings": item.source_settings,
+        "created_at": item.created_at,
+    }
+
+
+def _resolve_connector_request(
+    payload: ConnectorImportRequest, db: Session, organization_id: UUID
+) -> ConnectorImportRequest:
+    if payload.configuration_id is None:
+        return payload
+
+    inline_source_fields = {
+        "api_url", "api_records_path", "api_headers", "api_page_param",
+        "api_page_size_param", "api_page_size", "api_start_page", "api_max_pages",
+        "api_retry_attempts", "sftp_host", "sftp_port", "sftp_username",
+        "sftp_password", "sftp_private_key", "sftp_remote_path", "sftp_filename",
+        "sql_server_url", "sql_schema", "sql_table", "sql_columns", "sql_row_limit",
+        "sql_watermark_column", "sql_watermark_after",
+    }
+    if payload.model_fields_set.intersection(inline_source_fields):
+        raise HTTPException(
+            status_code=422,
+            detail="Use either a saved connector configuration or inline source settings, not both.",
+        )
+
+    item = db.scalar(
+        select(ConnectorConfiguration).where(
+            ConnectorConfiguration.id == payload.configuration_id,
+            ConnectorConfiguration.organization_id == organization_id,
+            ConnectorConfiguration.source_type == payload.source_type,
+            ConnectorConfiguration.deleted_at.is_(None),
+        )
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Connector configuration not found.")
+
+    try:
+        credentials = decrypt_credentials(
+            item.encrypted_credentials,
+            encryption_key=settings.connector_credential_encryption_key,
+            organization_id=organization_id,
+            configuration_id=item.id,
+            source_type=item.source_type,
+            key_version=item.encryption_key_version,
+        )
+    except CredentialVaultError:
+        raise HTTPException(
+            status_code=503,
+            detail="Saved connector credentials are unavailable; verify the credential encryption key.",
+        ) from None
+
+    if item.source_type == "sftp":
+        credentials = {
+            "sftp_password": credentials.get("password"),
+            "sftp_private_key": credentials.get("private_key"),
+        }
+    elif item.source_type == "sql_server":
+        credentials = {"sql_server_url": credentials.get("connection_url")}
+    return payload.model_copy(update={**item.source_settings, **credentials})
+
+
+@router.post("/connectors/configurations", status_code=201)
+def create_connector_configuration(
+    payload: ConnectorConfigurationCreate,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    name = payload.name.strip()
+    if not name or len(name) > 120:
+        raise HTTPException(status_code=422, detail="Connector configuration name is invalid.")
+    try:
+        source_settings, credentials, descriptor = validate_connector_configuration(
+            payload.source_type,
+            payload.source_settings,
+            payload.credentials,
+            allowed_hosts=_allowed_hosts(),
+            sftp_known_hosts_configured=bool(settings.sftp_known_hosts_path),
+        )
+    except CredentialVaultError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+
+    if not settings.connector_credential_encryption_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Connector credential encryption is not configured; no credentials were stored.",
+        )
+    configuration_id = uuid4()
+    try:
+        encrypted = encrypt_credentials(
+            credentials,
+            encryption_key=settings.connector_credential_encryption_key,
+            organization_id=current.profile.organization_id,
+            configuration_id=configuration_id,
+            source_type=payload.source_type,
+        )
+    except CredentialVaultError:
+        raise HTTPException(
+            status_code=503,
+            detail="Connector credential encryption is unavailable; no credentials were stored.",
+        ) from None
+
+    existing = db.scalar(
+        select(ConnectorConfiguration.id).where(
+            ConnectorConfiguration.organization_id == current.profile.organization_id,
+            ConnectorConfiguration.name == name,
+            ConnectorConfiguration.deleted_at.is_(None),
+        )
+    )
+    if existing is not None:
+        raise HTTPException(status_code=409, detail="A connector configuration with this name already exists.")
+
+    item = ConnectorConfiguration(
+        id=configuration_id,
+        organization_id=current.profile.organization_id,
+        created_by_user_id=current.profile.id,
+        name=name,
+        source_type=payload.source_type,
+        source_descriptor=descriptor,
+        source_settings=source_settings,
+        encrypted_credentials=encrypted,
+        encryption_key_version="v1",
+    )
+    db.add(item)
+    try:
+        db.commit()
+        db.refresh(item)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="A connector configuration with this name already exists.",
+        ) from None
+    return _configuration_public(item)
+
+
+@router.get("/connectors/configurations")
+def list_connector_configurations(
+    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    items = db.scalars(
+        select(ConnectorConfiguration)
+        .where(
+            ConnectorConfiguration.organization_id == current.profile.organization_id,
+            ConnectorConfiguration.deleted_at.is_(None),
+        )
+        .order_by(ConnectorConfiguration.created_at.desc())
+        .limit(100)
+    ).all()
+    return {"items": [_configuration_public(item) for item in items]}
+
+
+@router.delete("/connectors/configurations/{configuration_id}")
+def delete_connector_configuration(
+    configuration_id: UUID,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    item = db.scalar(
+        select(ConnectorConfiguration).where(
+            ConnectorConfiguration.id == configuration_id,
+            ConnectorConfiguration.organization_id == current.profile.organization_id,
+            ConnectorConfiguration.deleted_at.is_(None),
+        )
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Connector configuration not found.")
+    item.encrypted_credentials = ""
+    item.deleted_at = func.now()
+    db.commit()
+    return {"deleted": True}
 
 
 async def _enforce_connector_rate_limit(organization_id: UUID) -> None:
@@ -259,21 +457,23 @@ async def preview_connector_import(
     payload: ConnectorImportRequest,
     _current: AuthenticatedUser = Depends(require_permission("catalog:read")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
 ):
     await _enforce_connector_rate_limit(_current.profile.organization_id)
     try:
-        raw, filename = await _load_source(payload)
-        parsed, result = await run_in_threadpool(_prepare, payload, raw, filename)
+        resolved_payload = _resolve_connector_request(payload, db, _current.profile.organization_id)
+        raw, filename = await _load_source(resolved_payload)
+        parsed, result = await run_in_threadpool(_prepare, resolved_payload, raw, filename)
         ai_result = await suggest_field_mappings(
-            record_type=payload.record_type,
+            record_type=resolved_payload.record_type,
             headers=parsed.headers,
             sample_records=[record.values for record in parsed.records[:5]],
-            user_opted_in=payload.ai_opt_in,
+            user_opted_in=resolved_payload.ai_opt_in,
         )
     except (SourceConnectorError, IngestionParseError, RecordMappingError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     return {
-        "source_type": payload.source_type, "source_descriptor": _source_descriptor(payload), "filename": filename,
+        "source_type": resolved_payload.source_type, "source_descriptor": _source_descriptor(resolved_payload), "filename": filename,
         "format": parsed.format, "record_type": result.record_type,
         "total_records": result.total_records, "valid_records": len(result.valid_records),
         "invalid_records": result.invalid_records, "mappings": result.mappings,
@@ -323,16 +523,17 @@ async def commit_connector_import(
 ):
     await _enforce_connector_rate_limit(current.profile.organization_id)
     try:
-        raw, filename = await _load_source(payload)
-        parsed, result = await run_in_threadpool(_prepare, payload, raw, filename)
+        resolved_payload = _resolve_connector_request(payload, db, current.profile.organization_id)
+        raw, filename = await _load_source(resolved_payload)
+        parsed, result = await run_in_threadpool(_prepare, resolved_payload, raw, filename)
     except (SourceConnectorError, IngestionParseError, RecordMappingError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     return persist_validated_import(
         db=db, organization_id=current.profile.organization_id,
         filename=filename, parsed=parsed, result=result,
-        source_type=payload.source_type,
-        source_descriptor=_source_descriptor(payload),
-        source_metadata=_source_metadata(payload, parsed),
+        source_type=resolved_payload.source_type,
+        source_descriptor=_source_descriptor(resolved_payload),
+        source_metadata=_source_metadata(resolved_payload, parsed),
     )
 
 

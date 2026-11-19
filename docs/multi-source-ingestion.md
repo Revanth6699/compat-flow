@@ -72,6 +72,20 @@ SFTP requires an allowlisted host, an absolute remote path without `.` or `..` p
 
 The SFTP hostname is resolved once and every answer must be globally routable. CompatFlow opens the TCP socket directly to one of those validated IP addresses, then gives that socket to Paramiko while retaining the original hostname and port for known-host key verification. This avoids a second DNS lookup between validation and connection. Only a single file is fetched per invocation. Directory polling, scheduled triggers, remote-file deduplication, retry/recovery orchestration, and durable background jobs are not implemented. A read-only SFTP account and directory-level permissions must be provisioned by the supplier/operator.
 
+## Saved connector configurations and credential vault
+
+Authenticated organizations can create, list, and delete named REST API, SFTP, and SQL Server configurations through:
+
+- POST /api/v1/catalog/import/connectors/configurations
+- GET /api/v1/catalog/import/connectors/configurations
+- DELETE /api/v1/catalog/import/connectors/configurations/{configuration_id}
+
+Creation separates non-secret source settings from credentials. Credentials are encrypted with AES-256-GCM before persistence; the associated authenticated data binds the ciphertext to the organization, configuration ID, source type, and key version. Ciphertext is never returned by list/create endpoints. Connector preview/commit requests may supply configuration_id instead of inline source settings. The lookup is organization-scoped and source-type-scoped; inline source settings cannot be mixed with a saved configuration. The connector still revalidates the source at execution time, including the current host allowlist and DNS protections.
+
+Set CONNECTOR_CREDENTIAL_ENCRYPTION_KEY to URL-safe base64 encoding of exactly 32 random bytes. Generate one outside the application and store it only in the backend secret manager. Do not commit it, put it in the database, or reuse APP_SECRET_KEY. Every backend instance that reads saved connector configurations must use the same key. Back up the key separately from the database. Losing or rotating the key without a planned re-encryption procedure makes existing saved credentials undecryptable. The vault fails closed when the key is absent or invalid; inline request-scoped connector credentials remain available for development/testing.
+
+REST API header credentials, SFTP passwords/private keys, and SQL Server connection URLs are encrypted as one source-specific secret object. SQL Server connection URLs must still satisfy the ODBC Driver 18, TLS certificate verification, SQL authentication, and ApplicationIntent=ReadOnly checks. Saving a configuration does not prove that the remote account is read-only or that the source is reachable.
+
 ## SQL Server connector
 
 SQL Server extraction is limited to a reflected schema/table and selected column projection. It issues a SQLAlchemy SELECT with a bounded row limit; arbitrary SQL is not accepted.
@@ -114,7 +128,7 @@ Do not change subscription entitlements or pricing as part of ingestion work. Mu
 
 ## Remaining work
 
-- Complete source-configuration management and an encrypted credential vault; current credentials are request-scoped only.
+- Add planned key rotation/re-encryption and formal audit events for connector configuration changes; the initial encrypted vault uses one operator-managed application key.
 - Add API cursor/next-link adapters where supplier contracts require them, with source-specific pagination tests.
 - Add SFTP polling/trigger, remote-file deduplication, and retry/recovery orchestration.
 - Add durable SQL Server watermark checkpoint management. Composite-key watermark pagination is deliberately unsupported until a safe tie-breaking cursor is designed.
