@@ -1,5 +1,14 @@
 # Backend operations
 
+## Connector credential encryption
+
+Set `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` on every backend instance before using saved connector configurations. It must be URL-safe base64 encoding of exactly 32 cryptographically random bytes. Generate it securely outside the application, store it only in the deployment secret manager, and use the same value across all instances that access the same database. Do not commit it or derive it from `APP_SECRET_KEY`.
+
+The application encrypts connector credentials with AES-256-GCM and binds each ciphertext to its organization, configuration ID, and source type. Missing/invalid keys cause saved-configuration creation or use to fail closed. Back up the key separately from the database. Key rotation/re-encryption is not implemented yet; replacing the key without re-encrypting existing rows will make those saved credentials unavailable.
+
+Saved configurations can be created only for allowlisted REST API, SFTP, and SQL Server sources. The API returns source settings and a sanitized descriptor, never ciphertext or decrypted credentials. Keep the SQL Server login read-only at the database permission layer; `ApplicationIntent=ReadOnly` is not a substitute.
+
+
 ## Authentication and organization onboarding
 
 Supabase Auth owns password registration, login, email confirmation, and password recovery. The FastAPI service validates Supabase access tokens and maps authenticated Supabase users to CompatFlow organization profiles.
@@ -39,7 +48,7 @@ Invitation roles are limited to admin, member, and viewer. Only an owner can inv
 
 See the multi-source ingestion guide for the format matrix, API pagination and retry limits, SQL Server watermark requirements, security boundaries, and incomplete capabilities.
 
-Connector preview and commit routes require the existing supplier_catalogs plan entitlement and a database-backed catalog:read or catalog:write permission. Redis enforces a fixed-window per-organization request limit; if Redis is unavailable, connector execution fails closed. Import history stores source type, a sanitized source descriptor, non-secret source metadata, row errors, and record lineage. API tokens, SFTP passwords/private keys, and SQL Server connection URLs are request-scoped and must not be written to logs or persisted.
+Connector preview and commit routes require the existing supplier_catalogs plan entitlement and a database-backed catalog:read or catalog:write permission. Redis enforces a fixed-window per-organization request limit; if Redis is unavailable, connector execution fails closed. Import history stores source type, a sanitized source descriptor, non-secret source metadata, row errors, and record lineage. Inline API tokens, SFTP passwords/private keys, and SQL Server connection URLs are request-scoped and must never enter import metadata, errors, or logs. Explicitly saved configurations persist only AES-256-GCM ciphertext in the organization-scoped connector vault; plaintext credentials are never returned by its API.
 
 ### SQL Server runtime requirement
 
@@ -49,7 +58,7 @@ Provision a dedicated SQL-authenticated login with only SELECT on the approved s
 
 ### Connector credential handling
 
-There is no reusable connector credential vault yet. Credentials are submitted for one preview/commit request and are not stored as source configuration. Do not add secrets to import metadata, mapping templates, or error messages. SFTP known-hosts must be mounted as a managed file; do not accept host keys from the client.
+Saved connector configurations are organization-scoped and encrypted with AES-256-GCM using `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY`. The frontend can create, list, select, and delete these configurations; it receives only non-secret settings and a sanitized descriptor. Inline credentials remain request-scoped. Do not add secrets to import metadata, mapping templates, or error messages. Key rotation/re-encryption is not implemented yet. SFTP known-hosts must be mounted as a managed file; do not accept host keys from the client.
 
 ## Staging migration procedure
 

@@ -62,15 +62,29 @@ Page-number pagination is opt-in and requires explicit page and page-size query 
 
 Cursor-based pagination and vendor-specific next links are not implemented. Do not assume every supplier API uses page numbers or returns the configured records path.
 
-Connector preview and commit requests are authenticated, tenant-scoped, plan-gated, and rate-limited through Redis (20 operations per organization per minute by default). If Redis is unavailable, connector execution fails closed before contacting the source. Committed imports record the connector type and a sanitized host descriptor; credentials and query tokens are not stored.
+Connector preview and commit requests are authenticated, tenant-scoped, plan-gated, and rate-limited through Redis (20 operations per organization per minute by default). If Redis is unavailable, connector execution fails closed before contacting the source. API credentials must be supplied through bounded Authorization or X-API-Key headers; credential-like query parameters are rejected to avoid placing secrets in URLs. Committed imports record the connector type and a sanitized host descriptor; credentials and query tokens are not stored.
 
-The hostname is checked against the allowlist and its DNS answers are checked for private/local addresses. The current HTTP client resolves the hostname again when connecting; DNS answers are not pinned to the validation result, so DNS-rebinding resistance is not complete. Keep the allowlist limited to operator-controlled, stable supplier hosts.
+The hostname is checked against the exact allowlist and resolved once per connector invocation. Every DNS answer must be globally routable; mixed public/private answers are rejected. The REST connector uses a pinned aiohttp resolver so TCP connects only to those validated IP addresses while TLS certificate verification, SNI, and the HTTP Host header continue to use the original hostname. Redirects and environment proxies are disabled. This closes the validation/connect DNS-rebinding gap for REST requests. Keep the allowlist limited to operator-controlled supplier hosts.
 
 ## SFTP connector
 
-SFTP requires an allowlisted host, absolute remote path, username, exactly one authentication method, and a managed SFTP_KNOWN_HOSTS_PATH. Paramiko strict reject policy is used; unknown host keys are rejected. The read is bounded to the configured upload limit plus one byte. Credentials are request-scoped and are not stored in CompatFlow.
+SFTP requires an allowlisted host, an absolute remote path without `.` or `..` path segments, a username, exactly one authentication method, and a managed SFTP_KNOWN_HOSTS_PATH. Paramiko strict reject policy is used; unknown host keys are rejected. Password authentication is supported. Private-key authentication accepts pasted, unencrypted PEM/OpenSSH private-key content and parses it in memory; the value is never treated as a server-side file path. Encrypted private keys/passphrases are not supported yet. Key material is bounded to 64 KiB. The file read is bounded to the configured upload limit plus one byte. Inline credentials are request-scoped and are not stored in import history or logs. If an operator explicitly saves a connector configuration, its credential object is encrypted by the organization-scoped vault described below; ciphertext is never returned by the API.
 
-Only a single file is fetched per invocation. Directory polling, scheduled triggers, remote-file deduplication, retry/recovery orchestration, and durable background jobs are not implemented. A read-only SFTP account and directory-level permissions must be provisioned by the supplier/operator.
+The SFTP hostname is resolved once and every answer must be globally routable. CompatFlow opens the TCP socket directly to one of those validated IP addresses, then gives that socket to Paramiko while retaining the original hostname and port for known-host key verification. This avoids a second DNS lookup between validation and connection. Only a single file is fetched per invocation. Directory polling, scheduled triggers, remote-file deduplication, retry/recovery orchestration, and durable background jobs are not implemented. A read-only SFTP account and directory-level permissions must be provisioned by the supplier/operator.
+
+## Saved connector configurations and credential vault
+
+Authenticated organizations can create, list, and delete named REST API, SFTP, and SQL Server configurations through:
+
+- POST /api/v1/catalog/import/connectors/configurations
+- GET /api/v1/catalog/import/connectors/configurations
+- DELETE /api/v1/catalog/import/connectors/configurations/{configuration_id}
+
+Creation separates non-secret source settings from credentials. Credentials are encrypted with AES-256-GCM before persistence; the associated authenticated data binds the ciphertext to the organization, configuration ID, source type, and key version. Ciphertext is never returned by list/create endpoints. Connector preview/commit requests may supply configuration_id instead of inline source settings. The lookup is organization-scoped and source-type-scoped; inline source settings cannot be mixed with a saved configuration. Using a saved credential for preview or commit also requires the organization's `catalog:write` permission; a read-only catalog role cannot trigger a source request with stored credentials. The connector still revalidates the source at execution time, including the current host allowlist and DNS protections.
+
+Set CONNECTOR_CREDENTIAL_ENCRYPTION_KEY to URL-safe base64 encoding of exactly 32 random bytes. Generate one outside the application and store it only in the backend secret manager. Do not commit it, put it in the database, or reuse APP_SECRET_KEY. Every backend instance that reads saved connector configurations must use the same key. Back up the key separately from the database. Losing or rotating the key without a planned re-encryption procedure makes existing saved credentials undecryptable. The vault fails closed when the key is absent or invalid; inline request-scoped connector credentials remain available for development/testing.
+
+REST API header credentials, SFTP passwords/private keys, and SQL Server connection URLs are encrypted as one source-specific secret object. SQL Server connection URLs must still satisfy the ODBC Driver 18, TLS certificate verification, SQL authentication, and ApplicationIntent=ReadOnly checks. Saving a configuration does not prove that the remote account is read-only or that the source is reachable.
 
 ## SQL Server connector
 
@@ -92,26 +106,32 @@ An optional incremental watermark is supported only for a selected single-column
 
 No real SQL Server connection or least-privilege permission test has passed. Do not label SQL Server operational until a live connection and permission test succeeds.
 
-## AI-assisted mapping
+## AI-assisted record classification and mapping
 
-POST /api/v1/catalog/import/suggest-mappings is an explicit opt-in suggestion endpoint. It sends headers and at most five bounded sample values per header to a configured HTTPS OpenAI-compatible provider. Candidate fields are allowlisted by record type; evidence must match the submitted headers or sample values; confidence is model-reported and uncalibrated; every suggestion requires human confirmation.
+The authenticated file endpoint `POST /api/v1/catalog/import/suggest-mappings` and authenticated connector preview endpoint `POST /api/v1/catalog/import/connectors/preview` use the same opt-in assistant. One provider request can return a record-type classification across all five catalog record types plus field-mapping suggestions restricted to the user's selected record type. This works after parsing CSV, XLSX, XLS, JSON, XML, REST API JSON, SFTP files, and SQL Server row projections into the shared source-record representation.
 
-Provider configuration uses MAPPING_AI_BASE_URL, MAPPING_AI_API_KEY, and MAPPING_AI_MODEL. No provider credentials are configured in the current environment, so live AI suggestions are not verified. Manual and deterministic mapping remain available. No model is trained.
+AI evidence is deliberately bounded before serialization: at most 80 source headers (headers longer than 128 characters are rejected for AI processing), the first five records, and at most 120 characters per sample value. The aggregate evidence budget is 64,000 characters and provider responses are limited to 64 KiB. A request exceeding these limits receives a bounded-input error; deterministic/manual mapping remains available. Connector credentials, connection URLs, API authorization headers, SFTP passwords/private keys, and SQL connection secrets are not passed to the AI helper.
 
-The reviewed benchmark seed has 72 examples and is an evaluation seed, not a training corpus. Keep source families separated in any held-out evaluation; do not train on the seed or unconfirmed AI predictions.
+AI requests require explicit user opt-in. If the provider is not configured, no source evidence is sent and the endpoint reports `provider_unconfigured`. Provider configuration uses `MAPPING_AI_BASE_URL`, `MAPPING_AI_API_KEY`, and `MAPPING_AI_MODEL`; all three are required and the base URL must use HTTPS. No provider credentials are configured in the current environment, so live AI suggestions are not verified.
+
+The backend accepts only allowed record types and fields, verifies that each evidence item exactly matches a submitted header or bounded sample value, rejects duplicate source/target mapping suggestions, and marks every result as requiring confirmation. Classification and mapping confidence values are model-reported and uncalibrated; they are not data-quality metrics. The user must confirm a suggested record type or mapping before it is applied. Suggestions never authorize persistence, infer foreign-key relationships, or create catalog records.
+
+The reviewed benchmark seed has 72 examples and is an evaluation seed, not a training corpus. Keep source families separated in any held-out evaluation; do not train on the seed or unconfirmed AI predictions. No model is trained.
 
 ## UI and rollout boundary
 
-The file upload UI currently performs validation/preview; it does not expose the backend file commit endpoint. The connector UI exposes one-shot preview and commit, but does not expose all API pagination or SQL watermark settings yet. UI wording and controls must be updated before claiming complete multi-format or connector support.
+The authenticated file page exposes record-type selection and optional AI classification/mapping suggestions, but currently stops at validation and preview; it does not expose the backend file commit endpoint. The connector page exposes all five record types, one-shot preview and commit, optional AI suggestions, and reviewable field mappings. It still does not expose all API pagination or SQL watermark settings. The UI can create, list, select, and delete organization-scoped saved REST API, SFTP, and SQL Server configurations. Secrets are submitted only during creation and are not returned to the browser; selecting a saved configuration sends only its ID. Saved configurations fail closed until CONNECTOR_CREDENTIAL_ENCRYPTION_KEY is configured, and using a saved credential requires catalog:write permission. API pagination and SQL watermark controls are not yet fully exposed in the UI.
 
-Do not change subscription entitlements or pricing as part of ingestion work. Multi-format and connector routes retain the existing supplier_catalogs feature gate; the legacy CSV validator retains its existing csv_validation gate. A plan gate is not a claim that an external integration is live-compatible.
+The UI must continue to distinguish public demo validation, authenticated parser/preview, backend commit paths, mock-tested connector primitives, and live-verified integrations. None of the REST API, SFTP, or SQL Server connectors is live-verified. Do not describe the full multi-source workflow as generally available.
+
+Do not change subscription entitlements or pricing as part of ingestion work. Multi-format and connector routes retain the existing `supplier_catalogs` feature gate; the legacy CSV validator retains its existing `csv_validation` gate. A plan gate is not a claim that an external integration is live-compatible.
 
 ## Remaining work
 
-- Complete source-configuration management and an encrypted credential vault; current credentials are request-scoped only.
+- Add planned key rotation/re-encryption and formal audit events for connector configuration changes; the initial encrypted vault uses one operator-managed application key.
 - Add API cursor/next-link adapters where supplier contracts require them, with source-specific pagination tests.
 - Add SFTP polling/trigger, remote-file deduplication, and retry/recovery orchestration.
 - Add durable SQL Server watermark checkpoint management. Composite-key watermark pagination is deliberately unsupported until a safe tie-breaking cursor is designed.
-- Verify DNS pinning/connection-level SSRF controls for API destinations.
+
 - Run live, least-privilege tests against approved REST, SFTP, and SQL Server test sources before enabling broader product claims.
 - Update UI controls and labels so preview-only, mock-tested, live-verified, and generally available capabilities cannot be confused.

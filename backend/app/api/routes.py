@@ -305,7 +305,7 @@ async def suggest_multiformat_mappings(
     _current: AuthenticatedUser = Depends(require_permission("catalog:read")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
 ):
-    """Return optional AI mapping suggestions; data leaves CompatFlow only after explicit opt-in."""
+    """Return opt-in record-type and field-mapping suggestions for any supported file format."""
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
         await file.close()
@@ -332,6 +332,16 @@ async def suggest_multiformat_mappings(
     return {
         "status": result.status,
         "message": result.message,
+        "classification": (
+            {
+                "record_type": result.classification.record_type,
+                "confidence": result.classification.confidence,
+                "rationale": result.classification.rationale,
+                "evidence": result.classification.evidence,
+                "requires_confirmation": True,
+            }
+            if result.classification else None
+        ),
         "suggestions": [
             {
                 "source_header": item.source_header,
@@ -343,7 +353,8 @@ async def suggest_multiformat_mappings(
             }
             for item in result.suggestions
         ],
-        "source_data_sent": ai_opt_in and result.status != "provider_unconfigured",
+        "confidence_calibration": "model_reported_uncalibrated",
+        "source_data_sent": ai_opt_in and result.status not in {"provider_unconfigured", "consent_required"},
     }
 
 

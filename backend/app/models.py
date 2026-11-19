@@ -395,6 +395,50 @@ class ImportRecordLineage(Base):
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
+class ConnectorConfiguration(Base):
+    """Tenant-owned connector settings with credentials stored only as authenticated ciphertext."""
+
+    __tablename__ = "connector_configurations"
+    __table_args__ = (
+        CheckConstraint(
+            "source_type IN ('rest_api', 'sftp', 'sql_server')",
+            name="ck_connector_configurations_source_type",
+        ),
+        Index("ix_connector_configurations_org_source", "organization_id", "source_type"),
+        Index(
+            "uq_connector_configurations_org_name_active",
+            "organization_id",
+            "name",
+            unique=True,
+            postgresql_where=text("deleted_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    source_descriptor: Mapped[str] = mapped_column(String(512), nullable=False)
+    source_settings: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, default=dict, server_default="{}"
+    )
+    encrypted_credentials: Mapped[str] = mapped_column(Text, nullable=False)
+    encryption_key_version: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="v1", server_default="v1"
+    )
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    deleted_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
+
+
 class UserInvitation(Base):
     __tablename__ = "user_invitations"
     __table_args__ = (

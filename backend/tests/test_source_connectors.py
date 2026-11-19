@@ -1,3 +1,4 @@
+import socket
 import sys
 from types import SimpleNamespace
 
@@ -31,42 +32,66 @@ def test_api_connector_rejects_embedded_credentials():
         _validate_https_url("https://user:password@supplier.example/api", {"supplier.example"})
 
 
-@pytest.mark.anyio
-async def test_api_connector_fetches_and_extracts_records_path(monkeypatch):
+def _patch_api_http(monkeypatch, response_factory):
+    calls = {"requests": []}
+
+    class Content:
+        def __init__(self, payload):
+            self.payload = payload
+
+        async def iter_chunked(self, size):
+            calls["chunk_size"] = size
+            if self.payload:
+                yield self.payload
+
     class Response:
-        status_code = 200
-        headers = {"content-length": "30"}
-
-        def raise_for_status(self):
-            pass
+        def __init__(self, status, payload, headers=None):
+            self.status = status
+            self.headers = headers or {}
+            self.content = Content(payload)
 
         async def __aenter__(self):
             return self
 
         async def __aexit__(self, *args):
-            pass
+            return None
 
-        async def aiter_bytes(self):
-            yield b'{"data":{"items":[{"sku":"001"}]}}'
-
-    class Client:
+    class Session:
         def __init__(self, **kwargs):
-            self.options = kwargs
+            calls["session_options"] = kwargs
 
         async def __aenter__(self):
             return self
 
         async def __aexit__(self, *args):
-            pass
+            return None
 
-        def stream(self, method, url, headers=None):
-            assert method == "GET"
-            assert url == "https://supplier.example/catalog"
-            assert headers == {"X-API-Key": "secret"}
-            return Response()
+        def get(self, url, headers=None, allow_redirects=True):
+            calls["requests"].append(
+                {"url": url, "headers": headers, "allow_redirects": allow_redirects}
+            )
+            return response_factory(url)
 
-    monkeypatch.setattr(connectors, "_validate_https_url", lambda *args: None)
-    monkeypatch.setattr(connectors.httpx, "AsyncClient", Client)
+    class Connector:
+        def __init__(self, **kwargs):
+            calls["connector_options"] = kwargs
+
+    monkeypatch.setattr(connectors.aiohttp, "ClientSession", Session)
+    monkeypatch.setattr(connectors.aiohttp, "TCPConnector", Connector)
+    monkeypatch.setattr(
+        connectors,
+        "_resolve_https_target",
+        lambda url, allowed: ("supplier.example", 443, ["93.184.216.34"]),
+    )
+    return calls, Response
+
+
+@pytest.mark.anyio
+async def test_api_connector_fetches_records_and_pins_validated_dns(monkeypatch):
+    def response_factory(url):
+        return Response(200, b'{"data":{"items":[{"sku":"001"}]}}', {"content-length": "38"})
+
+    calls, Response = _patch_api_http(monkeypatch, response_factory)
     records = await fetch_api_records(
         "https://supplier.example/catalog",
         allowed_hosts={"supplier.example"},
@@ -74,43 +99,39 @@ async def test_api_connector_fetches_and_extracts_records_path(monkeypatch):
         records_key="data.items",
     )
     assert records == [{"sku": "001"}]
+    assert calls["session_options"]["trust_env"] is False
+    assert calls["requests"][0]["allow_redirects"] is False
+    assert calls["requests"][0]["headers"] == {"X-API-Key": "secret"}
+    resolver = calls["connector_options"]["resolver"]
+    assert isinstance(resolver, connectors._PinnedResolver)
+    pinned = await resolver.resolve("supplier.example", 443, socket.AF_UNSPEC)
+    assert [item["host"] for item in pinned] == ["93.184.216.34"]
+    with pytest.raises(OSError, match="unvalidated target"):
+        await resolver.resolve("other.example", 443, socket.AF_UNSPEC)
 
 
 @pytest.mark.anyio
 async def test_api_connector_rejects_non_object_records(monkeypatch):
-    class Response:
-        status_code = 200
-        headers = {}
-
-        def raise_for_status(self):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        async def aiter_bytes(self):
-            yield b'[1,2,3]'
-
-    class Client:
-        def __init__(self, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        def stream(self, *args, **kwargs):
-            return Response()
-
-    monkeypatch.setattr(connectors, "_validate_https_url", lambda *args: None)
-    monkeypatch.setattr(connectors.httpx, "AsyncClient", Client)
+    calls, Response = _patch_api_http(
+        monkeypatch, lambda url: Response(200, b"[1,2,3]")
+    )
     with pytest.raises(SourceConnectorError, match="array of objects"):
-        await fetch_api_records("https://supplier.example/catalog", allowed_hosts={"supplier.example"})
+        await fetch_api_records(
+            "https://supplier.example/catalog",
+            allowed_hosts={"supplier.example"},
+        )
+
+
+@pytest.mark.anyio
+async def test_api_connector_rejects_redirects(monkeypatch):
+    calls, Response = _patch_api_http(
+        monkeypatch, lambda url: Response(302, b"", {"location": "http://127.0.0.1"})
+    )
+    with pytest.raises(SourceConnectorError, match="redirects are not allowed"):
+        await fetch_api_records(
+            "https://supplier.example/catalog",
+            allowed_hosts={"supplier.example"},
+        )
 
 
 def test_sftp_connector_downloads_with_known_host_verification(monkeypatch):
@@ -125,7 +146,7 @@ def test_sftp_connector_downloads_with_known_host_verification(monkeypatch):
 
         def read(self, size):
             calls["read_size"] = size
-            return b"SKU,Name\\n001,Widget"
+            return b"SKU,Name\n001,Widget"
 
     class SFTP:
         def __enter__(self):
@@ -160,18 +181,223 @@ def test_sftp_connector_downloads_with_known_host_verification(monkeypatch):
 
         SSHClient = Client
 
+    class FakeSocket:
+        def close(self):
+            calls["socket_closed"] = True
+
+    monkeypatch.setattr(
+        connectors.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 22))],
+    )
+    def fake_create_connection(address, timeout):
+        calls["socket_target"] = address
+        return FakeSocket()
+
+    monkeypatch.setattr(connectors.socket, "create_connection", fake_create_connection)
     monkeypatch.setitem(sys.modules, "paramiko", Paramiko())
     result = fetch_sftp_file(
         host="sftp.supplier.example", port=22, username="reader",
         password="secret", remote_path="/exports/catalog.csv",
         known_hosts_path="/run/secrets/known_hosts", max_bytes=100,
     )
-    assert result == b"SKU,Name\\n001,Widget"
+    assert result == b"SKU,Name\n001,Widget"
     assert calls["known_hosts"] == "/run/secrets/known_hosts"
     assert calls["policy"] == "reject-unknown-host"
     assert calls["remote"] == ("/exports/catalog.csv", "rb")
     assert calls["connect"]["look_for_keys"] is False
+    assert calls["connect"]["hostname"] == "sftp.supplier.example"
+    assert calls["connect"]["sock"] is not None
+    assert calls["socket_target"] == ("93.184.216.34", 22)
+    assert calls["socket_closed"] is True
     assert calls["closed"] is True
+
+
+
+def test_api_connector_rejects_credentials_in_query_parameters():
+    with pytest.raises(SourceConnectorError, match="query parameters"):
+        _validate_https_url(
+            "https://supplier.example/catalog?api_key=secret",
+            {"supplier.example"},
+        )
+
+
+def test_sftp_connector_parses_pasted_private_key_content(monkeypatch):
+    calls = {}
+    key_material = (
+        "-----BEGIN OPENSSH PRIVATE KEY-----\n"
+        "test-private-key-material\n"
+        "-----END OPENSSH PRIVATE KEY-----"
+    )
+
+    class FakeKey:
+        @classmethod
+        def from_private_key(cls, stream):
+            calls["parsed_key_text"] = stream.read()
+            return "parsed-private-key"
+
+    class RemoteFile:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self, size):
+            return b"SKU,Name\n001,Widget"
+
+    class SFTP:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def open(self, path, mode):
+            calls["remote"] = (path, mode)
+            return RemoteFile()
+
+    class Client:
+        def load_host_keys(self, path):
+            calls["known_hosts"] = path
+
+        def set_missing_host_key_policy(self, policy):
+            calls["policy"] = policy
+
+        def connect(self, **kwargs):
+            calls["connect"] = kwargs
+
+        def open_sftp(self):
+            return SFTP()
+
+        def close(self):
+            calls["closed"] = True
+
+    class Paramiko:
+        SSHException = RuntimeError
+        Ed25519Key = FakeKey
+        ECDSAKey = FakeKey
+        RSAKey = FakeKey
+        SSHClient = Client
+
+        def RejectPolicy(self):
+            return "reject-unknown-host"
+
+    class FakeSocket:
+        def close(self):
+            calls["socket_closed"] = True
+
+    monkeypatch.setattr(
+        connectors.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 22))],
+    )
+    monkeypatch.setattr(
+        connectors.socket,
+        "create_connection",
+        lambda address, timeout: FakeSocket(),
+    )
+    monkeypatch.setitem(sys.modules, "paramiko", Paramiko())
+
+    result = fetch_sftp_file(
+        host="sftp.supplier.example",
+        port=22,
+        username="reader",
+        private_key=key_material,
+        remote_path="/exports/catalog.csv",
+        known_hosts_path="/run/secrets/known_hosts",
+        max_bytes=100,
+    )
+
+    assert result == b"SKU,Name\n001,Widget"
+    assert calls["parsed_key_text"] == key_material
+    assert calls["connect"]["pkey"] == "parsed-private-key"
+    assert calls["connect"]["key_filename"] is None
+    assert calls["connect"]["hostname"] == "sftp.supplier.example"
+    assert key_material not in str(calls["connect"])
+    assert calls["closed"] is True
+    assert calls["socket_closed"] is True
+
+
+def test_sftp_connector_rejects_key_paths_and_dot_segment_paths_before_network(monkeypatch):
+    def unexpected_dns(*args, **kwargs):
+        raise AssertionError("invalid SFTP input must be rejected before DNS")
+
+    monkeypatch.setattr(connectors.socket, "getaddrinfo", unexpected_dns)
+    with pytest.raises(SourceConnectorError, match="pasted PEM/OpenSSH"):
+        fetch_sftp_file(
+            host="sftp.supplier.example",
+            port=22,
+            username="reader",
+            private_key="/run/secrets/id_rsa",
+            remote_path="/exports/catalog.csv",
+            known_hosts_path="/known_hosts",
+        )
+
+    with pytest.raises(SourceConnectorError, match="dot segments"):
+        fetch_sftp_file(
+            host="sftp.supplier.example",
+            port=22,
+            username="reader",
+            password="secret",
+            remote_path="/exports/../private.csv",
+            known_hosts_path="/known_hosts",
+        )
+
+
+def test_sftp_private_key_parse_errors_do_not_echo_key_material(monkeypatch):
+    secret = "private-key-secret-marker"
+
+    class FakeKey:
+        @classmethod
+        def from_private_key(cls, stream):
+            raise ValueError(f"invalid key: {secret}")
+
+    class Paramiko:
+        SSHException = RuntimeError
+        Ed25519Key = FakeKey
+        ECDSAKey = FakeKey
+        RSAKey = FakeKey
+
+    monkeypatch.setitem(sys.modules, "paramiko", Paramiko())
+    with pytest.raises(SourceConnectorError) as exc:
+        fetch_sftp_file(
+            host="sftp.supplier.example",
+            port=22,
+            username="reader",
+            private_key=(
+                "-----BEGIN OPENSSH PRIVATE KEY-----\\n"
+                f"{secret}\\n"
+                "-----END OPENSSH PRIVATE KEY-----"
+            ),
+            remote_path="/exports/catalog.csv",
+            known_hosts_path="/known_hosts",
+        )
+    assert secret not in str(exc.value)
+    assert "invalid, encrypted, or uses an unsupported key type" in str(exc.value)
+
+def test_sftp_connector_rejects_private_dns_before_opening_socket(monkeypatch):
+    calls = {"connected": False}
+    monkeypatch.setattr(
+        connectors.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("127.0.0.1", 22))],
+    )
+    monkeypatch.setattr(
+        connectors.socket,
+        "create_connection",
+        lambda *args, **kwargs: calls.__setitem__("connected", True),
+    )
+    with pytest.raises(SourceConnectorError, match="Private and local"):
+        fetch_sftp_file(
+            host="sftp.supplier.example",
+            port=22,
+            username="reader",
+            password="secret",
+            remote_path="/catalog.csv",
+            known_hosts_path="/known_hosts",
+        )
+    assert calls["connected"] is False
 
 
 def test_sftp_connector_rejects_unknown_host_key(monkeypatch):
@@ -194,6 +420,18 @@ def test_sftp_connector_rejects_unknown_host_key(monkeypatch):
 
         SSHClient = Client
 
+    class FakeSocket:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(
+        connectors.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 22))],
+    )
+    monkeypatch.setattr(
+        connectors.socket, "create_connection", lambda *args, **kwargs: FakeSocket()
+    )
     monkeypatch.setitem(sys.modules, "paramiko", Paramiko())
     with pytest.raises(SourceConnectorError, match="SFTP connection"):
         fetch_sftp_file(
@@ -304,6 +542,21 @@ def test_api_connector_rejects_private_dns_targets(monkeypatch):
         _validate_https_url("https://supplier.example/api", {"supplier.example"})
 
 
+def test_api_connector_rejects_mixed_public_and_private_dns_answers(monkeypatch):
+    monkeypatch.setattr(
+        connectors.socket,
+        "getaddrinfo",
+        lambda *args, **kwargs: [
+            (None, None, None, None, ("93.184.216.34", 443)),
+            (None, None, None, None, ("10.0.0.8", 443)),
+        ],
+    )
+    with pytest.raises(SourceConnectorError, match="Private and local"):
+        _validate_https_url(
+            "https://supplier.example/api", {"supplier.example"}
+        )
+
+
 def test_api_connector_rejects_invalid_url_port():
     with pytest.raises(SourceConnectorError, match="invalid port"):
         _validate_https_url("https://supplier.example:bad/api", {"supplier.example"})
@@ -374,46 +627,12 @@ def test_sql_server_connector_enforces_serialized_result_byte_limit(monkeypatch)
 
 @pytest.mark.anyio
 async def test_api_connector_fetches_explicit_page_number_pagination(monkeypatch):
-    requested = []
+    def response_factory(url):
+        if "page=4" in url:
+            return Response(200, b'{"items":[{"sku":"A"}]}')
+        return Response(200, b'{"items":[]}')
 
-    class Response:
-        status_code = 200
-        headers = {}
-
-        def __init__(self, payload):
-            self.payload = payload
-
-        def raise_for_status(self):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        async def aiter_bytes(self):
-            yield self.payload
-
-    class Client:
-        def __init__(self, **kwargs):
-            assert kwargs["follow_redirects"] is False
-            assert kwargs["trust_env"] is False
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        def stream(self, method, url, headers=None):
-            requested.append(url)
-            if "page=4" in url:
-                return Response(b'{"items":[{"sku":"A"}]}')
-            return Response(b'{"items":[]}')
-
-    monkeypatch.setattr(connectors, "_validate_https_url", lambda *args: None)
-    monkeypatch.setattr(connectors.httpx, "AsyncClient", Client)
+    calls, Response = _patch_api_http(monkeypatch, response_factory)
     records = await fetch_api_records(
         "https://supplier.example/catalog?tenant=demo",
         allowed_hosts={"supplier.example"},
@@ -425,9 +644,10 @@ async def test_api_connector_fetches_explicit_page_number_pagination(monkeypatch
         max_pages=3,
     )
     assert records == [{"sku": "A"}]
-    assert "page=4" in requested[0] and "limit=1" in requested[0]
-    assert "tenant=demo" in requested[0]
-    assert "page=5" in requested[1]
+    assert "page=4" in calls["requests"][0]["url"]
+    assert "limit=1" in calls["requests"][0]["url"]
+    assert "tenant=demo" in calls["requests"][0]["url"]
+    assert "page=5" in calls["requests"][1]["url"]
 
 
 @pytest.mark.anyio
@@ -435,46 +655,17 @@ async def test_api_connector_retries_transient_server_errors(monkeypatch):
     attempts = {"count": 0}
     delays = []
 
-    class Response:
-        headers = {"retry-after": "0"}
+    def response_factory(url):
+        attempts["count"] += 1
+        if attempts["count"] == 1:
+            return Response(503, b"temporary", {"retry-after": "0"})
+        return Response(200, b'[{"sku":"001"}]')
 
-        def __init__(self, status_code):
-            self.status_code = status_code
-
-        def raise_for_status(self):
-            import httpx
-            request = httpx.Request("GET", "https://supplier.example/catalog")
-            response = httpx.Response(self.status_code, request=request)
-            response.raise_for_status()
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        async def aiter_bytes(self):
-            yield b'[{"sku":"001"}]'
-
-    class Client:
-        def __init__(self, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        def stream(self, *args, **kwargs):
-            attempts["count"] += 1
-            return Response(503 if attempts["count"] == 1 else 200)
+    calls, Response = _patch_api_http(monkeypatch, response_factory)
 
     async def fake_sleep(delay):
         delays.append(delay)
 
-    monkeypatch.setattr(connectors, "_validate_https_url", lambda *args: None)
-    monkeypatch.setattr(connectors.httpx, "AsyncClient", Client)
     monkeypatch.setattr(connectors.asyncio, "sleep", fake_sleep)
     records = await fetch_api_records(
         "https://supplier.example/catalog",
@@ -488,37 +679,9 @@ async def test_api_connector_retries_transient_server_errors(monkeypatch):
 
 @pytest.mark.anyio
 async def test_api_connector_fails_instead_of_silently_truncating_full_pages(monkeypatch):
-    class Response:
-        status_code = 200
-        headers = {}
-
-        def raise_for_status(self):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        async def aiter_bytes(self):
-            yield b'[{"sku":"001"}]'
-
-    class Client:
-        def __init__(self, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        def stream(self, *args, **kwargs):
-            return Response()
-
-    monkeypatch.setattr(connectors, "_validate_https_url", lambda *args: None)
-    monkeypatch.setattr(connectors.httpx, "AsyncClient", Client)
+    calls, Response = _patch_api_http(
+        monkeypatch, lambda url: Response(200, b'[{"sku":"001"}]')
+    )
     with pytest.raises(SourceConnectorError, match="may be incomplete"):
         await fetch_api_records(
             "https://supplier.example/catalog",
@@ -742,37 +905,9 @@ def test_sql_server_requires_read_only_application_intent():
 
 @pytest.mark.anyio
 async def test_api_connector_rejects_full_page_when_only_one_page_is_allowed(monkeypatch):
-    class Response:
-        status_code = 200
-        headers = {}
-
-        def raise_for_status(self):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        async def aiter_bytes(self):
-            yield b'[{"sku":"001"}]'
-
-    class Client:
-        def __init__(self, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        def stream(self, *args, **kwargs):
-            return Response()
-
-    monkeypatch.setattr(connectors, "_validate_https_url", lambda *args: None)
-    monkeypatch.setattr(connectors.httpx, "AsyncClient", Client)
+    calls, Response = _patch_api_http(
+        monkeypatch, lambda url: Response(200, b'[{"sku":"001"}]')
+    )
     with pytest.raises(SourceConnectorError, match="configure a larger max_pages"):
         await fetch_api_records(
             "https://supplier.example/catalog",
@@ -900,40 +1035,13 @@ def test_sql_server_connector_rejects_potentially_truncated_row_limit(monkeypatc
 
 @pytest.mark.anyio
 async def test_api_connector_converts_json_recursion_errors_to_safe_connector_errors(monkeypatch):
-    class Response:
-        status_code = 200
-        headers = {}
-
-        def raise_for_status(self):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        async def aiter_bytes(self):
-            yield b"{}"
-
-    class Client:
-        def __init__(self, **kwargs):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args):
-            pass
-
-        def stream(self, *args, **kwargs):
-            return Response()
+    calls, Response = _patch_api_http(
+        monkeypatch, lambda url: Response(200, b"{}")
+    )
 
     def reject_deep_json(*args, **kwargs):
         raise RecursionError("deeply nested JSON")
 
-    monkeypatch.setattr(connectors, "_validate_https_url", lambda *args: None)
-    monkeypatch.setattr(connectors.httpx, "AsyncClient", Client)
     monkeypatch.setattr(connectors.json, "loads", reject_deep_json)
 
     with pytest.raises(SourceConnectorError, match="nesting depth"):

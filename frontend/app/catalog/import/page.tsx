@@ -26,7 +26,9 @@ type MultiResult = {
 };
 type AiMappingResult = {
   status: string; message: string;
+  classification: { record_type: string; confidence: number; rationale: string; evidence: string[]; requires_confirmation: boolean } | null;
   suggestions: { source_header: string; candidate_field: string; confidence: number; rationale: string; evidence: string[]; requires_confirmation: boolean }[];
+  confidence_calibration: string;
   source_data_sent: boolean;
 };
 const recordFields: Record<string, string[]> = {
@@ -187,9 +189,18 @@ export default function CatalogImportPage() {
           <h2>Catalog file validation</h2>
           <p className="import-description">Public demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file. Subscribed imports: up to 25 MB, subject to plan entitlements.</p>
           <div className="import-description">
-            Product catalog validation. CompatFlow detects common supplier column names automatically.
-            The public demo accepts CSV, XLS and XLSX product files. JSON, XML and connected data sources require an eligible subscription.
+            The public demo validates CSV, XLS and XLSX product files. The authenticated backend has parser, preview and commit paths for CSV, XLSX, XLS, JSON and XML across the five catalog record types. This page currently exposes file validation and preview only; file persistence controls are not yet available here.
           </div>
+          {user && <div className="auth-form">
+            <label htmlFor="catalog-record-type">Catalog record type</label>
+            <select id="catalog-record-type" value={recordType} onChange={(event) => {
+              setRecordType(event.target.value);
+              setManualMapping({});
+              setResult(null); setMultiResult(null); setAiResult(null);
+            }}>
+              {Object.keys(recordFields).map((value) => <option key={value} value={value}>{value.replaceAll("_", " ")}</option>)}
+            </select>
+          </div>}
           <p className="import-description">Files are validated in memory. This public demo does not save files or modify a catalog.</p>
           <p className="column-hint">This demo validates product catalogs, not seller or customer master-data files. Download the sample product catalog to see the expected columns. Unrecognized datasets are rejected before a misleading quality score is generated.</p>
           <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>
@@ -215,13 +226,24 @@ export default function CatalogImportPage() {
 
         {file && user && (
           <section className="panel result-section" aria-live="polite">
-            <h3>AI-assisted mapping suggestions</h3>
-            <p className="import-description">AI is optional. If enabled and a provider is configured, CompatFlow sends the source headers and up to five bounded sample values per header to that external HTTPS provider. Suggestions are never applied automatically.</p>
-            <label><input type="checkbox" checked={aiConsent} onChange={(event) => { setAiConsent(event.target.checked); setAiResult(null); }} /> I consent to sending this bounded sample evidence to the configured AI provider for mapping suggestions.</label>
-            <button className="button button-secondary" type="button" onClick={handleSuggestMappings} disabled={!aiConsent || loading}>Suggest mappings with AI</button>
-            {aiResult && <><p className="import-description">{aiResult.message} {aiResult.source_data_sent ? "Sample evidence was sent to the configured provider." : "No sample evidence was sent."}</p>
+            <h3>AI record classification and field mapping</h3>
+            <p className="import-description">AI is optional. If enabled and a provider is configured, CompatFlow sends up to 80 source headers and the first five records to an external HTTPS provider. AI requests reject source headers longer than 128 characters; each sample value is clipped to 120 characters. Confidence is model-reported and uncalibrated. Suggestions require your confirmation and never trigger persistence.</p>
+            <label><input type="checkbox" checked={aiConsent} onChange={(event) => { setAiConsent(event.target.checked); setAiResult(null); }} /> I consent to sending this bounded sample evidence to the configured AI provider for record-type and field-mapping suggestions.</label>
+            <button className="button button-secondary" type="button" onClick={handleSuggestMappings} disabled={!aiConsent || loading}>Suggest record type and mappings with AI</button>
+            {aiResult && <>
+              <p className="import-description">{aiResult.message} {aiResult.source_data_sent ? "Bounded sample evidence was sent to the configured provider." : "No sample evidence was sent."}</p>
+              {aiResult.classification && <div className="panel">
+                <p><strong>Suggested record type: {aiResult.classification.record_type.replaceAll("_", " ")}</strong> — model-reported {Math.round(aiResult.classification.confidence * 100)}% (uncalibrated)</p>
+                <p>{aiResult.classification.rationale}</p>
+                <p className="import-description">Evidence: {aiResult.classification.evidence.join("; ")}</p>
+                <button className="button button-secondary" type="button" onClick={() => {
+                  if (!aiResult.classification?.requires_confirmation) return;
+                  setRecordType(aiResult.classification.record_type);
+                  setManualMapping({}); setResult(null); setMultiResult(null); setAiResult(null);
+                }}>Use suggested record type</button>
+              </div>}
               {aiResult.suggestions.length > 0 && <><ul className="error-list">{aiResult.suggestions.map((item, index) => <li key={index}><strong>{item.source_header} → {item.candidate_field}</strong> (model-reported {Math.round(item.confidence * 100)}%, uncalibrated): {item.rationale}<br />Evidence: {item.evidence.join("; ")}</li>)}</ul>
-                <button className="button button-secondary" type="button" onClick={applyAiSuggestions}>Apply suggestions to mapping form</button></>}
+                <button className="button button-secondary" type="button" onClick={applyAiSuggestions}>Apply mapping suggestions to form</button></>}
             </>}
           </section>
         )}

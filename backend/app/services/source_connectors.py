@@ -7,7 +7,9 @@ protocols require a dedicated adapter rather than guessing response semantics.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import ipaddress
+import io
 import json
 import re
 import socket
@@ -16,7 +18,8 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, unquote_plus, urlsplit, urlunsplit
 
-import httpx
+import aiohttp
+import ssl
 import pyodbc
 from sqlalchemy import (
     BigInteger,
@@ -37,7 +40,45 @@ class SourceConnectorError(RuntimeError):
     """Safe, non-secret-bearing connector failure."""
 
 
-def _validate_https_url(url: str, allowed_hosts: set[str]) -> None:
+def _normalize_hostname(host: str) -> str:
+    try:
+        return ipaddress.ip_address(host).compressed.casefold()
+    except ValueError:
+        try:
+            return host.encode("idna").decode("ascii").casefold().rstrip(".")
+        except UnicodeError:
+            raise SourceConnectorError("Connector hostname is invalid.") from None
+
+
+def _resolve_public_addresses(host: str, port: int) -> list[str]:
+    """Resolve once and reject every address that is not globally routable."""
+    try:
+        resolved = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+    except OSError:
+        raise SourceConnectorError("Connector host could not be resolved.") from None
+    addresses: set[str] = set()
+    for item in resolved:
+        try:
+            address = ipaddress.ip_address(item[4][0].split("%", 1)[0])
+        except (IndexError, ValueError):
+            raise SourceConnectorError("Connector host returned an invalid network address.") from None
+        if not address.is_global:
+            raise SourceConnectorError("Private and local network targets are not allowed.")
+        addresses.add(address.compressed)
+    if not addresses:
+        raise SourceConnectorError("Connector host did not resolve to an address.")
+    if len(addresses) > 16:
+        raise SourceConnectorError("Connector host returned too many network addresses.")
+    return sorted(
+        addresses,
+        key=lambda value: (
+            ipaddress.ip_address(value).version,
+            int(ipaddress.ip_address(value)),
+        ),
+    )
+
+
+def _resolve_https_target(url: str, allowed_hosts: set[str]) -> tuple[str, int, list[str]]:
     try:
         parsed = urlsplit(url)
     except ValueError:
@@ -46,6 +87,21 @@ def _validate_https_url(url: str, allowed_hosts: set[str]) -> None:
         port = parsed.port or 443
     except ValueError:
         raise SourceConnectorError("Connector URL contains an invalid port.") from None
+    sensitive_query_names = {
+        "api_key", "apikey", "access_token", "token", "password",
+        "client_secret", "secret", "authorization", "signature", "auth",
+        "credential", "x_api_key", "key", "accesskey", "secretkey", "auth_token",
+        "refresh_token", "client_assertion", "awsaccesskeyid", "x_amz_credential",
+        "x_amz_signature", "x_goog_signature", "sig", "se", "sp", "sv", "sr", "st",
+        "code", "jwt", "subscription_key", "ocp_apim_subscription_key",
+    }
+    if any(
+        name.casefold().replace("-", "_") in sensitive_query_names
+        for name, _ in parse_qsl(parsed.query, keep_blank_values=True)
+    ):
+        raise SourceConnectorError(
+            "Credentials in API query parameters are not allowed; use an Authorization or X-API-Key header."
+        )
     if (
         parsed.scheme != "https"
         or not parsed.hostname
@@ -56,28 +112,54 @@ def _validate_https_url(url: str, allowed_hosts: set[str]) -> None:
         raise SourceConnectorError(
             "Connector URL must be an HTTPS URL without embedded credentials."
         )
-    host = parsed.hostname.casefold().rstrip(".")
-    if host not in {item.casefold().rstrip(".") for item in allowed_hosts}:
+    host = _normalize_hostname(parsed.hostname)
+    allowed = {_normalize_hostname(item) for item in allowed_hosts}
+    if host not in allowed:
         raise SourceConnectorError("Connector host is not in the configured allowlist.")
-    try:
-        resolved = {
-            item[4][0]
-            for item in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
-        }
-    except OSError:
-        raise SourceConnectorError("Connector host could not be resolved.") from None
-    if not resolved:
-        raise SourceConnectorError("Connector host did not resolve to an address.")
-    for value in resolved:
-        address = ipaddress.ip_address(value)
-        if (
-            address.is_private
-            or address.is_loopback
-            or address.is_link_local
-            or address.is_reserved
-            or address.is_unspecified
-        ):
-            raise SourceConnectorError("Private and local network targets are not allowed.")
+    addresses = _resolve_public_addresses(parsed.hostname, port)
+    return host, port, addresses
+
+
+def _validate_https_url(url: str, allowed_hosts: set[str]) -> None:
+    """Validate URL and DNS answers without making an outbound request."""
+    _resolve_https_target(url, allowed_hosts)
+
+
+class _PinnedResolver(aiohttp.abc.AbstractResolver):
+    """aiohttp resolver that can only return the addresses validated for one host."""
+
+    def __init__(self, hostname: str, port: int, addresses: list[str]) -> None:
+        self.hostname = _normalize_hostname(hostname)
+        self.port = port
+        self.addresses = tuple(addresses)
+
+    async def resolve(
+        self, host: str, port: int = 0, family: int = socket.AF_INET
+    ) -> list[dict[str, Any]]:
+        if _normalize_hostname(host) != self.hostname or port != self.port:
+            raise OSError("Connector attempted to resolve an unvalidated target.")
+        results: list[dict[str, Any]] = []
+        for value in self.addresses:
+            address = ipaddress.ip_address(value)
+            address_family = socket.AF_INET6 if address.version == 6 else socket.AF_INET
+            if family not in (socket.AF_UNSPEC, address_family):
+                continue
+            results.append(
+                {
+                    "hostname": host,
+                    "host": address.compressed,
+                    "port": port,
+                    "family": address_family,
+                    "proto": socket.IPPROTO_TCP,
+                    "flags": socket.AI_NUMERICHOST,
+                }
+            )
+        if not results:
+            raise OSError("No validated connector address matches the requested address family.")
+        return results
+
+    async def close(self) -> None:
+        return None
 
 
 def _with_page_parameters(
@@ -109,7 +191,7 @@ def _extract_api_records(payload: Any, records_key: str | None) -> list[dict[str
 
 
 async def _fetch_api_page(
-    client: httpx.AsyncClient,
+    client: aiohttp.ClientSession,
     url: str,
     *,
     headers: dict[str, str] | None,
@@ -118,21 +200,34 @@ async def _fetch_api_page(
 ) -> tuple[Any, int]:
     for attempt in range(retry_attempts + 1):
         try:
-            async with client.stream("GET", url, headers=headers) as response:
-                retryable = response.status_code == 429 or 500 <= response.status_code <= 599
-                if retryable and attempt < retry_attempts:
+            async with client.get(
+                url, headers=headers, allow_redirects=False
+            ) as response:
+                status = response.status
+                retryable = status == 429 or 500 <= status <= 599
+                if retryable:
+                    if attempt >= retry_attempts:
+                        raise SourceConnectorError(
+                            "API request failed after the configured retry attempts."
+                        )
                     raw_delay = response.headers.get("retry-after", "")
                     try:
                         delay = min(max(float(raw_delay), 0.0), 5.0)
-                    except ValueError:
+                    except (TypeError, ValueError):
                         delay = min(0.25 * (2**attempt), 2.0)
                     await asyncio.sleep(delay)
                     continue
-                response.raise_for_status()
+                if 300 <= status <= 399:
+                    raise SourceConnectorError("API redirects are not allowed.")
+                if status >= 400:
+                    raise SourceConnectorError(
+                        "API request failed with a non-retryable HTTP status."
+                    )
                 raw_length = response.headers.get("content-length")
                 if raw_length:
                     try:
-                        if int(raw_length) > max_bytes:
+                        declared_length = int(raw_length)
+                        if declared_length < 0 or declared_length > max_bytes:
                             raise SourceConnectorError(
                                 "API response exceeds the configured size limit."
                             )
@@ -142,7 +237,7 @@ async def _fetch_api_page(
                         ) from None
                 chunks: list[bytes] = []
                 total = 0
-                async for chunk in response.aiter_bytes():
+                async for chunk in response.content.iter_chunked(64 * 1024):
                     total += len(chunk)
                     if total > max_bytes:
                         raise SourceConnectorError(
@@ -152,14 +247,12 @@ async def _fetch_api_page(
             try:
                 return json.loads(b"".join(chunks)), total
             except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
-                raise SourceConnectorError("API response is not valid or exceeds the supported JSON nesting depth.") from None
+                raise SourceConnectorError(
+                    "API response is not valid or exceeds the supported JSON nesting depth."
+                ) from None
         except SourceConnectorError:
             raise
-        except httpx.HTTPStatusError:
-            raise SourceConnectorError(
-                "API request failed with a non-retryable HTTP status."
-            ) from None
-        except httpx.TransportError:
+        except (aiohttp.ClientError, asyncio.TimeoutError):
             if attempt >= retry_attempts:
                 raise SourceConnectorError(
                     "API request failed after the configured retry attempts."
@@ -184,13 +277,14 @@ async def fetch_api_records(
     retry_attempts: int = 2,
     max_records: int = 10_000,
 ) -> list[dict[str, Any]]:
-    """Fetch bounded JSON pages with explicit page-number pagination and retries.
+    """Fetch bounded JSON pages with pinned DNS, explicit pagination, and retries.
 
-    Pagination is disabled by default. When enabled, both query parameter names
-    must be configured. A full final page at max_pages is treated as potentially
-    truncated and fails instead of silently importing an incomplete feed.
+    The validated DNS answers are pinned into the HTTP resolver for this run.
+    TLS verification and the HTTP Host header still use the original URL hostname.
+    Pagination is disabled by default. A full final page at max_pages fails rather
+    than silently importing an incomplete feed.
     """
-    _validate_https_url(url, allowed_hosts)
+    host, port, addresses = _resolve_https_target(url, allowed_hosts)
     if not 0 < timeout_seconds <= 60 or not 1 <= max_bytes <= 50 * 1024 * 1024:
         raise SourceConnectorError("API timeout or response-size limit is invalid.")
     if not 1 <= max_pages <= 20 or not 1 <= page_size <= 1000:
@@ -216,8 +310,20 @@ async def fetch_api_records(
 
     all_records: list[dict[str, Any]] = []
     total_bytes = 0
-    async with httpx.AsyncClient(
-        timeout=timeout_seconds, follow_redirects=False, trust_env=False
+    resolver = _PinnedResolver(host, port, addresses)
+    connector = aiohttp.TCPConnector(
+        resolver=resolver,
+        use_dns_cache=True,
+        ttl_dns_cache=300,
+        family=socket.AF_UNSPEC,
+        ssl=ssl.create_default_context(),
+        limit=10,
+    )
+    timeout = aiohttp.ClientTimeout(
+        total=timeout_seconds, connect=min(timeout_seconds, 10)
+    )
+    async with aiohttp.ClientSession(
+        connector=connector, timeout=timeout, trust_env=False
     ) as client:
         for page_index in range(max_pages):
             page_number = start_page + page_index
@@ -232,12 +338,16 @@ async def fetch_api_records(
                 if page_param and page_size_param
                 else url
             )
-            _validate_https_url(page_url, allowed_hosts)
+            remaining_bytes = max_bytes - total_bytes
+            if remaining_bytes <= 0:
+                raise SourceConnectorError(
+                    "API source reached the configured total response-size limit."
+                )
             payload, page_bytes = await _fetch_api_page(
                 client,
                 page_url,
                 headers=headers,
-                max_bytes=max_bytes - total_bytes,
+                max_bytes=remaining_bytes,
                 retry_attempts=retry_attempts,
             )
             total_bytes += page_bytes
@@ -260,6 +370,37 @@ async def fetch_api_records(
     return all_records
 
 
+def _load_sftp_private_key(private_key: str, paramiko: Any) -> Any:
+    """Parse pasted, unencrypted PEM/OpenSSH key material without using a file path."""
+    value = private_key.strip()
+    if len(value) > 64 * 1024:
+        raise SourceConnectorError("SFTP private key exceeds the supported size limit.")
+    first_line = value.splitlines()[0] if value else ""
+    if not first_line.startswith("-----BEGIN ") or "PRIVATE KEY-----" not in first_line:
+        raise SourceConnectorError(
+            "SFTP private-key authentication requires pasted PEM/OpenSSH private-key content."
+        )
+
+    key_types = (
+        getattr(paramiko, "Ed25519Key", None),
+        getattr(paramiko, "ECDSAKey", None),
+        getattr(paramiko, "RSAKey", None),
+    )
+    parse_failures = 0
+    for key_type in key_types:
+        if key_type is None:
+            continue
+        try:
+            return key_type.from_private_key(io.StringIO(value))
+        except (paramiko.SSHException, ValueError, TypeError):
+            parse_failures += 1
+    if parse_failures == 0:
+        raise SourceConnectorError("SFTP private-key parsing is unavailable.")
+    raise SourceConnectorError(
+        "SFTP private key is invalid, encrypted, or uses an unsupported key type."
+    ) from None
+
+
 def fetch_sftp_file(
     *,
     host: str,
@@ -271,20 +412,41 @@ def fetch_sftp_file(
     known_hosts_path: str,
     max_bytes: int = 10 * 1024 * 1024,
 ) -> bytes:
-    """Download one file using verified SSH host keys; unknown hosts are rejected."""
-    if not known_hosts_path or not remote_path.startswith("/") or "\x00" in remote_path:
+    """Download one file over SSH using pinned public DNS and strict host keys."""
+    path_parts = remote_path.split("/")
+    if (
+        not known_hosts_path
+        or not remote_path.startswith("/")
+        or "\x00" in remote_path
+        or any(part in {".", ".."} for part in path_parts)
+    ):
         raise SourceConnectorError(
-            "An absolute remote path and known-hosts file are required."
+            "An absolute remote path without dot segments and a known-hosts file are required."
         )
     if not username or bool(password) == bool(private_key):
         raise SourceConnectorError(
             "Provide a username and exactly one SFTP authentication method."
         )
-    if not 1 <= max_bytes <= 50 * 1024 * 1024:
-        raise SourceConnectorError("SFTP file-size limit is invalid.")
+    if not 1 <= port <= 65535 or not 1 <= max_bytes <= 50 * 1024 * 1024:
+        raise SourceConnectorError("SFTP port or file-size limit is invalid.")
     client = None
+    connection = None
     try:
         import paramiko
+
+        parsed_key = _load_sftp_private_key(private_key, paramiko) if private_key else None
+        addresses = _resolve_public_addresses(host, port)
+        last_connect_error: OSError | None = None
+        for address in addresses:
+            try:
+                connection = socket.create_connection((address, port), timeout=15)
+                break
+            except OSError as exc:
+                last_connect_error = exc
+        if connection is None:
+            raise SourceConnectorError(
+                "SFTP host could not be reached at its validated public addresses."
+            ) from last_connect_error
 
         client = paramiko.SSHClient()
         client.load_host_keys(known_hosts_path)
@@ -292,9 +454,11 @@ def fetch_sftp_file(
         client.connect(
             hostname=host,
             port=port,
+            sock=connection,
             username=username,
             password=password,
-            key_filename=private_key,
+            pkey=parsed_key,
+            key_filename=None,
             look_for_keys=False,
             allow_agent=False,
             timeout=15,
@@ -317,10 +481,11 @@ def fetch_sftp_file(
         ) from None
     finally:
         if client is not None:
-            try:
+            with contextlib.suppress(Exception):
                 client.close()
-            except Exception:
-                raise SourceConnectorError("SFTP session cleanup failed.") from None
+        if connection is not None:
+            with contextlib.suppress(OSError):
+                connection.close()
 
 
 def _coerce_watermark(value: str, column: Any) -> Any:
