@@ -206,21 +206,34 @@ def test_connector_source_metadata_records_pagination_and_watermark_without_secr
 
 @pytest.mark.anyio
 async def test_connector_rate_limit_is_enforced_per_organization(monkeypatch):
-    calls = {"count": 0, "closed": False}
+    calls = {"count": 0, "closed": 0, "committed": 0, "deleted_old_buckets": 0}
 
-    class FakeRedis:
-        @classmethod
-        def from_url(cls, *args, **kwargs):
-            return cls()
+    class FakeResult:
+        def __init__(self, value):
+            self.value = value
 
-        async def eval(self, script, key_count, key, expiry):
-            calls["count"] += 1
-            return calls["count"]
+        def scalar_one(self):
+            return self.value
 
-        async def aclose(self):
-            calls["closed"] = True
+    class FakeSession:
+        def execute(self, statement, params):
+            if "INSERT INTO connector_rate_limits" in str(statement):
+                calls["count"] += 1
+                calls["window_start"] = params["window_start"]
+                return FakeResult(calls["count"])
+            calls["deleted_old_buckets"] += 1
+            return FakeResult(None)
 
-    monkeypatch.setattr(routes, "Redis", FakeRedis)
+        def commit(self):
+            calls["committed"] += 1
+
+        def rollback(self):
+            raise AssertionError("Unexpected rollback")
+
+        def close(self):
+            calls["closed"] += 1
+
+    monkeypatch.setattr(routes, "SessionLocal", FakeSession)
     monkeypatch.setattr(settings, "connector_rate_limit_per_minute", 1)
     organization_id = uuid4()
     await routes._enforce_connector_rate_limit(organization_id)
@@ -228,28 +241,35 @@ async def test_connector_rate_limit_is_enforced_per_organization(monkeypatch):
         await routes._enforce_connector_rate_limit(organization_id)
     assert getattr(exc.value, "status_code", None) == 429
     assert calls["count"] == 2
-    assert calls["closed"] is True
+    assert calls["closed"] == 2
+    assert calls["committed"] == 2
+    assert calls["deleted_old_buckets"] == 2
+    assert calls["window_start"].second == 0
+    assert calls["window_start"].microsecond == 0
 
 
 @pytest.mark.anyio
-async def test_connector_rate_limit_fails_closed_when_redis_is_unavailable(monkeypatch):
-    class FakeRedis:
-        @classmethod
-        def from_url(cls, *args, **kwargs):
-            return cls()
+async def test_connector_rate_limit_fails_closed_when_postgres_is_unavailable(monkeypatch):
+    from sqlalchemy.exc import SQLAlchemyError
 
-        async def eval(self, *args):
-            from redis.exceptions import RedisError
-            raise RedisError("connection failed")
+    calls = {"rolled_back": False, "closed": False}
 
-        async def aclose(self):
-            pass
+    class FakeSession:
+        def execute(self, *args, **kwargs):
+            raise SQLAlchemyError("database unavailable")
 
-    monkeypatch.setattr(routes, "Redis", FakeRedis)
+        def rollback(self):
+            calls["rolled_back"] = True
+
+        def close(self):
+            calls["closed"] = True
+
+    monkeypatch.setattr(routes, "SessionLocal", FakeSession)
     with pytest.raises(Exception) as exc:
         await routes._enforce_connector_rate_limit(uuid4())
     assert getattr(exc.value, "status_code", None) == 503
-
+    assert calls["rolled_back"] is True
+    assert calls["closed"] is True
 
 
 def test_sql_watermark_checkpoint_is_recorded_without_connection_secrets():
