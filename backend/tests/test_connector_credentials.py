@@ -2,7 +2,15 @@ import base64
 from uuid import UUID, uuid4
 
 import pytest
+from types import SimpleNamespace
+from fastapi import HTTPException
 
+from app.api.connector_import_routes import (
+    ConnectorImportRequest,
+    _configuration_public,
+    _resolve_connector_request,
+)
+from app.core.config import settings
 from app.services.connector_credentials import (
     CredentialVaultError,
     decrypt_credentials,
@@ -219,3 +227,112 @@ def test_sql_server_configuration_requires_driver_18_tls_and_read_only_intent():
             allowed_hosts={"sql.example.com"},
             sftp_known_hosts_configured=False,
         )
+
+
+def test_configuration_public_view_never_exposes_ciphertext():
+    item = SimpleNamespace(
+        id=CONFIG,
+        name="Supplier feed",
+        source_type="rest_api",
+        source_descriptor="https://supplier.example.com",
+        source_settings={"api_url": "https://supplier.example.com/v1"},
+        encrypted_credentials="ciphertext-must-not-leak",
+        created_at=None,
+    )
+    public = _configuration_public(item)
+    assert "encrypted_credentials" not in public
+    assert "ciphertext-must-not-leak" not in str(public)
+
+
+def test_saved_configuration_is_resolved_only_for_its_tenant(monkeypatch):
+    encrypted = encrypt_credentials(
+        {"api_headers": {"Authorization": "Bearer saved-secret"}},
+        encryption_key=KEY,
+        organization_id=ORG,
+        configuration_id=CONFIG,
+        source_type="rest_api",
+    )
+    item = SimpleNamespace(
+        id=CONFIG,
+        organization_id=ORG,
+        source_type="rest_api",
+        source_settings={"api_url": "https://supplier.example.com/v1"},
+        encrypted_credentials=encrypted,
+        encryption_key_version="v1",
+        deleted_at=None,
+    )
+    monkeypatch.setattr(settings, "connector_credential_encryption_key", KEY)
+
+    class FakeDB:
+        def __init__(self, selected):
+            self.selected = selected
+            self.statement = ""
+
+        def scalar(self, statement):
+            self.statement = str(statement)
+            return self.selected
+
+    payload = ConnectorImportRequest(
+        source_type="rest_api",
+        record_type="products",
+        configuration_id=CONFIG,
+    )
+    db = FakeDB(item)
+    resolved = _resolve_connector_request(payload, db, ORG)
+    assert resolved.api_url == "https://supplier.example.com/v1"
+    assert resolved.api_headers == {"Authorization": "Bearer saved-secret"}
+    assert "connector_configurations.organization_id" in db.statement
+
+    other_tenant_db = FakeDB(None)
+    with pytest.raises(HTTPException) as exc:
+        _resolve_connector_request(payload, other_tenant_db, uuid4())
+    assert exc.value.status_code == 404
+    assert "connector_configurations.organization_id" in other_tenant_db.statement
+
+
+def test_saved_configuration_cannot_be_mixed_with_inline_credentials():
+    payload = ConnectorImportRequest(
+        source_type="rest_api",
+        record_type="products",
+        configuration_id=CONFIG,
+        api_url="https://attacker.example/override",
+    )
+    with pytest.raises(HTTPException) as exc:
+        _resolve_connector_request(payload, SimpleNamespace(), ORG)
+    assert exc.value.status_code == 422
+
+
+def test_saved_configuration_decryption_fails_closed_for_wrong_key(monkeypatch):
+    encrypted = encrypt_credentials(
+        {"api_headers": {"X-API-Key": "saved-secret"}},
+        encryption_key=KEY,
+        organization_id=ORG,
+        configuration_id=CONFIG,
+        source_type="rest_api",
+    )
+    item = SimpleNamespace(
+        id=CONFIG,
+        organization_id=ORG,
+        source_type="rest_api",
+        source_settings={"api_url": "https://supplier.example.com/v1"},
+        encrypted_credentials=encrypted,
+        encryption_key_version="v1",
+        deleted_at=None,
+    )
+    monkeypatch.setattr(
+        settings,
+        "connector_credential_encryption_key",
+        base64.urlsafe_b64encode(b"z" * 32).decode("ascii"),
+    )
+
+    class FakeDB:
+        def scalar(self, statement):
+            return item
+
+    payload = ConnectorImportRequest(
+        source_type="rest_api", record_type="products", configuration_id=CONFIG
+    )
+    with pytest.raises(HTTPException) as exc:
+        _resolve_connector_request(payload, FakeDB(), ORG)
+    assert exc.value.status_code == 503
+    assert "saved-secret" not in str(exc.value.detail)

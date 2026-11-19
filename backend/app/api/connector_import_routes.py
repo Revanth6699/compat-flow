@@ -326,6 +326,8 @@ def _source_descriptor(payload: ConnectorImportRequest) -> str:
 
 def _source_metadata(payload: ConnectorImportRequest, parsed) -> dict:
     metadata = dict(parsed.metadata)
+    if payload.configuration_id is not None:
+        metadata["connector_configuration_id"] = str(payload.configuration_id)
     if payload.source_type == "rest_api":
         metadata["pagination"] = {
             "mode": "page_number" if payload.api_page_param else "single_page",
