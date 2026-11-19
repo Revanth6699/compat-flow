@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/components/auth-provider";
 export function SiteFooter() {
  const { user } = useAuth();
  return <footer className="site-footer"><div className="container footer">
   <div className="footer-brand">
-   <Link className="footer-brand-name" href="/">compatflow</Link>
+   <Link className="footer-logo-link" href="/" aria-label="CompatFlow home"><Image src="/compatflow-logo.svg" alt="CompatFlow" width={130} height={90} /></Link>
    <span>Supplier catalog operations</span>
    <p className="footer-summary">A product in development focused on helping commerce teams work with more consistent supplier catalog data.</p>
   </div>
