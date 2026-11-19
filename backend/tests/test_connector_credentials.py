@@ -9,6 +9,7 @@ from app.api.connector_import_routes import (
     ConnectorImportRequest,
     _configuration_public,
     _resolve_connector_request,
+    _source_metadata,
 )
 from app.core.config import settings
 from app.services.connector_credentials import (
@@ -363,3 +364,16 @@ def test_signed_url_query_credentials_are_rejected():
             allowed_hosts={"supplier.example.com"},
             sftp_known_hosts_configured=False,
         )
+
+
+def test_import_history_metadata_records_saved_configuration_id_not_credentials():
+    payload = ConnectorImportRequest(
+        source_type="rest_api",
+        record_type="products",
+        configuration_id=CONFIG,
+        api_headers={"Authorization": "Bearer never-store-this"},
+    )
+    parsed = SimpleNamespace(metadata={"format": "json", "records": 1})
+    metadata = _source_metadata(payload, parsed)
+    assert metadata["connector_configuration_id"] == str(CONFIG)
+    assert "never-store-this" not in str(metadata)

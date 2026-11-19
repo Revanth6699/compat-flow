@@ -77,6 +77,21 @@ def test_connector_routes_require_authentication():
     assert client.post("/api/v1/catalog/import/connectors/preview", json=payload).status_code == 401
     assert client.post("/api/v1/catalog/import/connectors/commit", json=payload).status_code == 401
     assert client.get("/api/v1/catalog/import/history").status_code == 401
+    config_payload = {
+        "name": "Supplier API",
+        "source_type": "rest_api",
+        "source_settings": {"api_url": "https://supplier.example/catalog"},
+        "credentials": {"api_headers": {"X-API-Key": "must-not-be-returned"}},
+    }
+    assert client.post(
+        "/api/v1/catalog/import/connectors/configurations", json=config_payload
+    ).status_code == 401
+    assert client.get(
+        "/api/v1/catalog/import/connectors/configurations"
+    ).status_code == 401
+    assert client.delete(
+        "/api/v1/catalog/import/connectors/configurations/00000000-0000-0000-0000-000000000001"
+    ).status_code == 401
 
 
 def test_import_history_detail_does_not_expose_other_tenants_without_auth():
