@@ -1553,3 +1553,201 @@ h1, h2, h3, h4, .editorial-heading {
   .home-section { padding-block: 46px; }
   .home-final-cta { padding-block: 44px; }
 }
+
+
+/* Team access page — focused layout and responsive table refinement */
+.team-page {
+  min-height: 70vh;
+  padding: 48px 0 76px;
+  background: #f7f9fc;
+}
+.team-page .account-settings {
+  width: min(100% - 40px, 1120px);
+  max-width: 1120px;
+  padding: 0;
+}
+.team-page .workspace-heading {
+  align-items: flex-end;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+.team-page .workspace-heading > div { min-width: 0; }
+.team-page .workspace-heading h1 {
+  margin: 8px 0 7px;
+  color: #1e466d;
+  font-size: clamp(2rem, 3.4vw, 2.65rem);
+  line-height: 1.12;
+  letter-spacing: -.04em;
+}
+.team-page .workspace-heading p {
+  max-width: 620px;
+  margin: 0;
+  color: #5b6f84;
+  line-height: 1.65;
+}
+.team-page .settings-panel {
+  width: 100%;
+  max-width: none;
+  margin: 0 0 20px;
+  padding: clamp(20px, 2.6vw, 30px);
+  border: 1px solid #e0e7ef;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 5px 20px rgba(25, 53, 82, .045);
+}
+.team-page .settings-panel > h2 {
+  margin: 0 0 16px;
+  color: #234d73;
+  font-size: 1.18rem;
+  line-height: 1.35;
+  letter-spacing: -.02em;
+}
+.team-page .workspace-profile {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.team-page .workspace-profile > div {
+  display: block;
+  min-width: 0;
+  padding: 14px 15px;
+  border: 1px solid #e6ebf1;
+  border-radius: 9px;
+  background: #fbfcfe;
+}
+.team-page .workspace-profile dt {
+  margin: 0 0 6px;
+  color: #68798c;
+  font-size: .75rem;
+  font-weight: 650;
+}
+.team-page .workspace-profile dd {
+  margin: 0;
+  color: #243b53;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+.team-page .table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #e5ebf2;
+  border-radius: 9px;
+}
+.team-page table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  text-align: left;
+}
+.team-page th {
+  padding: 12px 15px;
+  background: #f3f6fa;
+  color: #53677d;
+  font-size: .7rem;
+  font-weight: 750;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.team-page td {
+  padding: 13px 15px;
+  border-top: 1px solid #edf1f5;
+  color: #34465a;
+  font-size: .84rem;
+  vertical-align: middle;
+}
+.team-page tbody tr:hover { background: #fafcff; }
+.team-page td:first-child { overflow-wrap: anywhere; }
+.team-page td select,
+.team-page .auth-form input,
+.team-page .auth-form select,
+.team-page textarea {
+  width: 100%;
+  min-height: 43px;
+  padding: 9px 11px;
+  border: 1px solid #d5dee8;
+  border-radius: 7px;
+  background: #fff;
+  color: #263b50;
+  font-size: .86rem;
+}
+.team-page td select { min-width: 125px; }
+.team-page select:disabled { opacity: .8; color: #52677f; background: #f6f8fa; }
+.team-page .settings-description {
+  max-width: 850px;
+  margin: 15px 0 0;
+  color: #65768a;
+  font-size: .82rem;
+  line-height: 1.65;
+}
+.team-page .auth-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(220px, .9fr) auto;
+  align-items: end;
+  gap: 10px 14px;
+  max-width: none;
+  margin-top: 20px;
+}
+.team-page .auth-form label {
+  margin: 0 0 -5px;
+  color: #53677d;
+  font-size: .75rem;
+  font-weight: 700;
+}
+.team-page .auth-form input { grid-column: 1; }
+.team-page .auth-form label[for="team-role"] { grid-column: 2; grid-row: 1; }
+.team-page .auth-form select { grid-column: 2; }
+.team-page .auth-form .auth-submit {
+  grid-column: 3;
+  grid-row: 2;
+  width: auto;
+  min-width: 190px;
+  margin: 0;
+  white-space: nowrap;
+}
+.team-page .notice {
+  margin: 14px 0;
+  border-radius: 9px;
+  line-height: 1.6;
+}
+.team-page .notice textarea {
+  display: block;
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.team-page .notice .button { margin-top: 4px; }
+.team-page .auth-error,
+.team-page .auth-success {
+  margin: 0 0 16px;
+  padding: 13px 16px;
+  border-radius: 9px;
+  font-size: .85rem;
+}
+.team-page .button { min-height: 42px; border-radius: 7px; }
+@media (max-width: 900px) {
+  .team-page .workspace-profile { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .team-page .auth-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .team-page .auth-form .auth-submit { grid-column: 1 / -1; grid-row: auto; width: 100%; }
+}
+@media (max-width: 640px) {
+  .team-page { padding: 30px 0 54px; }
+  .team-page .account-settings { width: min(100% - 28px, 1120px); }
+  .team-page .workspace-heading { align-items: flex-start; flex-direction: column; gap: 15px; }
+  .team-page .workspace-heading .button { width: 100%; }
+  .team-page .workspace-profile { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
+  .team-page .workspace-profile > div { padding: 12px; }
+  .team-page .workspace-profile dd { font-size: 1.1rem; }
+  .team-page .settings-panel { padding: 19px 16px; margin-bottom: 14px; }
+  .team-page .auth-form { grid-template-columns: 1fr; gap: 9px; }
+  .team-page .auth-form label,
+  .team-page .auth-form label[for="team-role"] { grid-column: 1; grid-row: auto; margin: 6px 0 -3px; }
+  .team-page .auth-form input,
+  .team-page .auth-form select,
+  .team-page .auth-form .auth-submit { grid-column: 1; grid-row: auto; width: 100%; min-width: 0; }
+}
