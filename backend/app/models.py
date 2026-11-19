@@ -561,3 +561,26 @@ class DemoAccessRequest(Base):
     reviewed_by: Mapped[str | None] = mapped_column(String(320))
     reviewed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class ConnectorRateLimit(Base):
+    """Atomic per-organization connector request counters for fixed UTC minute windows."""
+
+    __tablename__ = "connector_rate_limits"
+    __table_args__ = (
+        UniqueConstraint(
+            "organization_id", "window_start", name="uq_connector_rate_limits_org_window"
+        ),
+        Index("ix_connector_rate_limits_window_start", "window_start"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    window_start: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
+    request_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
