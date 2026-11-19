@@ -161,4 +161,4 @@ The production entrypoint intentionally does not auto-run Alembic migrations. Pr
 
 ## Go-live rule
 
-**Do not add `DATABASE_URL` to the Render production service until every blocking gate is closed and the operator receives an explicit instruction to add it.** Adding the variable is not the migration step by itself; it is the final connection cutover after schema deployment and verification.
+**The production Render service already has its database connection configured. Do not unset, replace, or repoint it. Do not run production migrations or deploy the staging feature branch until every blocking gate is closed, the backup restore is verified, and the migration has passed rehearsal.** The configured connection alone is not evidence that the live application schema is ready.
