@@ -200,7 +200,7 @@ function BillingContent() {
   if (!loading && isPlatformAdmin) {
     return (
       <main id="main" className="page">
-        <div className="container account-settings">
+        <div className="container account-settings billing-page">
           <header className="workspace-heading">
             <div><span className="eyebrow">PLATFORM ADMINISTRATOR</span><h1>Subscription exemption</h1><p>Your owner account does not require a customer subscription.</p></div>
             <Link className="button button-secondary" href="/workspace">Back to workspace</Link>
@@ -233,8 +233,8 @@ function BillingContent() {
           {error && <p className="auth-error" role="alert">{error}</p>}
           {message && <p className="auth-success" role="status">{message}</p>}
 
-          <section className="panel settings-panel">
-            <h2>Current subscription</h2>
+          <section className="panel settings-panel billing-section billing-current-section">
+            <div className="billing-section-heading"><div><span className="eyebrow">ACCOUNT STATUS</span><h2>Current subscription</h2></div></div>
             {loading ? <p>Loading subscription details…</p> : subscription ? (
               <>
                 <dl className="workspace-profile">
@@ -254,8 +254,8 @@ function BillingContent() {
             ) : <p>No subscription record is currently associated with this organization.</p>}
           </section>
 
-          <section className="panel settings-panel">
-            <h2>Choose a monthly plan</h2>
+          <section className="panel settings-panel billing-section billing-plans-section">
+            <div className="billing-section-heading"><div><span className="eyebrow">PLANS</span><h2>Choose a monthly plan</h2></div></div>
             <p className="settings-description">Checkout is available to the organization owner only. Prices below are the current reference prices in USD; payment availability and final currency depend on your Razorpay merchant account and configured plan IDs.</p>
             {!isOwner && <p className="notice">Only the organization owner can create or cancel a subscription. Contact your owner to manage billing.</p>}
             {subscriptionLocked && <p className="notice">Your organization already has a subscription in progress. Self-service upgrades and downgrades are not enabled yet; plan selection is locked until the current subscription is resolved.</p>}
