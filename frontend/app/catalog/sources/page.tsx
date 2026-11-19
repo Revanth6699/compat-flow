@@ -1,10 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthRequired } from "@/components/auth-required";
 import { apiRequest } from "@/lib/auth-client";
 
 type SourceType = "rest_api" | "sftp" | "sql_server";
+type SavedConfiguration = {
+  id: string;
+  name: string;
+  source_type: SourceType;
+  source_descriptor: string;
+  source_settings: Record<string, unknown>;
+  created_at: string;
+};
 const RECORD_FIELDS = {
   products: ["sku", "name", "manufacturer", "part_number", "category", "replacement_sku"],
   product_variants: ["product_id", "variant_sku", "attributes", "is_active"],
@@ -75,6 +83,21 @@ function SourcesContent() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [committed, setCommitted] = useState(false);
+  const [savedConnections, setSavedConnections] = useState<SavedConfiguration[]>([]);
+  const [selectedConfigurationId, setSelectedConfigurationId] = useState("");
+  const [configurationName, setConfigurationName] = useState("");
+  const [configurationBusy, setConfigurationBusy] = useState(false);
+  const [configurationMessage, setConfigurationMessage] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    apiRequest<{ items: SavedConfiguration[] }>("/api/v1/catalog/import/connectors/configurations")
+      .then(result => { if (active) setSavedConnections(result.items ?? []); })
+      .catch(err => {
+        if (active) setConfigurationMessage(err instanceof Error ? err.message : "Saved connections could not be loaded.");
+      });
+    return () => { active = false; };
+  }, []);
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm(current => ({ ...current, [key]: value }));
@@ -88,6 +111,7 @@ function SourcesContent() {
       column_mapping: Object.keys(columnMapping).length ? columnMapping : null,
       ai_opt_in: aiOptIn,
     };
+    if (selectedConfigurationId) return { ...common, configuration_id: selectedConfigurationId };
     if (sourceType === "rest_api") {
       return { ...common, api_url: form.api_url.trim(), api_records_path: form.api_records_path.trim() || null,
         api_headers: form.api_token.trim() ? { Authorization: form.api_token.trim().startsWith("Bearer ") ? form.api_token.trim() : `Bearer ${form.api_token.trim()}` } : {} };
@@ -98,6 +122,67 @@ function SourcesContent() {
     }
     return { ...common, sql_server_url: form.sql_server_url.trim(), sql_schema: form.sql_schema.trim(), sql_table: form.sql_table.trim(),
       sql_columns: form.sql_columns.split(",").map(value => value.trim()).filter(Boolean), sql_row_limit: Number(form.sql_row_limit) };
+  }
+
+  async function saveConnection() {
+    if (configurationBusy || busy || !configurationName.trim() || selectedConfigurationId) return;
+    setConfigurationBusy(true); setConfigurationMessage(""); setError("");
+    try {
+      let source_settings: Record<string, unknown>;
+      let credentials: Record<string, unknown>;
+      if (sourceType === "rest_api") {
+        const token = form.api_token.trim();
+        source_settings = { api_url: form.api_url.trim(), api_records_path: form.api_records_path.trim() || null };
+        credentials = { api_headers: token ? { Authorization: token.startsWith("Bearer ") ? token : `Bearer ${token}` } : {} };
+      } else if (sourceType === "sftp") {
+        source_settings = { sftp_host: form.sftp_host.trim(), sftp_port: Number(form.sftp_port), sftp_username: form.sftp_username.trim(), sftp_remote_path: form.sftp_remote_path.trim() };
+        credentials = form.sftp_password ? { password: form.sftp_password } : { private_key: form.sftp_private_key };
+      } else {
+        source_settings = { sql_schema: form.sql_schema.trim(), sql_table: form.sql_table.trim(), sql_columns: form.sql_columns.split(",").map(value => value.trim()).filter(Boolean), sql_row_limit: Number(form.sql_row_limit) };
+        credentials = { connection_url: form.sql_server_url.trim() };
+      }
+      const created = await apiRequest<SavedConfiguration>("/api/v1/catalog/import/connectors/configurations", {
+        method: "POST",
+        body: JSON.stringify({ name: configurationName.trim(), source_type: sourceType, source_settings, credentials }),
+      });
+      setSavedConnections(current => [created, ...current.filter(item => item.id !== created.id)]);
+      setSelectedConfigurationId(created.id);
+      setConfigurationName("");
+      setForm(current => ({ ...current, api_token: "", sftp_password: "", sftp_private_key: "", sql_server_url: "" }));
+      setPreview(null); setColumnMapping({}); setMappingDirty(false); setCommitted(false);
+      setNotice("Connection saved. Its credentials are encrypted by the backend and are never returned to this page.");
+    } catch (err) {
+      setConfigurationMessage(err instanceof Error ? err.message : "The connection could not be saved.");
+    } finally {
+      setConfigurationBusy(false);
+    }
+  }
+
+  function selectSavedConnection(id: string) {
+    setSelectedConfigurationId(id);
+    setPreview(null); setColumnMapping({}); setMappingDirty(false); setCommitted(false); setError(""); setNotice("");
+    if (id) {
+      const selected = savedConnections.find(item => item.id === id);
+      if (selected) setSourceType(selected.source_type);
+      setForm(current => ({ ...current, api_token: "", sftp_password: "", sftp_private_key: "", sql_server_url: "" }));
+    }
+  }
+
+  async function deleteSavedConnection(id: string) {
+    if (configurationBusy || !window.confirm("Delete this saved connector configuration? Its encrypted credential will be cleared.")) return;
+    setConfigurationBusy(true); setConfigurationMessage("");
+    try {
+      await apiRequest<{ deleted: boolean }>(`/api/v1/catalog/import/connectors/configurations/${id}`, { method: "DELETE" });
+      setSavedConnections(current => current.filter(item => item.id !== id));
+      if (selectedConfigurationId === id) {
+        setSelectedConfigurationId(""); setForm(initialForm); setPreview(null); setColumnMapping({}); setMappingDirty(false); setCommitted(false);
+      }
+      setNotice("Saved connection deleted.");
+    } catch (err) {
+      setConfigurationMessage(err instanceof Error ? err.message : "The saved connection could not be deleted.");
+    } finally {
+      setConfigurationBusy(false);
+    }
   }
 
   async function runPreview(requestAi = aiConsent) {
@@ -170,6 +255,7 @@ function SourcesContent() {
 
   function clearCredentials() {
     setForm(initialForm);
+    setSelectedConfigurationId("");
     setPreview(null);
     setColumnMapping({});
     setMappingDirty(false);
@@ -186,10 +272,25 @@ function SourcesContent() {
   return <main id="main" className="page"><div className="container">
     <header className="workspace-heading"><div><span className="eyebrow">INPUT SOURCES</span><h1>Connect a supplier source</h1><p>Preview data from an approved API, SFTP server or SQL Server before importing it into your organization workspace.</p></div><a className="button button-secondary" href="/catalog/import">Back to file upload</a></header>
     <section className="panel import-panel">
-      <p className="import-description">Connector ingestion requires a Growth, Business or Enterprise subscription and an operator-allowlisted source host. Credentials are sent for this request only and are not saved as reusable connection settings.</p>
+      <p className="import-description">Connector ingestion requires the existing supplier-catalog entitlement and an operator-allowlisted source host. Use one-time credentials or save a named connection. Saved credentials are encrypted by the backend and never returned to the browser; saving is unavailable until the backend encryption key is configured.</p>
+      <div className="auth-form">
+        <label htmlFor="saved-connection">Saved connection</label>
+        <select id="saved-connection" value={selectedConfigurationId} onChange={event => selectSavedConnection(event.target.value)} disabled={configurationBusy}>
+          <option value="">Use one-time credentials</option>
+          {savedConnections.map(item => <option key={item.id} value={item.id}>{item.name} · {item.source_type.replaceAll("_", " ")}</option>)}
+        </select>
+        {selectedConfigurationId && <p className="import-description">Using {savedConnections.find(item => item.id === selectedConfigurationId)?.source_descriptor}. Secret values are not available for viewing or editing.</p>}
+        {!selectedConfigurationId && <>
+          <label htmlFor="configuration-name">Save this connection securely (optional)</label>
+          <input id="configuration-name" value={configurationName} onChange={event => setConfigurationName(event.target.value)} maxLength={120} placeholder="e.g. Primary supplier API" />
+          <button className="button button-secondary" type="button" onClick={() => void saveConnection()} disabled={configurationBusy || busy || !configurationName.trim()}>{configurationBusy ? "Saving…" : "Save encrypted connection"}</button>
+        </>}
+        {configurationMessage && <p className="auth-error" role="alert">{configurationMessage}</p>}
+        {savedConnections.length > 0 && <div><p className="import-description">Saved connections are organization-scoped. Deleting one clears its encrypted credential.</p><ul className="error-list">{savedConnections.map(item => <li key={item.id}>{item.name} ({item.source_type.replaceAll("_", " ")}) <button className="button button-secondary" type="button" onClick={() => void deleteSavedConnection(item.id)} disabled={configurationBusy}>Delete</button></li>)}</ul></div>}
+      </div>
       <label className="column-hint" htmlFor="source-type">Source type</label>
-      <select id="source-type" value={sourceType} onChange={event => {
-        setSourceType(event.target.value as SourceType); setPreview(null); setColumnMapping({});
+      <select id="source-type" value={sourceType} disabled={Boolean(selectedConfigurationId)} onChange={event => {
+        setSelectedConfigurationId(""); setSourceType(event.target.value as SourceType); setPreview(null); setColumnMapping({});
         setMappingDirty(false); setCommitted(false); setError(""); setNotice("");
       }}>
         <option value="rest_api">REST API</option><option value="sftp">SFTP server</option><option value="sql_server">Microsoft SQL Server</option>
@@ -198,13 +299,13 @@ function SourcesContent() {
       <select id="record-type" value={recordType} onChange={event => changeRecordType(event.target.value as RecordType)}>
         {Object.keys(RECORD_FIELDS).map(value => <option key={value} value={value}>{value.replaceAll("_", " ")}</option>)}
       </select>
-      {sourceType === "rest_api" && <div className="auth-form">
+      {!selectedConfigurationId && sourceType === "rest_api" && <div className="auth-form">
         <label htmlFor="api-url">API endpoint URL</label><input id="api-url" type="url" required value={form.api_url} onChange={e => update("api_url", e.target.value)} placeholder="https://supplier.example.com/products" />
         <label htmlFor="api-token">API bearer token or API key</label><input id="api-token" type="password" autoComplete="off" value={form.api_token} onChange={e => update("api_token", e.target.value)} placeholder="Credential for this request" />
         <label htmlFor="api-record-path">Records path (optional)</label><input id="api-record-path" value={form.api_records_path} onChange={e => update("api_records_path", e.target.value)} placeholder="e.g. data.items" />
         <p className="import-description">The current connector supports one response or explicitly configured page-number pagination. Cursor and next-link pagination are not supported.</p>
       </div>}
-      {sourceType === "sftp" && <div className="auth-form">
+      {!selectedConfigurationId && sourceType === "sftp" && <div className="auth-form">
         <label htmlFor="sftp-host">SFTP host</label><input id="sftp-host" required value={form.sftp_host} onChange={e => update("sftp_host", e.target.value)} placeholder="sftp.supplier.example.com" />
         <label htmlFor="sftp-port">Port</label><input id="sftp-port" type="number" min="1" max="65535" required value={form.sftp_port} onChange={e => update("sftp_port", e.target.value)} />
         <label htmlFor="sftp-user">Username</label><input id="sftp-user" required value={form.sftp_username} onChange={e => update("sftp_username", e.target.value)} />
@@ -213,7 +314,7 @@ function SourcesContent() {
         <label htmlFor="sftp-key">Private key (unencrypted PEM/OpenSSH; alternative to password)</label><textarea id="sftp-key" rows={4} value={form.sftp_private_key} onChange={e => update("sftp_private_key", e.target.value)} placeholder="Paste an unencrypted PEM/OpenSSH private key" />
         <p className="import-description">SFTP uses strict known-host verification. A read-only supplier account and operator-managed known-host entry are required. Paste private-key content, not a server file path; encrypted private keys are not supported yet. This is a one-file operation; polling and file deduplication are not available.</p>
       </div>}
-      {sourceType === "sql_server" && <div className="auth-form">
+      {!selectedConfigurationId && sourceType === "sql_server" && <div className="auth-form">
         <label htmlFor="sql-url">SQL Server connection URL</label><input id="sql-url" type="password" autoComplete="off" required value={form.sql_server_url} onChange={e => update("sql_server_url", e.target.value)} placeholder="mssql+pyodbc://..." />
         <p className="import-description">Use a dedicated SQL-authenticated login with SELECT-only grants on the approved table/view. TLS encryption and certificate verification are required; Microsoft ODBC Driver 18 must be installed. Live source connectivity is not yet verified by CompatFlow.</p>
         <label htmlFor="sql-schema">Schema</label><input id="sql-schema" required value={form.sql_schema} onChange={e => update("sql_schema", e.target.value)} />
