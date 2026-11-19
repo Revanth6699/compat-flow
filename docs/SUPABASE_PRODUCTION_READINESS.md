@@ -2,11 +2,11 @@
 
 **Branch:** `infra/supabase-production-readiness`  
 **Audit source:** GitHub `feature/organization-first-onboarding`  
-**Status:** Preparation only. PostgreSQL 17 CI and Alembic model-drift checks pass on the latest audit commit. No Supabase schema, data, or Render environment has been changed.
+**Status:** Preparation only. PostgreSQL 17 CI and Alembic model-drift checks pass on the latest audit commit. Production Supabase schema/data have not been changed and no production migrations have been run. The production Render service environment was updated on 2026-11-19 and the resulting deploy succeeded; this audit does not alter or expose its secret values.
 
 ## Decision
 
-Supabase PostgreSQL is a viable candidate for the CompatFlow application database, but production must not be pointed at it until every release gate below is satisfied. The current Render production backend has no `DATABASE_URL`; leave it unset until the explicit go-ahead is given.
+Supabase PostgreSQL is the configured database target for the Render production backend, but the production application schema is not yet ready for the current application release. Do not unset, replace, or repoint the existing production `DATABASE_URL`. Do not run migrations or deploy the feature branch until every release gate below is satisfied and a restorable backup is verified. The Render service API confirms a successful environment-triggered deploy, but does not reveal secret values or prove application-level database queries.
 
 ## Verified environment facts
 
@@ -18,6 +18,18 @@ Supabase PostgreSQL is a viable candidate for the CompatFlow application databas
 - The backend migration chain on the staging branch currently ends at `20261116_0011_upload_limits`.
 - GitHub Actions passed the full backend industry-ingestion regression workflow and full CI (frontend + backend) against PostgreSQL 17 on the corrected audit commit `5b7d874347436780a183dc422283cf74cdf3b273`.
 - `alembic check` now passes in both workflows. It previously detected a mismatch between the model's implicit unique constraint and the migration's named unique index on `users.auth_user_id`; the model was corrected to represent the same named unique index. This verifies metadata parity for the current clean CI database, not the live Supabase schema.
+
+## Production snapshot verified on 2026-11-19
+
+- Render production web service `compat-flow` is on the Free plan, deploys from `main`, and its latest environment-triggered deploy completed successfully. This is not evidence that database-backed routes work.
+- The production health route is implemented as a static `status=ok` response and does not execute a database query. It is a liveness check only, not a readiness or database-connectivity check.
+- Production Supabase currently has exactly two public application tables:
+  - `contact_requests`: 6 rows.
+  - `demo_access`: 2 rows.
+- Production `public.alembic_version` does not exist; the live Supabase migration history is empty.
+- Staging PostgreSQL has 21 public tables including `alembic_version`, and is at migration head `20261116_0011`. The selected staging data counts are: 2 organizations, 2 users, 7 `demo_access_requests`, and 0 subscriptions, payments, products, suppliers, import jobs, or reviews.
+- The production and staging databases are not interchangeable. Do not copy staging data into production. Build and rehearse a migration against a separate empty PostgreSQL 17 database, then prepare a preservation-aware migration for the two existing production tables.
+- The production Render service has no persistent disk configured in its service definition. Any workflow that depends on local import-file persistence must be redesigned or backed by private shared object storage before production use.
 
 ## Confirmed product authority and access model
 
