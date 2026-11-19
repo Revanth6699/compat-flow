@@ -270,6 +270,8 @@ def test_saved_configuration_is_resolved_only_for_its_tenant(monkeypatch):
 
         def scalar(self, statement):
             self.statement = str(statement)
+            if "role_permissions" in self.statement:
+                return object()
             return self.selected
 
     payload = ConnectorImportRequest(
@@ -288,6 +290,20 @@ def test_saved_configuration_is_resolved_only_for_its_tenant(monkeypatch):
         _resolve_connector_request(payload, other_tenant_db, uuid4())
     assert exc.value.status_code == 404
     assert "connector_configurations.organization_id" in other_tenant_db.statement
+
+
+def test_saved_configuration_requires_catalog_write_permission():
+    payload = ConnectorImportRequest(
+        source_type="rest_api", record_type="products", configuration_id=CONFIG
+    )
+
+    class ReadOnlyDB:
+        def scalar(self, statement):
+            return None
+
+    with pytest.raises(HTTPException) as exc:
+        _resolve_connector_request(payload, ReadOnlyDB(), ORG, "viewer")
+    assert exc.value.status_code == 403
 
 
 def test_saved_configuration_cannot_be_mixed_with_inline_credentials():

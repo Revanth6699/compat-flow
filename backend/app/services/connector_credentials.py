@@ -26,7 +26,10 @@ _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 _QUERY_SECRET_NAMES = {
     "api_key", "apikey", "access_token", "token", "password",
     "client_secret", "secret", "authorization", "signature", "auth",
-    "credential", "x_api_key",
+    "credential", "x_api_key", "key", "accesskey", "secretkey", "auth_token",
+    "refresh_token", "client_assertion", "awsaccesskeyid", "x_amz_credential",
+    "x_amz_signature", "x_goog_signature", "sig", "se", "sp", "sv", "sr", "st",
+    "code", "jwt", "subscription_key", "ocp_apim_subscription_key",
 }
 
 

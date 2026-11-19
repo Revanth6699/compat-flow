@@ -90,7 +90,10 @@ def _resolve_https_target(url: str, allowed_hosts: set[str]) -> tuple[str, int, 
     sensitive_query_names = {
         "api_key", "apikey", "access_token", "token", "password",
         "client_secret", "secret", "authorization", "signature", "auth",
-        "credential", "x_api_key",
+        "credential", "x_api_key", "key", "accesskey", "secretkey", "auth_token",
+        "refresh_token", "client_assertion", "awsaccesskeyid", "x_amz_credential",
+        "x_amz_signature", "x_goog_signature", "sig", "se", "sp", "sv", "sr", "st",
+        "code", "jwt", "subscription_key", "ocp_apim_subscription_key",
     }
     if any(
         name.casefold().replace("-", "_") in sensitive_query_names

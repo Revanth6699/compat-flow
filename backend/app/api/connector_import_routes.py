@@ -19,7 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import ConnectorConfiguration, ImportJob, ImportRowError, ImportRecordLineage
+from app.models import ConnectorConfiguration, ImportJob, ImportRowError, ImportRecordLineage, RolePermission
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
@@ -101,7 +101,7 @@ def _configuration_public(item: ConnectorConfiguration) -> dict:
 
 
 def _resolve_connector_request(
-    payload: ConnectorImportRequest, db: Session, organization_id: UUID
+    payload: ConnectorImportRequest, db: Session, organization_id: UUID, role: str
 ) -> ConnectorImportRequest:
     if payload.configuration_id is None:
         return payload
@@ -118,6 +118,18 @@ def _resolve_connector_request(
         raise HTTPException(
             status_code=422,
             detail="Use either a saved connector configuration or inline source settings, not both.",
+        )
+
+    granted = db.scalar(
+        select(RolePermission.id).where(
+            RolePermission.role == role,
+            RolePermission.permission == "catalog:write",
+        )
+    )
+    if granted is None:
+        raise HTTPException(
+            status_code=403,
+            detail="Write permission is required to use a saved connector credential.",
         )
 
     item = db.scalar(
@@ -463,7 +475,7 @@ async def preview_connector_import(
 ):
     await _enforce_connector_rate_limit(_current.profile.organization_id)
     try:
-        resolved_payload = _resolve_connector_request(payload, db, _current.profile.organization_id)
+        resolved_payload = _resolve_connector_request(payload, db, _current.profile.organization_id, _current.profile.role)
         raw, filename = await _load_source(resolved_payload)
         parsed, result = await run_in_threadpool(_prepare, resolved_payload, raw, filename)
         ai_result = await suggest_field_mappings(
@@ -525,7 +537,7 @@ async def commit_connector_import(
 ):
     await _enforce_connector_rate_limit(current.profile.organization_id)
     try:
-        resolved_payload = _resolve_connector_request(payload, db, current.profile.organization_id)
+        resolved_payload = _resolve_connector_request(payload, db, current.profile.organization_id, current.profile.role)
         raw, filename = await _load_source(resolved_payload)
         parsed, result = await run_in_threadpool(_prepare, resolved_payload, raw, filename)
     except (SourceConnectorError, IngestionParseError, RecordMappingError) as exc:
