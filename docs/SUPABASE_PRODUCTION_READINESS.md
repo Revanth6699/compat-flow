@@ -16,7 +16,8 @@ Supabase PostgreSQL is the configured database target for the Render production 
 - The current public application schema contains `contact_requests` and `demo_access`; both contain existing data and must be preserved.
 - The Supabase migration history query returned no recorded migrations. The repository contains a SQL migration for those two tables, so the live schema and migration history need reconciliation rather than blindly reapplying it.
 - The backend migration chain on the staging branch currently ends at `20261116_0011_upload_limits`.
-- GitHub Actions passed the full backend industry-ingestion regression workflow and full CI (frontend + backend) against PostgreSQL 17 on the corrected audit commit `5b7d874347436780a183dc422283cf74cdf3b273`.
+- The staging rows (2 organizations, 2 users, 7 demo requests) are test records, not original customer/business records. They are not production seed data and must not be copied into production. They should still not be deleted without explicit approval.
+- GitHub Actions full CI passed (backend + frontend) against PostgreSQL 17 on audit commit `94b897133ef68e6af07177eeef67f41c1f6b6575`.
 - `alembic check` now passes in both workflows. It previously detected a mismatch between the model's implicit unique constraint and the migration's named unique index on `users.auth_user_id`; the model was corrected to represent the same named unique index. This verifies metadata parity for the current clean CI database, not the live Supabase schema.
 
 ## Production snapshot verified on 2026-11-19
@@ -30,6 +31,25 @@ Supabase PostgreSQL is the configured database target for the Render production 
 - Staging PostgreSQL has 21 public tables including `alembic_version`, and is at migration head `20261116_0011`. The selected staging data counts are: 2 organizations, 2 users, 7 `demo_access_requests`, and 0 subscriptions, payments, products, suppliers, import jobs, or reviews.
 - The production and staging databases are not interchangeable. Do not copy staging data into production. Build and rehearse a migration against a separate empty PostgreSQL 17 database, then prepare a preservation-aware migration for the two existing production tables.
 - The production Render service has no persistent disk configured in its service definition. Any workflow that depends on local import-file persistence must be redesigned or backed by private shared object storage before production use.
+
+## Verified free-tier runtime topology (2026-11-19)
+
+The Render account's current CompatFlow resources contain two web services only:
+
+- Production API: `compat-flow`, Free plan, branch `main`, health check `/api/v1/health`.
+- Staging API: `compat-flow-staging`, Free plan, branch `feature/organization-first-onboarding`.
+- No dedicated CompatFlow Celery worker or Redis/Key Value resource appears in the current Render service inventory. This is a verified account inventory snapshot, not proof that no external Redis service exists elsewhere.
+- The current application configuration defaults Redis, Celery broker, and Celery result backend to localhost. No production Redis endpoint has been verified.
+- The backend defines a Celery worker task for catalog import processing. A worker process must be deployed and connected to the same broker before those asynchronous tasks can execute.
+- Connector preview/commit rate limiting calls Redis and deliberately returns HTTP 503 when Redis is unavailable; it does not fail open.
+- Import files are written under `IMPORT_STORAGE_DIR` (default `/data/imports`) on the API filesystem. The worker reads that same path. The production Render service has no persistent disk, and separate services do not share local filesystems.
+
+**Immediate impact:** database-backed API routes may work with the configured Supabase URL, but connector workflows that require Redis currently have no verified production Redis dependency, and asynchronous file-import processing has no verified worker/shared-file setup. Do not advertise those workflows as operational until the full path is tested.
+
+Free-tier implementation decision must be explicit:
+- Prefer a PostgreSQL-backed durable job queue and rate limiter if the goal is strictly $0 and operational simplicity; implement row locking/leases, bounded retries, idempotency, stale-job recovery, and rate-limit atomicity.
+- If retaining Celery, use a compatible Redis service and a separate worker only after confirming a sustainable free tier and accepting its availability/quota limits.
+- Move import files to private shared object storage or redesign processing so files are streamed/processed within one request with safe limits; never rely on Render ephemeral disk for jobs that outlive the request.
 
 ## Confirmed product authority and access model
 
