@@ -99,6 +99,19 @@ allowed_origins = [
     if origin.strip()
 ]
 
+# The production Vercel project serves the same app from both its canonical
+# domain and its explicitly assigned project alias. Browsers send the page
+# origin on credentialed API preflights, so allow both exact production origins.
+if settings.app_env.lower() == "production":
+    allowed_origins.extend(
+        origin
+        for origin in (
+            "https://compat-flow-web.vercel.app",
+            "https://compat-flow-web-revanth-fbe6.vercel.app",
+        )
+        if origin not in allowed_origins
+    )
+
 app.add_middleware(
     UploadBodyLimitMiddleware,
     max_bytes=settings.import_max_upload_bytes + 64 * 1024,
