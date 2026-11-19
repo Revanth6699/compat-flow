@@ -14,6 +14,15 @@ class Settings(BaseSettings):
     allowed_hosts: str = "*"
     supabase_url: str = ""
     supabase_anon_key: str = ""
+    supabase_service_role_key: str = ""
+    platform_admin_email: str = "sarvasettyrevanth.66@gmail.com"
+    gmail_client_id: str = ""
+    gmail_client_secret: str = ""
+    gmail_refresh_token: str = ""
+    gmail_sender_email: str = "sarvasettyrevanth.66@gmail.com"
+    gmail_notification_to_email: str = "sarvasettyrevanth.66@gmail.com"
+    gmail_oauth_redirect_uri: str = ""
+    contact_notification_secret: str = ""
 
     database_url: str = (
         "postgresql+psycopg://compatflow_local:"
@@ -44,8 +53,8 @@ class Settings(BaseSettings):
         if self.import_max_upload_bytes <= 0:
             raise ValueError("IMPORT_MAX_UPLOAD_BYTES must be positive.")
 
-        if self.import_max_upload_bytes > 50 * 1024 * 1024:
-            raise ValueError("IMPORT_MAX_UPLOAD_BYTES cannot exceed 50 MB.")
+        if self.import_max_upload_bytes > 100 * 1024 * 1024:
+            raise ValueError("IMPORT_MAX_UPLOAD_BYTES cannot exceed 100 MB.")
         if self.connector_rate_limit_per_minute < 1 or self.connector_rate_limit_per_minute > 1000:
             raise ValueError("CONNECTOR_RATE_LIMIT_PER_MINUTE must be between 1 and 1000.")
 

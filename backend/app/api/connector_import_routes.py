@@ -1,22 +1,21 @@
 """Authenticated one-shot connector ingestion and tenant-scoped import history."""
 from __future__ import annotations
 
+import datetime
 import json
-import time
 from typing import Literal
 from urllib.parse import urlsplit
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from redis.asyncio import Redis
-from redis.exceptions import RedisError
 
 from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
 from app.models import ImportJob, ImportRowError, ImportRecordLineage
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.ingestion_adapters import IngestionParseError, parse_source
@@ -71,30 +70,52 @@ class ConnectorImportRequest(BaseModel):
 
 
 async def _enforce_connector_rate_limit(organization_id: UUID) -> None:
-    """Distributed fixed-window limit; fail closed if Redis cannot enforce it."""
-    redis = None
-    bucket = int(time.time() // 60)
-    key = f"compatflow:connector-rate:{organization_id}:{bucket}"
-    script = (
-        "local count = redis.call('INCR', KEYS[1]); "
-        "if count == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]); end; "
-        "return count"
+    """Enforce an atomic per-organization fixed-window limit using PostgreSQL."""
+    window_start = datetime.datetime.now(datetime.timezone.utc).replace(
+        second=0, microsecond=0
     )
+    db = SessionLocal()
     try:
-        redis = Redis.from_url(settings.redis_url, decode_responses=True)
-        count = await redis.eval(script, 1, key, 60)
-    except (RedisError, ValueError):
+        # The unique organization/window pair serializes concurrent requests.
+        # No Redis service or process-local counter is required.
+        result = db.execute(
+            text(
+                """
+                INSERT INTO connector_rate_limits
+                    (id, organization_id, window_start, request_count)
+                VALUES
+                    (gen_random_uuid(), :organization_id, :window_start, 1)
+                ON CONFLICT (organization_id, window_start)
+                DO UPDATE SET
+                    request_count = connector_rate_limits.request_count + 1
+                RETURNING request_count
+                """
+            ),
+            {
+                "organization_id": organization_id,
+                "window_start": window_start,
+            },
+        )
+        count = int(result.scalar_one())
+        # Opportunistically remove expired buckets without requiring a scheduler.
+        db.execute(
+            text(
+                "DELETE FROM connector_rate_limits "
+                "WHERE window_start < :expiry"
+            ),
+            {"expiry": window_start - datetime.timedelta(minutes=2)},
+        )
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
         raise HTTPException(
             status_code=503,
             detail="Connector rate limiting is unavailable; the source was not contacted.",
         ) from None
     finally:
-        if redis is not None:
-            try:
-                await redis.aclose()
-            except RedisError:
-                pass
-    if int(count) > settings.connector_rate_limit_per_minute:
+        db.close()
+
+    if count > settings.connector_rate_limit_per_minute:
         raise HTTPException(
             status_code=429,
             detail="Connector request limit reached for this organization. Retry after the current minute.",

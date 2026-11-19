@@ -38,7 +38,7 @@ HEADER_ALIASES = {
         "product_mpn": 0.98, "google_shopping_manufacturer_part_number_mpn": 0.96, "manufacturer_part": 0.97, "mpn": 0.98,
     },
     "category": {
-        "category": 1.0, "product_category": 0.99, "category_name": 0.98, "top_category": 0.97,
+        "category": 1.0, "product_category": 0.99, "product_category_name": 0.99, "category_name": 0.98, "top_category": 0.97,
     },
     "compatibility": {
         "compatibility": 1.0, "compatible_with": 0.98,
@@ -226,7 +226,7 @@ def _detect_columns(headers: list[str], required_fields=REQUIRED_FIELDS, column_
     return normalized, detected, mappings, unmapped
 
 
-def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS, profile_id: str = "general", column_mapping: dict[str, str] | None = None, allow_incomplete_mapping: bool = False) -> CatalogCSVResult:
+def parse_catalog_csv(content: str, max_rows: int | None = MAX_ROWS, profile_id: str = "general", column_mapping: dict[str, str] | None = None, allow_incomplete_mapping: bool = False) -> CatalogCSVResult:
     if profile_id not in CATALOG_PROFILES:
         raise CatalogCSVValidationError(f"Unknown catalog profile '{profile_id}'.")
     required_fields = CATALOG_PROFILES[profile_id]
@@ -259,7 +259,7 @@ def parse_catalog_csv(content: str, max_rows: int = MAX_ROWS, profile_id: str = 
         if not values or all(not value.strip() for value in values):
             continue
         total_rows += 1
-        if total_rows > max_rows:
+        if max_rows is not None and total_rows > max_rows:
             raise CatalogCSVValidationError(f"CSV exceeds the {max_rows:,}-row limit.")
 
         if len(values) != len(normalized_headers):

@@ -39,7 +39,7 @@ Invitation roles are limited to admin, member, and viewer. Only an owner can inv
 
 See the multi-source ingestion guide for the format matrix, API pagination and retry limits, SQL Server watermark requirements, security boundaries, and incomplete capabilities.
 
-Connector preview and commit routes require the existing supplier_catalogs plan entitlement and a database-backed catalog:read or catalog:write permission. Redis enforces a fixed-window per-organization request limit; if Redis is unavailable, connector execution fails closed. Import history stores source type, a sanitized source descriptor, non-secret source metadata, row errors, and record lineage. API tokens, SFTP passwords/private keys, and SQL Server connection URLs are request-scoped and must not be written to logs or persisted.
+Connector preview and commit routes require the existing supplier_catalogs plan entitlement and a database-backed catalog:read or catalog:write permission. PostgreSQL enforces an atomic fixed-window per-organization request limit through `connector_rate_limits`; if the database is unavailable, connector execution fails closed. Import history stores source type, a sanitized source descriptor, non-secret source metadata, row errors, and record lineage. API tokens, SFTP passwords/private keys, and SQL Server connection URLs are request-scoped and must not be written to logs or persisted.
 
 ### SQL Server runtime requirement
 
@@ -68,3 +68,14 @@ The workflow does not create a database backup. The operator must create and ver
 The public demo offers stateless CSV product-quality validation and XLS/XLSX product-record preview within the smaller public demo limit. It does not persist files or catalog records. Authenticated multi-format file validation/preview covers CSV, XLSX, XLS, JSON, and XML, but the current file UI does not expose the backend commit endpoint. Protected connector commit endpoints persist reviewed rows under the authenticated organization. Keep these capabilities clearly separated in UI copy.
 
 Persistent imports and connector runs remain subscription-gated. Do not change pricing or plan entitlements as part of ingestion work.
+
+
+## Account and organization deletion
+
+The backend account deletion endpoint requires a server-only `SUPABASE_SERVICE_ROLE_KEY`. Configure it in the backend secret manager; never expose it as a `NEXT_PUBLIC_*` variable or commit its value.
+
+- A member/admin confirms `DELETE MY ACCOUNT`: their Supabase identity, CompatFlow membership and personal review are removed. Shared organization records and the organization subscription remain.
+- An owner confirms `DELETE ORGANIZATION`: CompatFlow first requests immediate cancellation of provider subscriptions, then removes every linked Supabase identity and cascades the organization, members, catalog records, import history, review records, local subscription/payment rows and related webhook history.
+- If the payment provider cannot confirm cancellation, deletion is stopped before local organization data is removed.
+- Supabase Auth and PostgreSQL cannot participate in one distributed transaction. If Supabase deletes some linked identities and then returns an error, retry deletion; already-absent identities are treated as deleted.
+- Verify a recoverable backup and understand that this operation is irreversible before enabling the feature in a production environment.

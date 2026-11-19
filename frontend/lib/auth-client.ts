@@ -153,6 +153,7 @@ export async function signOut() {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     localStorage.removeItem(EXPIRY_KEY);
+    localStorage.removeItem(PKCE_VERIFIER_KEY);
     window.dispatchEvent(new Event("compatflow-auth-change"));
   }
   notify();

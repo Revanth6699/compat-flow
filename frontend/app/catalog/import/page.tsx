@@ -1,11 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/auth-client";
+import DatasetCharts from "@/components/dataset-charts";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
+type DatasetProfile = {
+  filename: string; format: string; dataset_type: string; total_records: number; total_columns: number;
+  total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number;
+  complete_records: number | null; incomplete_records: number | null; complete_records_pct: number | null;
+  duplicate_rows: number; duplicate_rate_pct: number; is_product_catalog: boolean; persisted: false;
+  columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string; minimum: number | string | null; maximum: number | string | null; average: number | null; top_values: { value: string; count: number; pct: number }[] }[];
+  categorical_distributions: { name: string; values: { value: string; count: number; pct: number }[] }[];
+  date_columns: string[]; numeric_columns: string[];
+  relationship_checks: { name: string; from_column: string; to_column: string; matched_records: number; average_days: number | null; minimum_days: number | null; maximum_days: number | null; negative_duration_records: number }[];
+  findings: { severity: string; title: string; detail: string }[];
+  preview: Record<string, unknown>[];
+};
+type IndustryResult = {
+  filename: string; profile_id: string | null; profile_detection: { profile_id: string | null; confidence: number; scores: Record<string, number>; needs_confirmation: boolean };
+  requires_profile_confirmation: boolean; total_rows: number; valid_rows: number; invalid_rows: number;
+  validation_pass_rate: number; column_mappings: { field: string; source_header: string; confidence: number }[];
+  unmapped_headers: string[]; field_metrics: { field: string; applicable: boolean; populated: number; missing: number; completeness_pct: number }[];
+  issues: { row_number: number; field: string | null; error_code: string; message: string; severity: string }[];
+  preview: Record<string, unknown>[]; metrics: { mapping_coverage_pct: number; validation_pass_rate_pct: number; issue_count: number; critical_issue_count: number; warning_issue_count: number };
+  persisted: false; validation_scope: string;
+};
 type PreviewRow = {
   sku: string; name: string; manufacturer: string; part_number: string;
   category: string; compatibility?: string | null; replacement_sku?: string | null;
@@ -48,67 +69,115 @@ type PreviewResponse = {
 };
 
 export default function CatalogImportPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const [accessResult, setAccessResult] = useState<{ email: string; type: "demo" | "subscription" | "none"; maxRecords: number | null; maxUploadBytes: number | null } | null>(null);
+  const email = user?.email?.toLowerCase() || "";
+  const accessType = !email ? "none" : accessResult?.email === email ? accessResult.type : "checking";
+  const demoApproved = accessType === "demo";
+  useEffect(() => {
+    if (!email) return;
+    let active = true;
+    apiRequest<{ allowed: boolean; access_type: "demo" | "subscription" | "none"; max_records?: number | null; max_upload_bytes?: number | null }>("/api/v1/demo-access")
+      .then((data) => { if (active) setAccessResult({ email, type: data.allowed ? data.access_type : "none", maxRecords: data.max_records ?? null, maxUploadBytes: data.max_upload_bytes ?? null }); })
+      .catch(() => { if (active) setAccessResult({ email, type: "none", maxRecords: null, maxUploadBytes: null }); });
+    return () => { active = false; };
+  }, [email]);
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<PreviewResponse | null>(null);
+  const [datasetResult, setDatasetResult] = useState<DatasetProfile | null>(null);
   const [multiResult, setMultiResult] = useState<MultiResult | null>(null);
+  const [industryResult, setIndustryResult] = useState<IndustryResult | null>(null);
   const [recordType, setRecordType] = useState("products");
   const [aiConsent, setAiConsent] = useState(false);
   const [aiResult, setAiResult] = useState<AiMappingResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [profileId, setProfileId] = useState("general");
   const [manualMapping, setManualMapping] = useState<Record<string, string>>({});
   const canonicalFields = ["sku", "name", "manufacturer", "part_number", "category", "compatibility", "replacement_sku"];
 
   function handleFileChange(selectedFile: File | null) {
-    setFile(selectedFile); setResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setError("");
+    setFile(selectedFile); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setAiResult(null); setAiConsent(false); setManualMapping({}); setError("");
     if (!selectedFile) return;
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
-    if (!(user ? ["csv", "xlsx", "xls", "json", "xml"] : ["csv", "xlsx", "xls"]).includes(extension ?? "")) {
-      setFile(null); setError(user ? "Supported formats: CSV, XLSX, XLS, JSON and XML. Your plan determines which formats you can process." : "The public demo accepts CSV, XLSX and XLS files only."); return;
+    const allowed = demoApproved ? ["csv", "xlsx", "xls"] : ["csv", "xlsx", "xls", "json", "xml"];
+    if (!allowed.includes(extension ?? "")) {
+      setFile(null);
+      setError(demoApproved ? "Approved demo supports CSV, XLSX and XLS only." : "Supported formats: CSV, XLSX, XLS, JSON and XML. Your plan determines which formats you can process.");
+      return;
     }
-    if (selectedFile.size > (user ? 25 : 5) * 1024 * 1024) {
-      setFile(null); setError(`The file exceeds the ${user ? "25 MB" : "5 MB"} limit for this access level.`);
+    const maxUploadBytes = accessResult?.email === email ? accessResult.maxUploadBytes : null;
+    if (maxUploadBytes !== null && selectedFile.size > maxUploadBytes) {
+      const limitMb = maxUploadBytes / (1024 * 1024);
+      setFile(null); setError(`The file exceeds the ${limitMb.toLocaleString()} MB limit for this access level.`);
     }
   }
 
   async function handleValidate() {
-    if (!file || loading) return;
-    setLoading(true); setError(""); setResult(null); setMultiResult(null);
+    if (!file || loading || !user) return;
+    setLoading(true); setError(""); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null);
     try {
-      const formData = new FormData(); formData.append("file", file);
+      const formData = new FormData();
+      formData.append("file", file);
       const extension = file.name.split(".").pop()?.toLowerCase();
-      if (extension !== "csv" || recordType !== "products" || Object.keys(manualMapping).some((field) => !canonicalFields.includes(field))) {
-        if (!user && ["xlsx", "xls"].includes(extension ?? "") && recordType === "products") {
-          const response = await fetch(`${API_BASE.replace(/\/$/, "")}/api/v1/catalog/import/preview-records`, { method: "POST", body: formData });
-          const data = await response.json();
-          if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The backend could not validate this spreadsheet.");
-          setMultiResult(data as MultiResult);
+
+      if (demoApproved) {
+        const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/preview-industry", { method: "POST", body: formData });
+        if (!data.profile_id) {
+          const profileForm = new FormData();
+          profileForm.append("file", file);
+          const profile = await apiRequest<Partial<DatasetProfile>>("/api/v1/catalog/import/profile", { method: "POST", body: profileForm });
+          const columns = profile.columns ?? [];
+          const totalRecords = profile.total_records ?? 0;
+          const duplicateRows = profile.duplicate_rows ?? 0;
+          const missingCells = profile.missing_cells ?? 0;
+          const normalizedHeaders = columns.map((column) => column.name.toLowerCase().replace(/[^a-z0-9]+/g, "_"));
+          const datasetType = profile.dataset_type ?? (normalizedHeaders.some((header) => ["order_id", "order_status", "order_purchase_timestamp", "order_item_id"].includes(header)) ? "orders / transactions" : profile.is_product_catalog ? "product catalog" : "general dataset");
+          const findings = profile.findings ?? [
+            ...(missingCells > 0 ? [{ severity: "warning", title: "Missing values detected", detail: missingCells.toLocaleString() + " cells are empty." }] : []),
+            ...(duplicateRows > 0 ? [{ severity: "warning", title: "Duplicate records detected", detail: duplicateRows.toLocaleString() + " exact duplicate rows were found." }] : []),
+          ];
+          setDatasetResult({
+            ...profile, filename: profile.filename ?? file.name, format: profile.format ?? extension ?? "unknown", dataset_type: datasetType,
+            total_records: totalRecords, total_columns: profile.total_columns ?? columns.length, total_cells: profile.total_cells ?? totalRecords * columns.length,
+            populated_cells: profile.populated_cells ?? Math.max(0, totalRecords * columns.length - missingCells), missing_cells: missingCells, completeness_pct: profile.completeness_pct ?? 0,
+            complete_records: profile.complete_records ?? null, incomplete_records: profile.incomplete_records ?? null, complete_records_pct: profile.complete_records_pct ?? null,
+            duplicate_rows: duplicateRows, duplicate_rate_pct: profile.duplicate_rate_pct ?? (totalRecords ? duplicateRows / totalRecords * 100 : 0),
+            columns, categorical_distributions: profile.categorical_distributions ?? [], date_columns: profile.date_columns ?? [], numeric_columns: profile.numeric_columns ?? [],
+            relationship_checks: profile.relationship_checks ?? [], findings, preview: profile.preview ?? [], is_product_catalog: profile.is_product_catalog ?? false, persisted: false, quality_score: null,
+          } as DatasetProfile);
           return;
         }
-        if (!user) throw new Error("Sign in and choose a plan to validate JSON, XML or other catalog inputs.");
-        formData.append("record_type", recordType);
-        if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
-        const data = await apiRequest<MultiResult>("/api/v1/catalog/import/validate-records", { method: "POST", body: formData });
-        setMultiResult(data);
-        setManualMapping(Object.fromEntries(data.mappings.map((item) => [item.field, item.source_header])));
+        setIndustryResult(data);
         return;
       }
-      formData.append("profile_id", profileId);
-      if (Object.keys(manualMapping).length) formData.append("column_mapping_json", JSON.stringify(Object.fromEntries(Object.entries(manualMapping).filter(([, value]) => value))));
-      if (user) {
-        const data = await apiRequest<PreviewResponse>("/api/v1/catalog/import/validate", { method: "POST", body: formData });
-        setResult(data);
-        setManualMapping(Object.fromEntries(data.column_mappings.map((item) => [item.field, item.source_header])));
-      } else {
-        const response = await fetch(`${API_BASE.replace(/\/$/, "")}/api/v1/catalog/import/preview`, { method: "POST", body: formData });
-        const data = await response.json();
-        if (!response.ok) throw new Error(typeof data.detail === "string" ? data.detail : "The backend could not validate this CSV.");
-        const parsed = data as PreviewResponse;
-        setResult(parsed);
-        setManualMapping(Object.fromEntries(parsed.column_mappings.map((item) => [item.field, item.source_header])));
+
+      const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/validate-industry", { method: "POST", body: formData });
+      if (!data.profile_id) {
+        const profileForm = new FormData();
+        profileForm.append("file", file);
+        const profile = await apiRequest<Partial<DatasetProfile>>("/api/v1/catalog/import/profile", { method: "POST", body: profileForm });
+        const columns = profile.columns ?? [];
+        const totalRecords = profile.total_records ?? 0;
+        const duplicateRows = profile.duplicate_rows ?? 0;
+        const missingCells = profile.missing_cells ?? 0;
+        const normalizedHeaders = columns.map((column) => column.name.toLowerCase().replace(/[^a-z0-9]+/g, "_"));
+        const datasetType = profile.dataset_type ?? (normalizedHeaders.some((header) => ["order_id", "order_status", "order_purchase_timestamp", "order_item_id"].includes(header)) ? "orders / transactions" : profile.is_product_catalog ? "product catalog" : "general dataset");
+        const findings = profile.findings ?? [
+          ...(missingCells > 0 ? [{ severity: "warning", title: "Missing values detected", detail: missingCells.toLocaleString() + " cells are empty." }] : []),
+          ...(duplicateRows > 0 ? [{ severity: "warning", title: "Duplicate records detected", detail: duplicateRows.toLocaleString() + " exact duplicate rows were found." }] : []),
+        ];
+        setDatasetResult({
+          ...profile, filename: profile.filename ?? file.name, format: profile.format ?? extension ?? "unknown", dataset_type: datasetType,
+          total_records: totalRecords, total_columns: profile.total_columns ?? columns.length, total_cells: profile.total_cells ?? totalRecords * columns.length,
+          populated_cells: profile.populated_cells ?? Math.max(0, totalRecords * columns.length - missingCells), missing_cells: missingCells, completeness_pct: profile.completeness_pct ?? 0,
+          complete_records: profile.complete_records ?? null, incomplete_records: profile.incomplete_records ?? null, complete_records_pct: profile.complete_records_pct ?? null,
+          duplicate_rows: duplicateRows, duplicate_rate_pct: profile.duplicate_rate_pct ?? (totalRecords ? duplicateRows / totalRecords * 100 : 0),
+          columns, categorical_distributions: profile.categorical_distributions ?? [], date_columns: profile.date_columns ?? [], numeric_columns: profile.numeric_columns ?? [],
+          relationship_checks: profile.relationship_checks ?? [], findings, preview: profile.preview ?? [], is_product_catalog: profile.is_product_catalog ?? false, persisted: false, quality_score: null,
+        } as DatasetProfile);
+        return;
       }
+      setIndustryResult(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong while validating the file.");
     } finally { setLoading(false); }
@@ -137,75 +206,129 @@ export default function CatalogImportPage() {
     }));
   }
 
-  function downloadReport() {
-    if (!result) return;
-    const report = [
-      ["CompatFlow CSV Validation Report", result.filename],
-      ["Total records", result.total_rows],
-      ["Valid records", result.valid_rows],
-      ["Invalid records", result.invalid_rows],
-      ["Validation pass rate (%)", result.validation_pass_rate],
-      ["Data quality score (%)", result.data_quality_score],
-      ["Total issues", result.total_issues],
-      ["Critical issues", result.critical_issues],
-      ["Warnings", result.warning_issues],
-      ["Records with issues", result.records_with_issues],
-      ["Duplicate SKU count", result.duplicate_sku_count],
-      ["Duplicate SKU rate (%)", result.duplicate_rate],
-      ["Issue density (issues per record)", result.issue_density],
-      ["Critical record rate (%)", result.critical_record_rate],
-            ["Canonical field", "Detected source header", "Mapping confidence"],
-      ...result.column_mappings.map((m) => [m.field, m.source_header, m.confidence]),
-      [],
-      ["Field", "Populated", "Missing", "Completeness (%)"],
-      ...result.field_metrics.map((m) => [m.field, m.populated, m.missing, m.completeness_pct]),
-      [],
-      ["Row", "Field", "Severity", "Category", "Issue", "Recommended action"],
-      ...result.row_errors.map((i) => [i.row_number, i.field ?? "General", i.severity, i.category, i.message, i.recommendation]),
-    ];
-    const csv = report.map((row) => row.map((v) => {
-      const value = String(v ?? "");
-      return `"${value.replace(/"/g, '""')}"`;
-    }).join(",")).join("\n");
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  function saveBlob(filename: string, content: string, mimeType: string) {
+    const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
     const anchor = document.createElement("a");
-    anchor.href = url; anchor.download = "compatflow-validation-report.csv"; anchor.click();
-    URL.revokeObjectURL(url);
+    anchor.href = url; anchor.download = filename; anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  function downloadReport() {
+    if (datasetResult) {
+      const rows: unknown[][] = [
+        ["CompatFlow Dataset Profile", datasetResult.filename],
+        ["Dataset type", datasetResult.dataset_type],
+        ["Records", datasetResult.total_records],
+        ["Columns", datasetResult.total_columns],
+        ["Completeness (%)", datasetResult.completeness_pct],
+        ["Complete records", datasetResult.complete_records],
+        ["Incomplete records", datasetResult.incomplete_records],
+        ["Duplicate rows", datasetResult.duplicate_rows],
+        ["Duplicate rate (%)", datasetResult.duplicate_rate_pct],
+        [],
+        ["Column", "Inferred type", "Populated", "Missing", "Completeness (%)", "Distinct values", "Minimum", "Maximum", "Average"],
+        ...datasetResult.columns.map(c => [c.name,c.inferred_type,c.populated,c.missing,c.completeness_pct,c.distinct_values,c.minimum ?? "",c.maximum ?? "",c.average ?? ""]),
+        [],
+        ["Categorical column", "Value", "Count", "Share (%)"],
+        ...datasetResult.categorical_distributions.flatMap(c => c.values.map(v => [c.name,v.value,v.count,v.pct])),
+        [],
+        ["Finding severity", "Finding", "Details"],
+        ...datasetResult.findings.map(f => [f.severity,f.title,f.detail]),
+        [],
+        ["Relationship check", "From", "To", "Matched records", "Average days", "Minimum days", "Maximum days", "Negative durations"],
+        ...datasetResult.relationship_checks.map(r => [r.name,r.from_column,r.to_column,r.matched_records,r.average_days ?? "",r.minimum_days ?? "",r.maximum_days ?? "",r.negative_duration_records]),
+      ];
+      const csv = rows.map(row => row.map(value => {
+        let cell = String(value ?? "");
+        if (/^[=+@-]/.test(cell)) cell = "'" + cell;
+        return '"' + cell.replace(/"/g, '""') + '"';
+      }).join(",")).join("\n");
+      saveBlob("compatflow-dataset-profile.csv", csv, "text/csv;charset=utf-8");
+      return;
+    }
+    if (!result) return;
+    const report = [
+      ["CompatFlow Catalog Validation Report", result.filename],
+      ["Total records", result.total_rows], ["Valid records", result.valid_rows],
+      ["Invalid records", result.invalid_rows], ["Validation pass rate (%)", result.validation_pass_rate],
+      ["Data quality score (%)", result.data_quality_score], ["Total issues", result.total_issues],
+      ["Critical issues", result.critical_issues], ["Warnings", result.warning_issues],
+      ["Records with issues", result.records_with_issues], ["Duplicate SKU count", result.duplicate_sku_count],
+      ["Duplicate SKU rate (%)", result.duplicate_rate], ["Issue density", result.issue_density],
+      ["Critical record rate (%)", result.critical_record_rate], [],
+      ["Canonical field", "Detected source header", "Mapping confidence"],
+      ...result.column_mappings.map(m => [m.field,m.source_header,m.confidence]), [],
+      ["Field", "Populated", "Missing", "Completeness (%)"],
+      ...result.field_metrics.map(m => [m.field,m.populated,m.missing,m.completeness_pct]), [],
+      ["Row", "Field", "Severity", "Category", "Issue", "Recommended action"],
+      ...result.row_errors.map(i => [i.row_number,i.field ?? "General",i.severity,i.category,i.message,i.recommendation]),
+    ];
+    const csv = report.map(row => row.map(v => '"' + String(v ?? "").replace(/"/g, '""') + '"').join(",")).join("\n");
+    saveBlob("compatflow-validation-report.csv", csv, "text/csv;charset=utf-8");
+  }
+
+  function downloadProfileJson() {
+    if (!datasetResult) return;
+    saveBlob("compatflow-dataset-profile.json", JSON.stringify(datasetResult, null, 2), "application/json;charset=utf-8");
+  }
+
+  function printReport() {
+    window.print();
+  }
+
+  if (authLoading) return <main id="main" className="page"><div className="container"><p>Checking your account...</p></div></main>;
+  if (!user) return (
+    <main id="main" className="page"><div className="container">
+      <section className="panel import-panel">
+        <div className="eyebrow">RESTRICTED WORKSPACE</div>
+        <h1>Demo access is not public</h1>
+        <p>Submit a demo request. If approved, create an account or sign in with the same email address to use the upload workflow. Subscribed customers can sign in to access their plan features.</p>
+        <div className="import-actions"><a className="button" href="/contact?intent=demo">Request demo access</a><a className="button button-secondary" href="/sign-in">Sign in</a></div>
+      </section>
+    </div></main>
+  );
+  if (accessType === "checking") return <main id="main" className="page"><div className="container"><p>Checking your upload entitlement...</p></div></main>;
+  if (accessType === "none") return (
+    <main id="main" className="page"><div className="container">
+      <section className="panel import-panel"><div className="eyebrow">UPLOAD ACCESS REQUIRED</div><h1>Your account does not have upload access</h1>
+        <p>Demo uploads are available only after an operator approves your request. Subscribed organizations can use the features included in their active plan.</p>
+        <div className="import-actions"><a className="button" href="/contact?intent=demo">Request demo access</a><a className="button button-secondary" href="/pricing">View plans</a></div>
+      </section>
+    </div></main>
+  );
   return (
     <main id="main" className="page">
       <div className="container">
         <div className="import-heading">
-          <div className="eyebrow">Public product demo</div>
-          <h1>Validate a supplier catalog</h1>
-          <p>Validate supplier product files, identify data-quality issues and review clear recommendations before importing.</p>
+          <div className="eyebrow">{demoApproved ? "APPROVED DEMO WORKSPACE" : "CUSTOMER CATALOG WORKSPACE"}</div>
+          <h1>{demoApproved ? "Explore your approved demo" : "Validate your catalog data"}</h1>
+          <p>{demoApproved ? "Use the limited, stateless demo workflow. Access is checked by the backend on every upload." : "Validate product data using the file formats and limits available to your organization. Review field completeness, duplicates and actionable issues."}</p>
           {user && <p className="import-description"><a href="/catalog/sources">Connect a REST API, SFTP server or SQL Server source →</a></p>}
         </div>
 
         <section className="panel import-panel">
-          <h2>Catalog file validation</h2>
-          <p className="import-description">Public demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file. Subscribed imports: up to 25 MB, subject to plan entitlements.</p>
+          <h2>Multi-industry catalog validation</h2>
+          <p className="import-description">{demoApproved ? "Approved demo: CSV, XLS and XLSX · Maximum 5 MB and 10,000 records per file." : accessResult?.maxRecords === null ? "Website owner: no plan-level record or file-size cap." : `Your plan: up to ${accessResult?.maxRecords?.toLocaleString() ?? "—"} records and ${((accessResult?.maxUploadBytes ?? 0) / (1024 * 1024)).toLocaleString()} MB per file.`}</p>
           <div className="import-description">
-            Product catalog validation. CompatFlow detects common supplier column names automatically.
-            The public demo accepts CSV, XLS and XLSX product files. JSON, XML and connected data sources require an eligible subscription.
+            {demoApproved ? "Approved demo access is stateless and does not save uploaded files." : "CompatFlow detects common supplier product fields and applies the validation features available on your plan."}
           </div>
-          <p className="import-description">Files are validated in memory. This public demo does not save files or modify a catalog.</p>
-          <p className="column-hint">This demo validates product catalogs, not seller or customer master-data files. Download the sample product catalog to see the expected columns. Unrecognized datasets are rejected before a misleading quality score is generated.</p>
-          <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>
+          <p className="import-description">Files are validated in memory. This preview does not save files or commit records to your organization catalog.</p>
+          {demoApproved && <p className="column-hint">Non-product datasets are profiled using their actual columns; CompatFlow will not label them as invalid product catalogs or invent a product quality score.</p>}
+          {demoApproved && <p className="column-hint"><a href="/sample_supplier_catalog.csv" download>Download the sample supplier catalog</a></p>}
+          <p className="import-description">CompatFlow identifies the most likely industry from the file&apos;s column evidence. If the file is not clearly a product catalog, it provides a structural dataset profile instead of asking you to choose an industry.</p>
           <label className="file-picker" htmlFor="catalog-file">
             <span className="file-picker-icon" aria-hidden="true">↥</span>
             <strong>{file ? file.name : "Choose a catalog file"}</strong>
             <span>{file ? `${(file.size / 1024).toFixed(1)} KB` : "Select a file from your computer"}</span>
           </label>
-          <input id="catalog-file" className="visually-hidden" type="file" accept={user ? ".csv,.xlsx,.xls,.json,.xml,text/csv,application/json,application/xml" : ".csv,.xlsx,.xls,text/csv"}
+          <input id="catalog-file" className="visually-hidden" type="file" accept={demoApproved ? ".csv,.xlsx,.xls,text/csv" : ".csv,.xlsx,.xls,.json,.xml,text/csv,application/json,application/xml"}
             onChange={(event) => handleFileChange(event.target.files?.[0] ?? null)} />
           <div className="import-actions">
             <button className="button" type="button" onClick={handleValidate} disabled={!file || loading}>
               {loading ? "Validating..." : "Validate file"}
             </button>
             <button className="button button-secondary" type="button" disabled={loading} onClick={() => {
-              setFile(null); setResult(null); setMultiResult(null); setAiResult(null); setAiConsent(false); setError("");
+              setFile(null); setResult(null); setMultiResult(null); setIndustryResult(null); setAiResult(null); setAiConsent(false); setError("");
               const input = document.getElementById("catalog-file") as HTMLInputElement | null;
               if (input) input.value = "";
             }}>Clear</button>
@@ -214,7 +337,7 @@ export default function CatalogImportPage() {
         </section>
 
         {file && user && (
-          <section className="panel result-section" aria-live="polite">
+          <section className="panel result-section no-print" aria-live="polite">
             <h3>AI-assisted mapping suggestions</h3>
             <p className="import-description">AI is optional. If enabled and a provider is configured, CompatFlow sends the source headers and up to five bounded sample values per header to that external HTTPS provider. Suggestions are never applied automatically.</p>
             <label><input type="checkbox" checked={aiConsent} onChange={(event) => { setAiConsent(event.target.checked); setAiResult(null); }} /> I consent to sending this bounded sample evidence to the configured AI provider for mapping suggestions.</label>
@@ -225,6 +348,86 @@ export default function CatalogImportPage() {
             </>}
           </section>
         )}
+        {industryResult && (
+          <section className="import-results" aria-live="polite">
+            <div className="results-heading"><div><div className="eyebrow">Industry validation complete</div><h2>{industryResult.profile_id ? industryResult.profile_id.replaceAll("_", " ") : "Industry needs confirmation"}</h2><p>{industryResult.filename} · {industryResult.total_rows.toLocaleString()} rows · Stateless preview</p></div><span className={industryResult.profile_id ? "result-status success" : "result-status warning"}>{industryResult.profile_id ? "Profile applied" : "Choose an industry profile"}</span></div>
+            {industryResult.requires_profile_confirmation && <p className="column-hint">Automatic detection did not find enough distinct evidence. Select the correct profile and validate again.</p>}
+            {industryResult.profile_id && <>
+              <div className="result-stats">
+                <div className="panel stat-card"><span>Total rows</span><strong>{industryResult.total_rows.toLocaleString()}</strong></div>
+                <div className="panel stat-card"><span>Valid rows</span><strong className="metric-valid">{industryResult.valid_rows.toLocaleString()}</strong></div>
+                <div className="panel stat-card"><span>Invalid rows</span><strong className="metric-invalid">{industryResult.invalid_rows.toLocaleString()}</strong></div>
+                <div className="panel stat-card"><span>Mapping coverage</span><strong>{industryResult.metrics.mapping_coverage_pct.toFixed(1)}%</strong></div>
+                <div className="panel stat-card"><span>Pass rate</span><strong>{industryResult.validation_pass_rate.toFixed(1)}%</strong></div>
+                <div className="panel stat-card"><span>Issues</span><strong>{industryResult.metrics.issue_count.toLocaleString()}</strong></div>
+              </div>
+              <div className="panel result-section"><h3>Detected column mappings</h3><div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical field</th><th>Source column</th><th>Confidence</th></tr></thead><tbody>{industryResult.column_mappings.map((item) => <tr key={item.field}><td>{item.field}</td><td>{item.source_header}</td><td>{(item.confidence * 100).toFixed(0)}%</td></tr>)}</tbody></table></div>{industryResult.unmapped_headers.length > 0 && <p className="import-description">Unmapped source columns retained: {industryResult.unmapped_headers.join(", ")}</p>}</div>
+              <div className="panel result-section"><h3>Applicable field completeness</h3><div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead><tbody>{industryResult.field_metrics.map((item) => <tr key={item.field}><td>{item.field}</td><td>{item.populated}</td><td>{item.missing}</td><td>{item.completeness_pct.toFixed(1)}%</td></tr>)}</tbody></table></div></div>
+              <div className="panel result-section"><h3>Validation issues</h3>{industryResult.issues.length === 0 ? <p>No issues detected by the current profile rules.</p> : <ul className="error-list">{industryResult.issues.slice(0, 50).map((item, index) => <li key={index}><strong>Row {item.row_number} · {item.field ?? "Record"}</strong>: {item.message} ({item.severity})</li>)}</ul>}<h3>Source-preserving preview</h3>{industryResult.preview.map((row, index) => <pre key={index} className="code-preview">{JSON.stringify(row, null, 2)}</pre>)}<p className="import-disclaimer">External vehicle fitment, certification, taxonomy and compatibility reference checks are not included. No records are saved.</p></div>
+            </>}
+          </section>
+        )}
+        {datasetResult && (
+          <section className="import-results premium-report" aria-live="polite">
+            <div className="results-heading">
+              <div><div className="eyebrow">DATA INTELLIGENCE REPORT</div><h2>{datasetResult.dataset_type} overview</h2><p>{datasetResult.filename} · {datasetResult.format.toUpperCase()} · Stateless analysis</p></div>
+              <span className="result-status success">Analysis complete</span>
+            </div>
+            <div className="report-actions no-print">
+              <button className="button" type="button" onClick={downloadReport}>Download CSV report</button>
+              <button className="button button-secondary" type="button" onClick={downloadProfileJson}>Download JSON</button>
+              <button className="button button-secondary" type="button" onClick={printReport}>Print / Save PDF</button>
+            </div>
+            <div className="result-stats premium-kpis">
+              <div className="panel stat-card"><span>Total records</span><strong>{datasetResult.total_records.toLocaleString()}</strong><small>{datasetResult.total_columns} columns analysed</small></div>
+              <div className="panel stat-card"><span>Completeness</span><strong>{datasetResult.completeness_pct.toFixed(2)}%</strong><small>{datasetResult.populated_cells.toLocaleString()} populated cells</small></div>
+              <div className="panel stat-card"><span>Incomplete records</span><strong className={datasetResult.incomplete_records ? "metric-warning" : "metric-valid"}>{datasetResult.incomplete_records === null ? "Not calculated" : datasetResult.incomplete_records.toLocaleString()}</strong><small>{datasetResult.complete_records_pct === null ? "Record-level completeness unavailable" : datasetResult.complete_records_pct.toFixed(1) + "% fully populated"}</small></div>
+              <div className="panel stat-card"><span>Duplicate rows</span><strong className={datasetResult.duplicate_rows ? "metric-warning" : "metric-valid"}>{datasetResult.duplicate_rows.toLocaleString()}</strong><small>{datasetResult.duplicate_rate_pct.toFixed(2)}% duplicate rate</small></div>
+            </div>
+            <div className="premium-dashboard-grid">
+              <div className="panel result-section">
+                <div className="section-heading"><div><h3>Record health</h3><p>Completeness and exact duplicate checks</p></div></div>
+                {datasetResult.complete_records === null || datasetResult.incomplete_records === null || datasetResult.complete_records_pct === null ? (
+                  <p className="import-description">Record-level completeness is not provided by the connected backend version. Cell-level completeness is shown below.</p>
+                ) : <>
+                  <div className="health-row"><span>Complete records</span><strong>{datasetResult.complete_records.toLocaleString()}</strong></div>
+                  <div className="metric-bar"><span style={{width: `${datasetResult.complete_records_pct}%`}} /></div>
+                  <div className="health-row"><span>Incomplete records</span><strong>{datasetResult.incomplete_records.toLocaleString()}</strong></div>
+                  <div className="metric-bar"><span className="bar-warning" style={{width: `${100-datasetResult.complete_records_pct}%`}} /></div>
+                </>}
+                <p className="import-description">{datasetResult.missing_cells.toLocaleString()} missing cells across {datasetResult.total_cells.toLocaleString()} possible cells.</p>
+              </div>
+              <div className="panel result-section">
+                <div className="section-heading"><div><h3>Key findings</h3><p>Prioritized observations from this file</p></div></div>
+                <div className="finding-list">{datasetResult.findings.map((finding,index)=><div className={`finding-item finding-${finding.severity}`} key={index}><span>{finding.severity.toUpperCase()}</span><div><strong>{finding.title}</strong><p>{finding.detail}</p></div></div>)}</div>
+              </div>
+            </div>
+            <DatasetCharts profile={datasetResult} />
+            {datasetResult.categorical_distributions.length > 0 && (
+              <div className="panel result-section">
+                <div className="section-heading"><div><h3>Category distribution</h3><p>Most frequent values in categorical columns</p></div></div>
+                <div className="distribution-grid">{datasetResult.categorical_distributions.slice(0,6).map(group=><div className="distribution-card" key={group.name}><h4>{group.name}</h4>{group.values.slice(0,6).map(item=><div className="distribution-row" key={item.value}><div><span>{item.value}</span><strong>{item.count.toLocaleString()}</strong></div><div className="metric-bar"><span style={{width:`${item.pct}%`}} /></div><small>{item.pct.toFixed(1)}%</small></div>)}</div>)}</div>
+              </div>
+            )}
+            {datasetResult.relationship_checks.length > 0 && (
+              <div className="panel result-section">
+                <div className="section-heading"><div><h3>Relationship analysis</h3><p>Cross-column checks supported by detected date fields</p></div></div>
+                {datasetResult.relationship_checks.map(check=><div className="relationship-card" key={check.name}><h4>{check.name}</h4><p>{check.from_column} → {check.to_column}</p><div className="relationship-metrics"><div><span>Matched records</span><strong>{check.matched_records.toLocaleString()}</strong></div><div><span>Average duration</span><strong>{check.average_days === null ? "—" : `${check.average_days} days`}</strong></div><div><span>Range</span><strong>{check.minimum_days === null || check.maximum_days === null ? "—" : `${check.minimum_days}–${check.maximum_days} days`}</strong></div><div><span>Negative durations</span><strong className={check.negative_duration_records ? "metric-warning" : "metric-valid"}>{check.negative_duration_records.toLocaleString()}</strong></div></div></div>)}
+              </div>
+            )}
+            <div className="panel result-section report-wide-page">
+              <div className="section-heading"><div><h3>Column intelligence</h3><p>Inferred type, completeness, cardinality and distribution statistics</p></div></div>
+              <div className="table-scroll"><table className="preview-table"><thead><tr><th>Column</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th><th>Distinct</th><th>Min / start</th><th>Max / end</th><th>Average</th></tr></thead><tbody>
+                {datasetResult.columns.map(column=><tr key={column.name}><td>{column.name}</td><td>{column.inferred_type}</td><td>{column.populated.toLocaleString()}</td><td className={column.missing ? "metric-warning" : "metric-valid"}>{column.missing.toLocaleString()}</td><td><div className="metric-bar metric-bar-small"><span style={{width:`${column.completeness_pct}%`}} /></div>{column.completeness_pct.toFixed(1)}%</td><td>{column.distinct_values.toLocaleString()}</td><td>{column.minimum ?? "—"}</td><td>{column.maximum ?? "—"}</td><td>{column.average ?? "—"}</td></tr>)}
+              </tbody></table></div>
+            </div>
+            <div className="panel result-section report-wide-page">
+              <div className="section-heading"><div><h3>Record sample</h3><p>First 10 records from the uploaded file</p></div></div>
+              <div className="table-scroll"><table className="preview-table"><thead><tr>{datasetResult.columns.map(column=><th key={column.name}>{column.name}</th>)}</tr></thead><tbody>{datasetResult.preview.map((row,index)=><tr key={index}>{datasetResult.columns.map(column=><td key={column.name}>{String(row[column.name] ?? "—")}</td>)}</tr>)}</tbody></table></div>
+            </div>
+            <p className="import-disclaimer">This report measures structural completeness, exact duplicates, inferred types and supported column relationships. It does not claim business accuracy or apply product rules to non-product data. No file or record was saved.</p>
+          </section>
+        )}
         {multiResult && (
           <section className="import-results" aria-live="polite">
             <div className="results-heading">
@@ -233,8 +436,13 @@ export default function CatalogImportPage() {
             </div>
             <div className="result-stats">
               <div className="panel stat-card"><span>Total records</span><strong>{multiResult.total_records.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Valid records</span><strong>{multiResult.valid_records.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Invalid records</span><strong>{multiResult.invalid_records.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Valid records</span><strong className="metric-valid">{multiResult.valid_records.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Invalid records</span><strong className="metric-invalid">{multiResult.invalid_records.toLocaleString()}</strong></div>
+            </div>
+            <div className="panel result-section">
+              <h3>Validation outcome</h3>
+              <div className="validation-chart"><span className="chart-valid" style={{ width: `${multiResult.total_records ? multiResult.valid_records / multiResult.total_records * 100 : 0}%` }} /><span className="chart-invalid" style={{ width: `${multiResult.total_records ? multiResult.invalid_records / multiResult.total_records * 100 : 0}%` }} /></div>
+              <p><span className="metric-valid">Valid: {multiResult.valid_records.toLocaleString()}</span> · <span className="metric-invalid">Invalid: {multiResult.invalid_records.toLocaleString()}</span></p>
             </div>
             <div className="panel result-section">
               <h3>Field mapping</h3>
@@ -276,13 +484,20 @@ export default function CatalogImportPage() {
 
             <div className="result-stats">
               <div className="panel stat-card"><span>Total records</span><strong>{result.total_rows.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Valid records</span><strong>{result.valid_rows.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Invalid records</span><strong>{result.invalid_rows.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Valid records</span><strong className="metric-valid">{result.valid_rows.toLocaleString()}</strong></div>
+              <div className="panel stat-card"><span>Invalid records</span><strong className="metric-invalid">{result.invalid_rows.toLocaleString()}</strong></div>
               <div className="panel stat-card"><span>Quality score</span><strong>{result.data_quality_score.toFixed(2)}%</strong></div>
               <div className="panel stat-card"><span>Pass rate</span><strong>{result.validation_pass_rate.toFixed(2)}%</strong></div>
               <div className="panel stat-card"><span>Total issues</span><strong>{result.total_issues.toLocaleString()}</strong></div>
             </div>
 
+            <div className="panel result-section">
+              <h3>Validation outcome</h3>
+              <div className="validation-chart"><span className="chart-valid" style={{ width: `${result.total_rows ? result.valid_rows / result.total_rows * 100 : 0}%` }} /><span className="chart-invalid" style={{ width: `${result.total_rows ? result.invalid_rows / result.total_rows * 100 : 0}%` }} /></div>
+              <p><span className="metric-valid">Valid: {result.valid_rows.toLocaleString()}</span> · <span className="metric-invalid">Invalid: {result.invalid_rows.toLocaleString()}</span> · <span className="metric-warning">Warnings: {result.warning_issues.toLocaleString()}</span></p>
+              <h3>Required-field completeness by column</h3>
+              <div className="field-chart-list">{result.field_metrics.map(metric => <div key={metric.field}><span>{metric.field.replaceAll("_", " ")}</span><div className="metric-bar"><span style={{ width: `${metric.completeness_pct}%` }} /></div><strong>{metric.completeness_pct.toFixed(1)}%</strong></div>)}</div>
+            </div>
             <div className="panel result-section">
               <h3>Column mapping</h3>
               <p className="import-description">Confidence indicates how closely a source header matches a known alias. It is not a measure of data accuracy. Unrecognized columns are preserved in the source file but are not part of this product validation check.</p>
@@ -330,7 +545,7 @@ export default function CatalogImportPage() {
               {result.row_errors.length === 0 ? <p>No row-level issues were found.</p> : (
                 <div className="table-scroll"><table className="preview-table"><thead><tr><th>Row</th><th>Field</th><th>Severity</th><th>Category</th><th>Reason</th><th>Recommended action</th></tr></thead>
                   <tbody>{result.row_errors.slice(0, 50).map((item, index) => <tr key={`${item.row_number}-${item.error_code}-${index}`}>
-                    <td>{item.row_number}</td><td>{item.field ?? "General"}</td><td>{item.severity}</td><td>{item.category.replaceAll("_", " ")}</td><td>{item.message}</td><td>{item.recommendation}</td>
+                    <td>{item.row_number}</td><td>{item.field ?? "General"}</td><td className={item.severity === "critical" ? "metric-invalid" : "metric-warning"}>{item.severity}</td><td>{item.category.replaceAll("_", " ")}</td><td>{item.message}</td><td>{item.recommendation}</td>
                   </tr>)}</tbody></table></div>
               )}
             </div>
