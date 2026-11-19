@@ -1,8 +1,8 @@
 """Authenticated one-shot connector ingestion and tenant-scoped import history."""
 from __future__ import annotations
 
-import json
 import datetime
+import json
 from typing import Literal
 from urllib.parse import urlsplit
 from uuid import UUID
@@ -12,11 +12,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
-from app.core.database import SessionLocal
 
 from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import SessionLocal, get_db
 from app.models import ImportJob, ImportRowError, ImportRecordLineage
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.ingestion_adapters import IngestionParseError, parse_source
