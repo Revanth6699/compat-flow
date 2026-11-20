@@ -544,6 +544,21 @@ class Review(Base):
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
 
+class ReviewReply(Base):
+    __tablename__ = "review_replies"
+    __table_args__ = (
+        Index("ix_review_replies_review_created", "review_id", "created_at"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    review_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("reviews.id", ondelete="CASCADE"), nullable=False
+    )
+    display_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    comment: Mapped[str] = mapped_column(String(2000), nullable=False)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class DemoAccessRequest(Base):
     __tablename__ = "demo_access_requests"
     __table_args__ = (
