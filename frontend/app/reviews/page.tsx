@@ -14,7 +14,7 @@ export default function ReviewsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (user) { setLoading(false); return; }
+    if (user) return;
     let active = true;
     fetch(`${API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE}/api/v1/reviews`)
       .then(async response => {
