@@ -13,28 +13,31 @@ from app.models import Review, ReviewReply
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
 
-def clean_text(value: str) -> str:
-    normalized = value.strip()
-    if not normalized:
-        raise ValueError("This field cannot be blank.")
-    return normalized
-
-
 class ReviewCreateRequest(BaseModel):
     display_name: str = Field(min_length=2, max_length=80)
     rating: int = Field(ge=1, le=5)
     comment: str = Field(min_length=15, max_length=2000)
 
-    _trim_display_name = field_validator("display_name")(clean_text)
-    _trim_comment = field_validator("comment")(clean_text)
+    @field_validator("display_name", "comment")
+    @classmethod
+    def trim_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("This field cannot be blank.")
+        return normalized
 
 
 class ReviewReplyCreateRequest(BaseModel):
     display_name: str = Field(min_length=2, max_length=80)
     comment: str = Field(min_length=2, max_length=2000)
 
-    _trim_display_name = field_validator("display_name")(clean_text)
-    _trim_comment = field_validator("comment")(clean_text)
+    @field_validator("display_name", "comment")
+    @classmethod
+    def trim_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("This field cannot be blank.")
+        return normalized
 
 
 class ReviewResponse(BaseModel):
