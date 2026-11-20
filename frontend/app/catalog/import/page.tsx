@@ -235,6 +235,9 @@ export default function CatalogImportPage() {
         ["Finding severity", "Finding", "Details"],
         ...datasetResult.findings.map(f => [f.severity,f.title,f.detail]),
         [],
+        ["Dataset-specific check", "Code", "Severity", "Records flagged", "Finding", "Recommendation"],
+        ...(datasetResult.domain_checks ?? []).map(check => [check.title,check.code,check.severity,check.issue_records,check.detail,check.recommendation]),
+        [],
         ["Relationship check", "From", "To", "Matched records", "Average days", "Minimum days", "Maximum days", "Negative durations"],
         ...datasetResult.relationship_checks.map(r => [r.name,r.from_column,r.to_column,r.matched_records,r.average_days ?? "",r.minimum_days ?? "",r.maximum_days ?? "",r.negative_duration_records]),
       ];
@@ -362,7 +365,7 @@ export default function CatalogImportPage() {
               {loading ? "Validating..." : "Validate file"}
             </button>
             <button className="button button-secondary" type="button" disabled={loading} onClick={() => {
-              setFile(null); setResult(null); setMultiResult(null); setIndustryResult(null); setAiResult(null); setAiConsent(false); setError("");
+              setFile(null); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setAiResult(null); setAiConsent(false); setError("");
               const input = document.getElementById("catalog-file") as HTMLInputElement | null;
               if (input) input.value = "";
             }}>Clear</button>
