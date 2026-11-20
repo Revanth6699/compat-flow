@@ -375,16 +375,19 @@ export default function CatalogImportPage() {
         </section>
 
         {file && user && (
-          <section className="panel result-section no-print" aria-live="polite">
-            <h3>AI-assisted mapping suggestions</h3>
-            <p className="import-description">AI is optional. If enabled and a provider is configured, CompatFlow sends the source headers and up to five bounded sample values per header to that external HTTPS provider. Suggestions are never applied automatically.</p>
-            <label><input type="checkbox" checked={aiConsent} onChange={(event) => { setAiConsent(event.target.checked); setAiResult(null); }} /> I consent to sending this bounded sample evidence to the configured AI provider for mapping suggestions.</label>
-            <button className="button button-secondary" type="button" onClick={handleSuggestMappings} disabled={!aiConsent || loading}>Suggest mappings with AI</button>
-            {aiResult && <><p className="import-description">{aiResult.message} {aiResult.source_data_sent ? "Sample evidence was sent to the configured provider." : "No sample evidence was sent."}</p>
+          <details className="panel result-section no-print ai-mapping-panel" aria-live="polite">
+            <summary><span>AI-assisted mapping</span><small>{aiResult?.status === "provider_unconfigured" ? "Provider not configured" : aiResult?.status === "suggestions_ready" ? `${aiResult.suggestions.length} suggestions returned` : "Optional · requires consent"}</small></summary>
+            <p className="import-description">Optional mapping assistance. If configured and enabled, CompatFlow sends the source headers and up to five bounded sample values per header to an external HTTPS provider. Suggestions are never applied automatically.</p>
+            <label className="ai-consent"><input type="checkbox" checked={aiConsent} onChange={(event) => { setAiConsent(event.target.checked); setAiResult(null); }} /> I consent to sending this bounded sample evidence to the configured AI provider for mapping suggestions.</label>
+            <button className="button button-secondary" type="button" onClick={handleSuggestMappings} disabled={!aiConsent || loading}>{loading ? "Requesting suggestions..." : "Suggest mappings with AI"}</button>
+            {aiResult && <div className={aiResult.status === "provider_unconfigured" ? "ai-provider-notice" : "ai-result-notice"} role="status">
+              <strong>{aiResult.status === "provider_unconfigured" ? "AI provider is not configured" : aiResult.status === "suggestions_ready" ? "Suggestions ready for review" : "AI mapping response"}</strong>
+              <p>{aiResult.message} {aiResult.source_data_sent ? "Sample evidence was sent to the configured provider." : "No sample evidence was sent."}</p>
+              {aiResult.status === "provider_unconfigured" && <p>To enable this feature, the platform operator must configure the backend HTTPS provider URL, API key and model. Do not paste API keys into this page.</p>}
               {aiResult.suggestions.length > 0 && <><ul className="error-list">{aiResult.suggestions.map((item, index) => <li key={index}><strong>{item.source_header} → {item.candidate_field}</strong> (model-reported {Math.round(item.confidence * 100)}%, uncalibrated): {item.rationale}<br />Evidence: {item.evidence.join("; ")}</li>)}</ul>
                 <button className="button button-secondary" type="button" onClick={applyAiSuggestions}>Apply suggestions to mapping form</button></>}
-            </>}
-          </section>
+            </div>}
+          </details>
         )}
         <UnifiedImportReport datasetResult={datasetResult} industryResult={industryResult} multiResult={multiResult} result={result} onDownloadCsv={downloadReport} onDownloadJson={downloadProfileJson} onPrint={printReport} />
         {accessType !== "subscription" && <p className="import-disclaimer">Demonstration only. Do not upload confidential supplier files, personal information or production catalog data.</p>}
