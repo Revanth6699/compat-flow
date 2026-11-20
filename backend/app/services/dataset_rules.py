@@ -77,8 +77,8 @@ def profile_dataset_rules(headers: list[str], rows: list[dict[str, Any]]) -> dic
             add_check("DELIVERY_BEFORE_PURCHASE", "Delivery date precedes purchase date", reversed_dates, f"{reversed_dates} rows have a delivery timestamp earlier than the purchase timestamp.", "Correct the source timestamps or investigate timezone and date-mapping errors.", "critical")
     elif dataset_type == "inventory":
         quantity_cols = [header(name) for name in ("quantity_on_hand", "quantity_available", "available_quantity", "stock_quantity", "quantity_reserved") if header(name)]
-        negative = sum(1 for row in rows for col in quantity_cols if _number(row.get(col)) is not None and _number(row.get(col)) < 0)
-        add_check("NEGATIVE_INVENTORY_QUANTITY", "Negative inventory quantities", negative, f"{negative} quantity values are below zero.", "Verify stock movements, reservations and adjustment signs before importing.", "critical")
+        negative = sum(1 for row in rows if any(_number(row.get(col)) is not None and _number(row.get(col)) < 0 for col in quantity_cols))
+        add_check("NEGATIVE_INVENTORY_QUANTITY", "Negative inventory quantities", negative, f"{negative} records contain at least one quantity below zero.", "Verify stock movements, reservations and adjustment signs before importing.", "critical")
         on_hand, reserved, available = header("quantity_on_hand", "stock_quantity"), header("quantity_reserved"), header("quantity_available", "available_quantity")
         if on_hand and reserved and available:
             mismatch = 0
