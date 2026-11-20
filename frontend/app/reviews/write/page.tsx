@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AuthRequired } from "@/components/auth-required";
 import { useAuth } from "@/components/auth-provider";
-import { apiRequest } from "@/lib/auth-client";
+import { apiRequest, ApiRequestError } from "@/lib/auth-client";
 
 type Review = { id: string; display_name: string; rating: number; comment: string; created_at: string };
 
@@ -14,13 +14,22 @@ function WriteReviewContent() {
   const [rating, setRating] = useState("5");
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingReview, setCheckingReview] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let active = true;
     void apiRequest<Review>("/api/v1/reviews/mine").then(review => {
+      if (!active) return;
       setDisplayName(review.display_name); setRating(String(review.rating)); setComment(review.comment);
-    }).catch(() => {});
+      setMessage("You already have a review. Submitting this form will update it.");
+    }).catch(cause => {
+      if (active && !(cause instanceof ApiRequestError && cause.status === 404)) {
+        setError(cause instanceof Error ? cause.message : "Could not load your existing review.");
+      }
+    }).finally(() => { if (active) setCheckingReview(false); });
+    return () => { active = false; };
   }, []);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -39,7 +48,7 @@ function WriteReviewContent() {
   return <main id="main" className="page"><div className="container review-form-page">
     <header className="workspace-heading"><div><span className="eyebrow">YOUR FEEDBACK</span><h1>Write a review</h1><p>Share an honest account of your experience with CompatFlow.</p></div><Link className="button button-secondary" href="/reviews">View published reviews</Link></header>
     <section className="panel settings-panel">
-      <form className="auth-form" onSubmit={submit}>
+      {checkingReview ? <p>Checking your existing review…</p> : <form className="auth-form" onSubmit={submit}>
         <label htmlFor="review-display-name">Display name</label><input id="review-display-name" required minLength={2} maxLength={80} value={displayName} onChange={event => setDisplayName(event.target.value)} />
         <label htmlFor="review-rating">Star rating</label><select id="review-rating" value={rating} onChange={event => setRating(event.target.value)}><option value="5">★★★★★ — Excellent</option><option value="4">★★★★☆ — Good</option><option value="3">★★★☆☆ — Average</option><option value="2">★★☆☆☆ — Poor</option><option value="1">★☆☆☆☆ — Very poor</option></select>
         <label htmlFor="review-comment">Your review</label><textarea id="review-comment" required minLength={15} maxLength={2000} rows={7} value={comment} onChange={event => setComment(event.target.value)} placeholder="What worked well? What should we improve?" />
