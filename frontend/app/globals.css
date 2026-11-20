@@ -1782,3 +1782,65 @@ h1, h2, h3, h4, .editorial-heading {
   .brand img { width: 76px; height: 53px; }
   .header-inner { min-height: 68px; gap: 12px; }
 }
+
+
+/* Platform administration dashboard */
+.platform-admin-page {
+  min-height: 70vh;
+  padding: 42px 0 76px;
+  background: #f5f7fa;
+}
+.platform-admin-container { width: min(100% - 40px, 1320px); max-width: 1320px; }
+.platform-admin-page .platform-admin-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(290px, 1fr);
+  align-items: start;
+  gap: 20px;
+}
+.platform-admin-page section.panel {
+  min-width: 0;
+  padding: clamp(18px, 2.2vw, 26px);
+  border: 1px solid #e1e8f0;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 5px 22px rgba(22, 43, 67, .045);
+}
+.platform-admin-page .preview-table { width: 100%; min-width: 720px; }
+.platform-admin-page .table-scroll { max-width: 100%; overflow-x: auto; border: 1px solid #e7edf3; border-radius: 9px; }
+.platform-admin-page .preview-table th { background: #f3f6fa; color: #52677d; font-size: .7rem; letter-spacing: .05em; }
+.platform-admin-page .preview-table td { color: #34465a; line-height: 1.5; }
+.platform-admin-page .auth-form { max-width: none; }
+.platform-admin-page .auth-form input { width: 100%; min-height: 44px; }
+.platform-admin-page .button { min-height: 40px; }
+@media (max-width: 900px) {
+  .platform-admin-page .platform-admin-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .platform-admin-page { padding: 28px 0 52px; }
+  .platform-admin-container { width: min(100% - 28px, 1320px); }
+  .platform-admin-page header { align-items: flex-start !important; }
+  .platform-admin-page section.panel { padding: 18px 15px; }
+  .platform-admin-page .table-scroll { margin-inline: -2px; }
+}
+
+/* Clickable, keyboard-accessible review rating */
+.review-compose-panel { width: 100%; max-width: 760px; padding: clamp(20px, 3vw, 32px); border: 1px solid #e1e8f0; border-radius: 14px; box-shadow: 0 8px 28px rgba(24,48,75,.045); }
+.review-compose-panel .auth-form { max-width: none; }
+.review-compose-panel .auth-form input,
+.review-compose-panel .auth-form textarea { width: 100%; }
+.review-star-field { min-width: 0; margin: 8px 0 4px; padding: 0; border: 0; }
+.review-star-field legend { margin-bottom: 8px; color: #34465a; font-size: .9rem; font-weight: 650; }
+.review-star-picker { display: flex; align-items: center; gap: 7px; }
+.review-star {
+  display: grid; width: 48px; height: 48px; place-items: center;
+  padding: 0; border: 1px solid #d8e1eb; border-radius: 9px;
+  background: #fff; color: #9aa8b7; font-size: 2rem; line-height: 1;
+  cursor: pointer; transition: color .15s ease, background .15s ease, border-color .15s ease, transform .15s ease;
+}
+.review-star:hover { border-color: #d69b24; color: #d69b24; background: #fffbeb; transform: translateY(-1px); }
+.review-star.selected { border-color: #e4b64e; color: #d99b16; background: #fff8e7; }
+.review-star:focus-visible { outline: 3px solid rgba(37, 99, 235, .3); outline-offset: 2px; }
+.review-rating-hint { display: block; margin-top: 8px; color: #718096; font-size: .78rem; }
+@media (max-width: 480px) {
+  .review-star { width: 43px; height: 43px; font-size: 1.8rem; }
+}
