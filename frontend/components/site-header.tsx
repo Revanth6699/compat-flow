@@ -32,6 +32,7 @@ export function SiteHeader() {
               <Link href="/workspace">Workspace</Link>
               <Link href="/catalog/import">Catalog</Link>
               <Link href="/catalog/sources">Data sources</Link>
+              <Link href="/reviews/write">Write a review</Link>
               {!isPlatformAdmin && <Link href="/pricing">Plans</Link>}
               {isPlatformAdmin && <Link href="/platform-admin">Platform admin</Link>}
             </>
