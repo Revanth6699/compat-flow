@@ -12,6 +12,7 @@ type DatasetProfile = {
   date_columns: string[]; numeric_columns: string[];
   relationship_checks: { name: string; from_column: string; to_column: string; matched_records: number; average_days: number | null; minimum_days: number | null; maximum_days: number | null; negative_duration_records: number }[];
   findings: { severity: string; title: string; detail: string }[];
+  domain_checks?: { code: string; title: string; issue_records: number; severity: string; detail: string; recommendation: string }[];
   preview: Record<string, unknown>[];
 };
 type IndustryResult = {
@@ -54,6 +55,8 @@ function Table({ headers, rows }: { headers: string[]; rows: Record<string, unkn
 }
 
 export default function UnifiedImportReport({ datasetResult, industryResult, multiResult, result, onDownloadCsv, onDownloadJson, onPrint }: Props) {
+  if (!datasetResult && !industryResult && !multiResult && !result) return null;
+
   const filename = datasetResult?.filename ?? industryResult?.filename ?? multiResult?.filename ?? result?.filename ?? "Uploaded dataset";
   const format = datasetResult?.format ?? multiResult?.format ?? filename.split(".").pop() ?? "unknown";
   const total = datasetResult?.total_records ?? industryResult?.total_rows ?? multiResult?.total_records ?? result?.total_rows ?? 0;
@@ -110,6 +113,12 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
       {fieldMetrics.length > 0 && <div className="panel result-section">
         <h3>Column completeness and data types</h3>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead><tbody>{fieldMetrics.map((item) => <tr key={item.field}><td>{item.field}</td><td>{"inferred_type" in item ? String(item.inferred_type) : "—"}</td><td>{item.populated.toLocaleString()}</td><td>{item.missing.toLocaleString()}</td><td>{item.completeness_pct.toFixed(2)}%</td></tr>)}</tbody></table></div>
+      </div>}
+
+      {datasetResult && datasetResult.domain_checks && datasetResult.domain_checks.length > 0 && <div className="panel result-section">
+        <h3>Dataset-specific validation checks</h3>
+        <p className="import-description">These rules were selected from the detected dataset type and available columns. A zero issue count means the check ran and did not flag a record; it does not certify external or business-specific correctness.</p>
+        <div className="table-scroll"><table className="preview-table"><thead><tr><th>Check</th><th>Severity</th><th>Records flagged</th><th>Finding</th><th>Recommended action</th></tr></thead><tbody>{datasetResult.domain_checks.map((check) => <tr key={check.code}><td>{check.title}</td><td>{check.severity}</td><td>{check.issue_records.toLocaleString()}</td><td>{check.detail}</td><td>{check.recommendation}</td></tr>)}</tbody></table></div>
       </div>}
 
       <div className="panel result-section">

@@ -15,6 +15,7 @@ type DatasetProfile = {
   categorical_distributions: { name: string; values: { value: string; count: number; pct: number }[] }[];
   date_columns: string[]; numeric_columns: string[];
   relationship_checks: { name: string; from_column: string; to_column: string; matched_records: number; average_days: number | null; minimum_days: number | null; maximum_days: number | null; negative_duration_records: number }[];
+  domain_checks?: { code: string; title: string; issue_records: number; severity: string; detail: string; recommendation: string }[];
   findings: { severity: string; title: string; detail: string }[];
   preview: Record<string, unknown>[];
 };
@@ -235,6 +236,9 @@ export default function CatalogImportPage() {
         ["Finding severity", "Finding", "Details"],
         ...datasetResult.findings.map(f => [f.severity,f.title,f.detail]),
         [],
+        ["Dataset-specific check", "Code", "Severity", "Records flagged", "Finding", "Recommendation"],
+        ...(datasetResult.domain_checks ?? []).map(check => [check.title,check.code,check.severity,check.issue_records,check.detail,check.recommendation]),
+        [],
         ["Relationship check", "From", "To", "Matched records", "Average days", "Minimum days", "Maximum days", "Negative durations"],
         ...datasetResult.relationship_checks.map(r => [r.name,r.from_column,r.to_column,r.matched_records,r.average_days ?? "",r.minimum_days ?? "",r.maximum_days ?? "",r.negative_duration_records]),
       ];
@@ -362,7 +366,7 @@ export default function CatalogImportPage() {
               {loading ? "Validating..." : "Validate file"}
             </button>
             <button className="button button-secondary" type="button" disabled={loading} onClick={() => {
-              setFile(null); setResult(null); setMultiResult(null); setIndustryResult(null); setAiResult(null); setAiConsent(false); setError("");
+              setFile(null); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setAiResult(null); setAiConsent(false); setError("");
               const input = document.getElementById("catalog-file") as HTMLInputElement | null;
               if (input) input.value = "";
             }}>Clear</button>
