@@ -516,7 +516,7 @@ def test_file_ai_endpoint_returns_record_classification_and_mapping(monkeypatch)
 
 
 def test_saved_configuration_rotation_is_tenant_scoped_and_audited(monkeypatch):
-    organization_id, current, _ = install_connector_auth(monkeypatch)
+    organization_id, _, _ = install_connector_auth(monkeypatch)
     old_key = base64.urlsafe_b64encode(b"o" * 32).decode("ascii")
     new_key = base64.urlsafe_b64encode(b"n" * 32).decode("ascii")
     configuration_id = uuid4()
@@ -600,7 +600,7 @@ def test_saved_configuration_rotation_is_tenant_scoped_and_audited(monkeypatch):
 
 
 def test_saved_configuration_audit_lookup_does_not_cross_tenant(monkeypatch):
-    organization_id, _, _ = install_connector_auth(monkeypatch)
+    install_connector_auth(monkeypatch)
 
     class TenantDB:
         subscription = SimpleNamespace(status="active", plan_code="growth", current_period_end=None)
