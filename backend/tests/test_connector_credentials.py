@@ -17,7 +17,11 @@ from app.services.connector_credentials import (
     decrypt_credentials,
     encrypt_credentials,
     validate_connector_configuration,
+    active_connector_encryption_key,
+    connector_encryption_key_for_version,
+    reencrypt_credentials,
 )
+from app.api.connector_import_routes import _configuration_audit_event
 
 
 KEY = base64.urlsafe_b64encode(bytes(range(32))).decode("ascii")
@@ -377,3 +381,105 @@ def test_import_history_metadata_records_saved_configuration_id_not_credentials(
     metadata = _source_metadata(payload, parsed)
     assert metadata["connector_configuration_id"] == str(CONFIG)
     assert "never-store-this" not in str(metadata)
+
+
+
+def test_versioned_key_rotation_reencrypts_without_losing_old_key_access():
+    import json
+
+    old_key = KEY
+    new_key = base64.urlsafe_b64encode(b"n" * 32).decode("ascii")
+    credentials = {"api_headers": {"Authorization": "Bearer rotate-me"}}
+    original = encrypt_credentials(
+        credentials,
+        encryption_key=old_key,
+        organization_id=ORG,
+        configuration_id=CONFIG,
+        source_type="rest_api",
+        key_version="v1",
+    )
+    rotated, version, changed = reencrypt_credentials(
+        original,
+        current_key_version="v1",
+        active_key=new_key,
+        active_version="v2",
+        previous_keys_json=json.dumps({"v1": old_key}),
+        organization_id=ORG,
+        configuration_id=CONFIG,
+        source_type="rest_api",
+    )
+    assert changed is True
+    assert version == "v2"
+    assert rotated != original
+    assert decrypt_credentials(
+        rotated,
+        encryption_key=new_key,
+        organization_id=ORG,
+        configuration_id=CONFIG,
+        source_type="rest_api",
+        key_version="v2",
+    ) == credentials
+    assert connector_encryption_key_for_version(
+        "v1",
+        active_key=new_key,
+        active_version="v2",
+        previous_keys_json=json.dumps({"v1": old_key}),
+    ) == old_key
+
+
+def test_key_rotation_fails_closed_when_previous_key_is_missing():
+    new_key = base64.urlsafe_b64encode(b"n" * 32).decode("ascii")
+    original = encrypt_credentials(
+        {"password": "keep-secret"},
+        encryption_key=KEY,
+        organization_id=ORG,
+        configuration_id=CONFIG,
+        source_type="sftp",
+        key_version="v1",
+    )
+    with pytest.raises(CredentialVaultError, match="not configured"):
+        reencrypt_credentials(
+            original,
+            current_key_version="v1",
+            active_key=new_key,
+            active_version="v2",
+            previous_keys_json="{}",
+            organization_id=ORG,
+            configuration_id=CONFIG,
+            source_type="sftp",
+        )
+
+
+def test_active_keyring_rejects_duplicate_active_version_and_invalid_json():
+    with pytest.raises(CredentialVaultError, match="valid JSON"):
+        active_connector_encryption_key(
+            active_key=KEY, active_version="v2", previous_keys_json="{"
+        )
+    with pytest.raises(CredentialVaultError, match="cannot also be a previous"):
+        active_connector_encryption_key(
+            active_key=KEY,
+            active_version="v1",
+            previous_keys_json='{"v1":"' + KEY + '"}',
+        )
+
+
+def test_configuration_audit_event_contains_only_safe_fields():
+    item = SimpleNamespace(
+        id=CONFIG,
+        organization_id=ORG,
+        source_type="rest_api",
+        source_descriptor="https://supplier.example.com",
+    )
+    event = _configuration_audit_event(
+        item=item,
+        action="credentials_rotated",
+        actor_user_id=uuid4(),
+        key_version_from="v1",
+        key_version_to="v2",
+    )
+    assert event.configuration_id == CONFIG
+    assert event.organization_id == ORG
+    assert event.action == "credentials_rotated"
+    assert event.key_version_from == "v1"
+    assert event.key_version_to == "v2"
+    assert "secret" not in str(event.__dict__).casefold()
