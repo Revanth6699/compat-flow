@@ -109,7 +109,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
 
       {fieldMetrics.length > 0 && <div className="panel result-section">
         <h3>Column completeness and data types</h3>
-        <div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead><tbody>{fieldMetrics.map((item) => <tr key={item.field}><td>{item.field}</td><td>{"inferred_type" in item ? item.inferred_type : "—"}</td><td>{item.populated.toLocaleString()}</td><td>{item.missing.toLocaleString()}</td><td>{item.completeness_pct.toFixed(2)}%</td></tr>)}</tbody></table></div>
+        <div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead><tbody>{fieldMetrics.map((item) => <tr key={item.field}><td>{item.field}</td><td>{"inferred_type" in item ? String(item.inferred_type) : "—"}</td><td>{item.populated.toLocaleString()}</td><td>{item.missing.toLocaleString()}</td><td>{item.completeness_pct.toFixed(2)}%</td></tr>)}</tbody></table></div>
       </div>}
 
       <div className="panel result-section">
