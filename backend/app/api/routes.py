@@ -161,9 +161,9 @@ async def profile_public_dataset(
         await file.close()
         raise HTTPException(status_code=400, detail="A valid filename is required.")
     extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-    if extension not in {"csv", "xls", "xlsx"}:
+    if extension not in {"csv", "xls", "xlsx", "json", "xml"}:
         await file.close()
-        raise HTTPException(status_code=415, detail="The dataset profiler accepts CSV, XLS and XLSX files.")
+        raise HTTPException(status_code=415, detail="Supported dataset profile formats: CSV, XLS, XLSX, JSON and XML.")
     limit = limits["max_upload_bytes"]
     try:
         raw = await file.read(limit + 1) if limit is not None else await file.read()
