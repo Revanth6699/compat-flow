@@ -46,18 +46,6 @@ type MultiResult = {
   preview: Record<string, unknown>[];
   persisted: false; validation_scope: string; referential_checks: string;
 };
-type AiMappingResult = {
-  status: string; message: string;
-  suggestions: { source_header: string; candidate_field: string; confidence: number; rationale: string; evidence: string[]; requires_confirmation: boolean }[];
-  source_data_sent: boolean;
-};
-const recordFields: Record<string, string[]> = {
-  products: ["sku", "name", "manufacturer", "part_number", "category", "supplier_id", "replacement_sku"],
-  product_variants: ["product_id", "variant_sku", "attributes", "is_active"],
-  supplier_offers: ["supplier_id", "product_id", "supplier_sku", "supplier_product_id", "unit_price", "currency", "unit_of_measure", "minimum_order_quantity", "lead_time_days", "source_url", "status"],
-  inventory_snapshots: ["product_id", "supplier_offer_id", "warehouse_code", "quantity_on_hand", "quantity_reserved", "quantity_available", "snapshot_at", "source_reference"],
-  product_identifiers: ["product_id", "identifier_type", "namespace", "value", "source_reference", "is_primary"],
-};
 type PreviewResponse = {
   filename: string; profile_id: string; records_with_issues: number; duplicate_sku_count: number; duplicate_rate: number; issue_density: number; critical_record_rate: number; total_rows: number; valid_rows: number; invalid_rows: number;
   validation_pass_rate: number; data_quality_score: number; total_issues: number;
@@ -88,16 +76,13 @@ export default function CatalogImportPage() {
   const [datasetResult, setDatasetResult] = useState<DatasetProfile | null>(null);
   const [multiResult, setMultiResult] = useState<MultiResult | null>(null);
   const [industryResult, setIndustryResult] = useState<IndustryResult | null>(null);
-  const [recordType, setRecordType] = useState("products");
-  const [aiConsent, setAiConsent] = useState(false);
-  const [aiResult, setAiResult] = useState<AiMappingResult | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [manualMapping, setManualMapping] = useState<Record<string, string>>({});
   const canonicalFields = ["sku", "name", "manufacturer", "part_number", "category", "compatibility", "replacement_sku"];
 
   function handleFileChange(selectedFile: File | null) {
-    setFile(selectedFile); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setAiResult(null); setAiConsent(false); setManualMapping({}); setError("");
+    setFile(selectedFile); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setManualMapping({}); setError("");
     if (!selectedFile) return;
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
     const allowed = demoApproved ? ["csv", "xlsx", "xls"] : ["csv", "xlsx", "xls", "json", "xml"];
@@ -182,29 +167,6 @@ export default function CatalogImportPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong while validating the file.");
     } finally { setLoading(false); }
-  }
-
-  async function handleSuggestMappings() {
-    if (!file || !user || !aiConsent || loading) return;
-    setLoading(true); setError(""); setAiResult(null);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("record_type", recordType);
-      formData.append("ai_opt_in", "true");
-      const data = await apiRequest<AiMappingResult>("/api/v1/catalog/import/suggest-mappings", { method: "POST", body: formData });
-      setAiResult(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "AI mapping suggestions could not be generated.");
-    } finally { setLoading(false); }
-  }
-
-  function applyAiSuggestions() {
-    if (!aiResult) return;
-    setManualMapping((current) => ({
-      ...current,
-      ...Object.fromEntries(aiResult.suggestions.map((item) => [item.candidate_field, item.source_header])),
-    }));
   }
 
   function saveBlob(filename: string, content: string, mimeType: string) {
@@ -366,7 +328,7 @@ export default function CatalogImportPage() {
               {loading ? "Validating..." : "Validate file"}
             </button>
             <button className="button button-secondary" type="button" disabled={loading} onClick={() => {
-              setFile(null); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setAiResult(null); setAiConsent(false); setError("");
+              setFile(null); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setError("");
               const input = document.getElementById("catalog-file") as HTMLInputElement | null;
               if (input) input.value = "";
             }}>Clear</button>
@@ -374,21 +336,6 @@ export default function CatalogImportPage() {
           {error && <div className="import-error" role="alert">{error}</div>}
         </section>
 
-        {file && user && (
-          <details className="panel result-section no-print ai-mapping-panel" aria-live="polite">
-            <summary><span>AI-assisted mapping</span><small>{aiResult?.status === "provider_unconfigured" ? "Provider not configured" : aiResult?.status === "suggestions_ready" ? `${aiResult.suggestions.length} suggestions returned` : "Optional · requires consent"}</small></summary>
-            <p className="import-description">Optional mapping assistance. If configured and enabled, CompatFlow sends the source headers and up to five bounded sample values per header to an external HTTPS provider. Suggestions are never applied automatically.</p>
-            <label className="ai-consent"><input type="checkbox" checked={aiConsent} onChange={(event) => { setAiConsent(event.target.checked); setAiResult(null); }} /> I consent to sending this bounded sample evidence to the configured AI provider for mapping suggestions.</label>
-            <button className="button button-secondary" type="button" onClick={handleSuggestMappings} disabled={!aiConsent || loading}>{loading ? "Requesting suggestions..." : "Suggest mappings with AI"}</button>
-            {aiResult && <div className={aiResult.status === "provider_unconfigured" ? "ai-provider-notice" : "ai-result-notice"} role="status">
-              <strong>{aiResult.status === "provider_unconfigured" ? "AI provider is not configured" : aiResult.status === "suggestions_ready" ? "Suggestions ready for review" : "AI mapping response"}</strong>
-              <p>{aiResult.message} {aiResult.source_data_sent ? "Sample evidence was sent to the configured provider." : "No sample evidence was sent."}</p>
-              {aiResult.status === "provider_unconfigured" && <p>To enable this feature, the platform operator must configure the backend HTTPS provider URL, API key and model. Do not paste API keys into this page.</p>}
-              {aiResult.suggestions.length > 0 && <><ul className="error-list">{aiResult.suggestions.map((item, index) => <li key={index}><strong>{item.source_header} → {item.candidate_field}</strong> (model-reported {Math.round(item.confidence * 100)}%, uncalibrated): {item.rationale}<br />Evidence: {item.evidence.join("; ")}</li>)}</ul>
-                <button className="button button-secondary" type="button" onClick={applyAiSuggestions}>Apply suggestions to mapping form</button></>}
-            </div>}
-          </details>
-        )}
         <UnifiedImportReport datasetResult={datasetResult} industryResult={industryResult} multiResult={multiResult} result={result} onDownloadCsv={downloadReport} onDownloadJson={downloadProfileJson} onPrint={printReport} />
         {accessType !== "subscription" && <p className="import-disclaimer">Demonstration only. Do not upload confidential supplier files, personal information or production catalog data.</p>}
       </div>
