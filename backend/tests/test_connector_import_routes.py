@@ -1,3 +1,4 @@
+import base64
 import threading
 
 import pytest
@@ -12,6 +13,7 @@ from app.core.database import get_db
 from app.api import connector_import_routes as routes
 from app.api import routes as file_import_routes
 from app.api.connector_import_routes import ConnectorImportRequest, _prepare, _require_allowed_host
+from app.services.connector_credentials import decrypt_credentials, encrypt_credentials
 
 client = TestClient(app)
 
@@ -89,8 +91,15 @@ def test_connector_routes_require_authentication():
     assert client.get(
         "/api/v1/catalog/import/connectors/configurations"
     ).status_code == 401
+    config_id = "00000000-0000-0000-0000-000000000001"
     assert client.delete(
-        "/api/v1/catalog/import/connectors/configurations/00000000-0000-0000-0000-000000000001"
+        f"/api/v1/catalog/import/connectors/configurations/{config_id}"
+    ).status_code == 401
+    assert client.post(
+        f"/api/v1/catalog/import/connectors/configurations/{config_id}/rotate-credentials"
+    ).status_code == 401
+    assert client.get(
+        f"/api/v1/catalog/import/connectors/configurations/{config_id}/audit"
     ).status_code == 401
 
 
@@ -501,5 +510,120 @@ def test_file_ai_endpoint_returns_record_classification_and_mapping(monkeypatch)
         assert set(captured["headers"]) == {"identifier_type", "value", "product_id"}
         assert captured["sample_records"][0]["value"] == "00012345678905"
         assert captured["user_opted_in"] is True
+    finally:
+        clear_connector_auth()
+
+
+
+def test_saved_configuration_rotation_is_tenant_scoped_and_audited(monkeypatch):
+    organization_id, current, _ = install_connector_auth(monkeypatch)
+    old_key = base64.urlsafe_b64encode(b"o" * 32).decode("ascii")
+    new_key = base64.urlsafe_b64encode(b"n" * 32).decode("ascii")
+    configuration_id = uuid4()
+    credentials = {"api_headers": {"Authorization": "Bearer rotation-secret"}}
+    encrypted = encrypt_credentials(
+        credentials,
+        encryption_key=old_key,
+        organization_id=organization_id,
+        configuration_id=configuration_id,
+        source_type="rest_api",
+        key_version="v1",
+    )
+    item = SimpleNamespace(
+        id=configuration_id,
+        organization_id=organization_id,
+        source_type="rest_api",
+        source_descriptor="https://supplier.example",
+        encryption_key_version="v1",
+        encrypted_credentials=encrypted,
+        deleted_at=None,
+    )
+    monkeypatch.setattr(settings, "connector_credential_encryption_key", new_key)
+    monkeypatch.setattr(settings, "connector_credential_encryption_key_version", "v2")
+    monkeypatch.setattr(
+        settings,
+        "connector_credential_encryption_previous_keys",
+        '{"v1":"' + old_key + '"}',
+    )
+
+    class RotationDB:
+        def __init__(self):
+            self.subscription = SimpleNamespace(status="active", plan_code="growth", current_period_end=None)
+            self.plan = SimpleNamespace(code="growth", is_active=True, entitlements={"supplier_catalogs": True})
+            self.events = []
+            self.committed = False
+
+        def scalar(self, statement):
+            query = str(statement)
+            if "role_permissions" in query:
+                return object()
+            if "connector_configurations" in query:
+                return item
+            if "subscriptions" in query:
+                return self.subscription
+            return object()
+
+        def get(self, model, key):
+            return self.plan
+
+        def add(self, event):
+            self.events.append(event)
+
+        def commit(self):
+            self.committed = True
+
+    db = RotationDB()
+    app.dependency_overrides[get_db] = lambda: db
+    try:
+        response = TestClient(app).post(
+            f"/api/v1/catalog/import/connectors/configurations/{configuration_id}/rotate-credentials"
+        )
+        assert response.status_code == 200, response.text
+        assert response.json() == {"rotated": True, "key_version": "v2"}
+        assert item.encryption_key_version == "v2"
+        assert db.committed is True
+        assert len(db.events) == 1
+        assert db.events[0].action == "credentials_rotated"
+        assert db.events[0].key_version_from == "v1"
+        assert db.events[0].key_version_to == "v2"
+        assert decrypt_credentials(
+            item.encrypted_credentials,
+            encryption_key=new_key,
+            organization_id=organization_id,
+            configuration_id=configuration_id,
+            source_type="rest_api",
+            key_version="v2",
+        ) == credentials
+        assert "rotation-secret" not in str(db.events[0].__dict__)
+    finally:
+        clear_connector_auth()
+
+
+def test_saved_configuration_audit_lookup_does_not_cross_tenant(monkeypatch):
+    organization_id, _, _ = install_connector_auth(monkeypatch)
+
+    class TenantDB:
+        subscription = SimpleNamespace(status="active", plan_code="growth", current_period_end=None)
+        plan = SimpleNamespace(code="growth", is_active=True, entitlements={"supplier_catalogs": True})
+
+        def scalar(self, statement):
+            query = str(statement)
+            if "role_permissions" in query:
+                return object()
+            if "subscriptions" in query:
+                return self.subscription
+            if "connector_configurations" in query:
+                return None
+            return object()
+
+        def get(self, model, key):
+            return self.plan
+
+    app.dependency_overrides[get_db] = lambda: TenantDB()
+    try:
+        response = TestClient(app).get(
+            f"/api/v1/catalog/import/connectors/configurations/{uuid4()}/audit"
+        )
+        assert response.status_code == 404
     finally:
         clear_connector_auth()
