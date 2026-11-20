@@ -439,6 +439,45 @@ class ConnectorConfiguration(Base):
     deleted_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True))
 
 
+class ConnectorConfigurationAuditEvent(Base):
+    """Immutable, secret-free audit record for saved connector configuration changes."""
+
+    __tablename__ = "connector_configuration_audit_events"
+    __table_args__ = (
+        CheckConstraint(
+            "action IN ('created', 'deleted', 'credentials_rotated')",
+            name="ck_connector_configuration_audit_action",
+        ),
+        Index(
+            "ix_connector_configuration_audit_org_created",
+            "organization_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    configuration_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("connector_configurations.id", ondelete="SET NULL"),
+    )
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
+    action: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    source_descriptor: Mapped[str] = mapped_column(String(512), nullable=False)
+    key_version_from: Mapped[str | None] = mapped_column(String(16))
+    key_version_to: Mapped[str | None] = mapped_column(String(16))
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class UserInvitation(Base):
     __tablename__ = "user_invitations"
     __table_args__ = (
