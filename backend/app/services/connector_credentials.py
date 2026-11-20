@@ -20,6 +20,7 @@ class CredentialVaultError(ValueError):
 
 
 _KEY_VERSION = "v1"
+_KEY_VERSION_PATTERN = re.compile(r"^v[1-9][0-9]{0,7}$")
 _NONCE_BYTES = 12
 _MAX_CREDENTIAL_BYTES = 64 * 1024
 _IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
@@ -72,8 +73,11 @@ def encrypt_credentials(
     organization_id: UUID,
     configuration_id: UUID,
     source_type: str,
+    key_version: str = _KEY_VERSION,
 ) -> str:
     """Encrypt JSON credentials with AES-256-GCM and tenant/configuration AAD."""
+    if not _KEY_VERSION_PATTERN.fullmatch(key_version):
+        raise CredentialVaultError("Connector credential encryption version is invalid.")
     if not isinstance(credentials, dict):
         raise CredentialVaultError("Connector credentials must be an object.")
     try:
@@ -88,7 +92,7 @@ def encrypt_credentials(
     ciphertext = AESGCM(_decode_key(encryption_key)).encrypt(
         nonce,
         plaintext,
-        _aad(organization_id, configuration_id, source_type),
+        _aad(organization_id, configuration_id, source_type, key_version),
     )
     return base64.urlsafe_b64encode(nonce + ciphertext).decode("ascii")
 
@@ -103,7 +107,7 @@ def decrypt_credentials(
     key_version: str = _KEY_VERSION,
 ) -> dict[str, Any]:
     """Decrypt only for the owning tenant and exact connector configuration."""
-    if key_version != _KEY_VERSION:
+    if not _KEY_VERSION_PATTERN.fullmatch(key_version):
         raise CredentialVaultError(
             "Connector credential encryption version is not supported."
         )
@@ -127,7 +131,113 @@ def decrypt_credentials(
     except (InvalidTag, UnicodeDecodeError, json.JSONDecodeError, ValueError, binascii.Error):
         raise CredentialVaultError(
             "Stored connector credentials could not be decrypted."
-        ) from None
+                ) from None
+
+
+def _parse_previous_encryption_keys(previous_keys_json: str | None) -> dict[str, str]:
+    if not previous_keys_json:
+        return {}
+    if len(previous_keys_json) > 16 * 1024:
+        raise CredentialVaultError("Previous connector encryption key configuration is too large.")
+    try:
+        parsed = json.loads(previous_keys_json)
+    except (TypeError, json.JSONDecodeError):
+        raise CredentialVaultError("Previous connector encryption keys must be valid JSON.") from None
+    if not isinstance(parsed, dict) or len(parsed) > 8:
+        raise CredentialVaultError("At most eight previous connector encryption keys may be configured.")
+    result: dict[str, str] = {}
+    for version, key in parsed.items():
+        if (
+            not isinstance(version, str)
+            or not _KEY_VERSION_PATTERN.fullmatch(version)
+            or not isinstance(key, str)
+        ):
+            raise CredentialVaultError("Previous connector encryption key configuration is invalid.")
+        _decode_key(key)
+        result[version] = key
+    return result
+
+
+def active_connector_encryption_key(
+    *,
+    active_key: str | None,
+    active_version: str,
+    previous_keys_json: str | None,
+) -> tuple[str, str]:
+    """Return the configured active key and version without exposing key material."""
+    if not isinstance(active_version, str) or not _KEY_VERSION_PATTERN.fullmatch(active_version):
+        raise CredentialVaultError("Active connector encryption key version is invalid.")
+    previous = _parse_previous_encryption_keys(previous_keys_json)
+    if active_version in previous:
+        raise CredentialVaultError("The active connector key version cannot also be a previous key.")
+    _decode_key(active_key)
+    return active_version, active_key
+
+
+def connector_encryption_key_for_version(
+    version: str,
+    *,
+    active_key: str | None,
+    active_version: str,
+    previous_keys_json: str | None,
+) -> str:
+    """Resolve one key version; old keys must remain configured until re-encryption completes."""
+    if not isinstance(active_version, str) or not _KEY_VERSION_PATTERN.fullmatch(active_version):
+        raise CredentialVaultError("Active connector encryption key version is invalid.")
+    if not isinstance(version, str) or not _KEY_VERSION_PATTERN.fullmatch(version):
+        raise CredentialVaultError("Stored connector encryption key version is invalid.")
+    if version == active_version:
+        _decode_key(active_key)
+        return active_key
+    previous = _parse_previous_encryption_keys(previous_keys_json)
+    key = previous.get(version)
+    if key is None:
+        raise CredentialVaultError("The required connector encryption key version is not configured.")
+    return key
+
+
+def reencrypt_credentials(
+    encrypted_value: str,
+    *,
+    current_key_version: str,
+    active_key: str | None,
+    active_version: str,
+    previous_keys_json: str | None,
+    organization_id: UUID,
+    configuration_id: UUID,
+    source_type: str,
+) -> tuple[str, str, bool]:
+    """Re-encrypt one saved credential payload under the active key version."""
+    target_version, target_key = active_connector_encryption_key(
+        active_key=active_key,
+        active_version=active_version,
+        previous_keys_json=previous_keys_json,
+    )
+    if current_key_version == target_version:
+        return encrypted_value, current_key_version, False
+    old_key = connector_encryption_key_for_version(
+        current_key_version,
+        active_key=active_key,
+        active_version=active_version,
+        previous_keys_json=previous_keys_json,
+    )
+    credentials = decrypt_credentials(
+        encrypted_value,
+        encryption_key=old_key,
+        organization_id=organization_id,
+        configuration_id=configuration_id,
+        source_type=source_type,
+        key_version=current_key_version,
+    )
+    rotated = encrypt_credentials(
+        credentials,
+        encryption_key=target_key,
+        organization_id=organization_id,
+        configuration_id=configuration_id,
+        source_type=source_type,
+        key_version=target_version,
+    )
+    return rotated, target_version, True
 
 
 def _require_keys(
