@@ -449,8 +449,9 @@ class ConnectorConfigurationAuditEvent(Base):
             name="ck_connector_configuration_audit_action",
         ),
         Index(
-            "ix_connector_configuration_audit_org_created",
+            "ix_connector_configuration_audit_org_config_created",
             "organization_id",
+            "configuration_id",
             "created_at",
         ),
     )
