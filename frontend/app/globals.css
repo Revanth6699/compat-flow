@@ -1844,3 +1844,37 @@ h1, h2, h3, h4, .editorial-heading {
 @media (max-width: 480px) {
   .review-star { width: 43px; height: 43px; font-size: 1.8rem; }
 }
+
+
+/* Public review discussions and profile review management */
+.your-reviews-panel { scroll-margin-top: 110px; }
+.your-reviews-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:18px; }
+.your-reviews-heading h2 { margin:0 0 6px; color:#234d73; }
+.your-reviews-heading .settings-description { margin:0; }
+.your-review-card { padding:18px; border:1px solid #e4eaf1; border-radius:11px; background:#fbfcfe; }
+.your-review-card > p { color:#34465a; line-height:1.7; white-space:pre-wrap; overflow-wrap:anywhere; }
+.your-review-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+.review-replies { margin-top:20px; padding-top:18px; border-top:1px solid #e8edf3; }
+.review-replies h3 { margin:0 0 14px; color:#294d6c; font-size:1rem; }
+.review-reply { margin:10px 0; padding:13px 15px; border:1px solid #e7edf3; border-radius:9px; background:#f8fafc; }
+.review-reply-meta { display:flex; align-items:center; justify-content:space-between; gap:12px; color:#41576d; font-size:.82rem; }
+.review-reply-meta time { color:#78889a; font-size:.72rem; }
+.review-reply p { margin:8px 0 0; color:#34465a; line-height:1.6; white-space:pre-wrap; overflow-wrap:anywhere; }
+.review-reply-form { display:grid; gap:8px; margin-top:16px; }
+.review-reply-form label { color:#53677d; font-size:.8rem; font-weight:650; }
+.review-reply-form input,
+.review-reply-form textarea { width:100%; min-width:0; padding:11px 12px; border:1px solid #d6e0e9; border-radius:8px; background:#fff; color:#263b50; font:inherit; }
+.review-reply-form textarea { resize:vertical; }
+.review-reply-form .button { justify-self:start; margin-top:4px; }
+.reviews-page .reviews-heading { display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
+.reviews-page .reviews-heading .button { margin-top:4px; }
+.reviews-page .review-card { min-width:0; }
+.reviews-page .review-card > p { white-space:pre-wrap; overflow-wrap:anywhere; }
+@media (max-width:640px) {
+  .your-reviews-heading { flex-direction:column; }
+  .your-reviews-heading > .button { width:100%; }
+  .your-review-actions { flex-direction:column; }
+  .your-review-actions .button { width:100%; }
+  .review-reply-meta { align-items:flex-start; flex-direction:column; gap:3px; }
+  .review-reply-form .button { width:100%; }
+}
