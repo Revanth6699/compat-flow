@@ -15,6 +15,7 @@ type DatasetProfile = {
   categorical_distributions: { name: string; values: { value: string; count: number; pct: number }[] }[];
   date_columns: string[]; numeric_columns: string[];
   relationship_checks: { name: string; from_column: string; to_column: string; matched_records: number; average_days: number | null; minimum_days: number | null; maximum_days: number | null; negative_duration_records: number }[];
+  domain_checks?: { code: string; title: string; issue_records: number; severity: string; detail: string; recommendation: string }[];
   findings: { severity: string; title: string; detail: string }[];
   preview: Record<string, unknown>[];
 };
