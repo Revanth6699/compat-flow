@@ -186,10 +186,12 @@ def connector_encryption_key_for_version(
         raise CredentialVaultError("Active connector encryption key version is invalid.")
     if not isinstance(version, str) or not _KEY_VERSION_PATTERN.fullmatch(version):
         raise CredentialVaultError("Stored connector encryption key version is invalid.")
+    previous = _parse_previous_encryption_keys(previous_keys_json)
+    if active_version in previous:
+        raise CredentialVaultError("The active connector key version cannot also be a previous key.")
     if version == active_version:
         _decode_key(active_key)
         return active_key
-    previous = _parse_previous_encryption_keys(previous_keys_json)
     key = previous.get(version)
     if key is None:
         raise CredentialVaultError("The required connector encryption key version is not configured.")
