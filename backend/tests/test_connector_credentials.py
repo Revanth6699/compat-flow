@@ -242,6 +242,7 @@ def test_configuration_public_view_never_exposes_ciphertext():
         source_descriptor="https://supplier.example.com",
         source_settings={"api_url": "https://supplier.example.com/v1"},
         encrypted_credentials="ciphertext-must-not-leak",
+        encryption_key_version="v1",
         created_at=None,
     )
     public = _configuration_public(item)
