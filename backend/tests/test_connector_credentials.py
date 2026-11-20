@@ -484,3 +484,33 @@ def test_configuration_audit_event_contains_only_safe_fields():
     assert event.key_version_from == "v1"
     assert event.key_version_to == "v2"
     assert "secret" not in str(event.__dict__).casefold()
+
+
+
+def test_key_version_is_authenticated_and_duplicate_active_keyring_entry_fails():
+    import json
+
+    encrypted = encrypt_credentials(
+        {"api_headers": {"X-API-Key": "version-bound"}},
+        encryption_key=KEY,
+        organization_id=ORG,
+        configuration_id=CONFIG,
+        source_type="rest_api",
+        key_version="v2",
+    )
+    with pytest.raises(CredentialVaultError, match="could not be decrypted"):
+        decrypt_credentials(
+            encrypted,
+            encryption_key=KEY,
+            organization_id=ORG,
+            configuration_id=CONFIG,
+            source_type="rest_api",
+            key_version="v1",
+        )
+    with pytest.raises(CredentialVaultError, match="cannot also be a previous"):
+        connector_encryption_key_for_version(
+            "v1",
+            active_key=KEY,
+            active_version="v1",
+            previous_keys_json=json.dumps({"v1": KEY}),
+        )
