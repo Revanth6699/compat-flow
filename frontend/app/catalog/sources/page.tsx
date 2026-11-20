@@ -71,10 +71,20 @@ function SourcesContent() {
     <header className="workspace-heading"><div><span className="eyebrow">INPUT SOURCES</span><h1>Connect a supplier source</h1><p>Preview data from an approved API, SFTP server or SQL Server before importing it into your organization workspace.</p></div><a className="button button-secondary" href="/catalog/import">Back to file upload</a></header>
     <section className="panel import-panel">
       <p className="import-description">Connector ingestion requires a Growth, Business or Enterprise subscription and the source host must be allowlisted by the CompatFlow operator. Credentials are sent for this request only and are not saved as reusable connection settings.</p>
-      <label className="column-hint" htmlFor="source-type">Source type</label>
-      <select id="source-type" value={sourceType} onChange={event => { setSourceType(event.target.value as SourceType); setPreview(null); setCommitted(false); setError(""); setNotice(""); }}>
-        <option value="rest_api">REST API</option><option value="sftp">SFTP server</option><option value="sql_server">Microsoft SQL Server</option>
-      </select>
+      <div className="source-type-field">
+        <span className="source-type-label" id="source-type-label">Source type</span>
+        <div className="source-type-options" role="radiogroup" aria-labelledby="source-type-label">
+          <button type="button" className={`source-type-option ${sourceType === "rest_api" ? "is-selected" : ""}`} role="radio" aria-checked={sourceType === "rest_api"} onClick={() => { setSourceType("rest_api"); setPreview(null); setCommitted(false); setError(""); setNotice(""); }}>
+            <span className="source-type-option-title">REST API</span><span className="source-type-option-detail">Connect using an endpoint and API credential</span>
+          </button>
+          <button type="button" className={`source-type-option ${sourceType === "sftp" ? "is-selected" : ""}`} role="radio" aria-checked={sourceType === "sftp"} onClick={() => { setSourceType("sftp"); setPreview(null); setCommitted(false); setError(""); setNotice(""); }}>
+            <span className="source-type-option-title">SFTP server</span><span className="source-type-option-detail">Read a supplier file from a remote server</span>
+          </button>
+          <button type="button" className={`source-type-option ${sourceType === "sql_server" ? "is-selected" : ""}`} role="radio" aria-checked={sourceType === "sql_server"} onClick={() => { setSourceType("sql_server"); setPreview(null); setCommitted(false); setError(""); setNotice(""); }}>
+            <span className="source-type-option-title">Microsoft SQL Server</span><span className="source-type-option-detail">Query a supplier catalog table or view</span>
+          </button>
+        </div>
+      </div>
       {sourceType === "rest_api" && <div className="auth-form">
         <label htmlFor="api-url">API endpoint URL</label><input id="api-url" type="url" required value={form.api_url} onChange={e => update("api_url", e.target.value)} placeholder="https://supplier.example.com/products" />
         <label htmlFor="api-token">API bearer token or API key</label><input id="api-token" type="password" autoComplete="off" value={form.api_token} onChange={e => update("api_token", e.target.value)} placeholder="Credential for this request" />
