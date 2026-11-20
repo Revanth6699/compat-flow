@@ -5,7 +5,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthRequired } from "@/components/auth-required";
 import { useAuth } from "@/components/auth-provider";
-import { apiRequest, updatePassword, updateProfile } from "@/lib/auth-client";
+import { apiRequest, ApiRequestError, updatePassword, updateProfile } from "@/lib/auth-client";
+
+type OwnReview = { id: string; display_name: string; rating: number; comment: string; created_at: string };
+type OwnReviewReply = { id: string; review_id: string; display_name: string; comment: string; created_at: string };
 
 function SettingsContent() {
   const { user, signOut } = useAuth();
@@ -33,6 +36,14 @@ function SettingsContent() {
   const [passwordError, setPasswordError] = useState("");
   const [busyProfile, setBusyProfile] = useState(false);
   const [busyPassword, setBusyPassword] = useState(false);
+  const [myReview, setMyReview] = useState<OwnReview | null>(null);
+  const [myReviewReplies, setMyReviewReplies] = useState<OwnReviewReply[]>([]);
+  const [myReviewLoading, setMyReviewLoading] = useState(true);
+  const [myReplyText, setMyReplyText] = useState("");
+  const [myReplyName, setMyReplyName] = useState(metadata.full_name || "");
+  const [myReviewMessage, setMyReviewMessage] = useState("");
+  const [myReviewError, setMyReviewError] = useState("");
+  const [myReviewBusy, setMyReviewBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -42,6 +53,55 @@ function SettingsContent() {
       .finally(() => { if (active) setRoleLoading(false); });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    void apiRequest<OwnReview>("/api/v1/reviews/mine")
+      .then(async review => {
+        if (!active) return;
+        setMyReview(review);
+        const replies = await apiRequest<OwnReviewReply[]>("/api/v1/reviews/" + review.id + "/replies");
+        if (active) setMyReviewReplies(replies);
+      })
+      .catch(cause => {
+        if (cause instanceof ApiRequestError && cause.status === 404) {
+          if (active) { setMyReview(null); setMyReviewReplies([]); }
+        } else if (active) {
+          setMyReviewError(cause instanceof Error ? cause.message : "Could not load your review.");
+        }
+      })
+      .finally(() => { if (active) setMyReviewLoading(false); });
+    return () => { active = false; };
+  }, []);
+
+  async function deleteMyReview() {
+    if (!myReview || !window.confirm("Delete your published review and all replies? This cannot be undone.")) return;
+    setMyReviewBusy(true); setMyReviewError(""); setMyReviewMessage("");
+    try {
+      await apiRequest<{ deleted: boolean }>("/api/v1/reviews/mine", { method: "DELETE" });
+      setMyReview(null); setMyReviewReplies([]); setMyReplyText("");
+      setMyReviewMessage("Your review and its replies have been deleted.");
+    } catch (cause) {
+      setMyReviewError(cause instanceof Error ? cause.message : "Could not delete your review.");
+    } finally { setMyReviewBusy(false); }
+  }
+
+  async function sendMyReviewReply(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!myReview) return;
+    setMyReviewBusy(true); setMyReviewError(""); setMyReviewMessage("");
+    try {
+      const reply = await apiRequest<OwnReviewReply>("/api/v1/reviews/" + myReview.id + "/replies", {
+        method: "POST",
+        body: JSON.stringify({ display_name: myReplyName, comment: myReplyText }),
+      });
+      setMyReviewReplies(current => [...current, reply]);
+      setMyReplyText("");
+      setMyReviewMessage("Your reply has been posted.");
+    } catch (cause) {
+      setMyReviewError(cause instanceof Error ? cause.message : "Could not post your reply.");
+    } finally { setMyReviewBusy(false); }
+  }
 
   async function deleteAccount() {
     setDeleteError("");
@@ -106,6 +166,30 @@ function SettingsContent() {
       {passwordError && <p className="auth-error" role="alert">{passwordError}</p>}{passwordMessage && <p className="auth-success" role="status">{passwordMessage}</p>}
       <button className="button auth-submit" disabled={busyPassword}>{busyPassword ? "Updating…" : "Update password"}</button>
     </form></section>
+    <section className="panel settings-panel your-reviews-panel" id="your-reviews">
+      <div className="your-reviews-heading"><div><h2>Your reviews</h2><p className="settings-description">Manage your published review and read or join its public reply thread.</p></div><Link className="button button-secondary" href="/reviews/write">{myReview ? "Edit review" : "Write a review"}</Link></div>
+      {myReviewLoading && <p>Loading your review…</p>}
+      {!myReviewLoading && !myReview && <p className="settings-description">You have not published a review yet.</p>}
+      {myReview && <>
+        <article className="your-review-card">
+          <div className="review-card-top"><strong>{myReview.display_name}</strong><time dateTime={myReview.created_at}>{new Date(myReview.created_at).toLocaleDateString()}</time></div>
+          <div className="review-stars" aria-label={myReview.rating + " out of 5 stars"}>{"★".repeat(myReview.rating)}{"☆".repeat(5-myReview.rating)}</div>
+          <p>{myReview.comment}</p>
+          <div className="your-review-actions"><Link className="button button-secondary" href="/reviews/write">Edit review</Link><button className="button button-danger" type="button" disabled={myReviewBusy} onClick={() => void deleteMyReview()}>{myReviewBusy ? "Please wait…" : "Delete review"}</button></div>
+        </article>
+        <div className="review-replies">
+          <h3>Replies ({myReviewReplies.length})</h3>
+          {myReviewReplies.map(reply => <div className="review-reply" key={reply.id}><div className="review-reply-meta"><strong>{reply.display_name}</strong><time dateTime={reply.created_at}>{new Date(reply.created_at).toLocaleString()}</time></div><p>{reply.comment}</p></div>)}
+          <form className="review-reply-form" onSubmit={sendMyReviewReply}>
+            <label htmlFor="your-review-reply-name">Your name</label><input id="your-review-reply-name" minLength={2} maxLength={80} required value={myReplyName} onChange={event => setMyReplyName(event.target.value)} />
+            <label htmlFor="your-review-reply-text">Reply to the thread</label><textarea id="your-review-reply-text" minLength={2} maxLength={2000} required rows={3} value={myReplyText} onChange={event => setMyReplyText(event.target.value)} placeholder="Write a reply…" />
+            <button className="button button-secondary" disabled={myReviewBusy}>{myReviewBusy ? "Posting…" : "Post reply"}</button>
+          </form>
+        </div>
+      </>}
+      {myReviewError && <p className="auth-error" role="alert">{myReviewError}</p>}
+      {myReviewMessage && <p className="auth-success" role="status">{myReviewMessage}</p>}
+    </section>
     <section className="panel settings-panel"><h2>Account and privacy</h2><p className="settings-description">CompatFlow uses your account details to authenticate you and associate your access with an organization. You can review how information is processed in the <Link href="/privacy">Privacy Policy</Link>.</p><button className="button button-secondary" onClick={() => void signOut()}>Sign out</button></section>
     <section className="panel settings-panel danger-zone">
       <h2>Delete account</h2>

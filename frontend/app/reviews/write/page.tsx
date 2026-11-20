@@ -17,11 +17,13 @@ function WriteReviewContent() {
   const [checkingReview, setCheckingReview] = useState(true);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [hasExistingReview, setHasExistingReview] = useState(false);
 
   useEffect(() => {
     let active = true;
     void apiRequest<Review>("/api/v1/reviews/mine").then(review => {
       if (!active) return;
+      setHasExistingReview(true);
       setDisplayName(review.display_name);
       setRating(review.rating);
       setComment(review.comment);
@@ -48,7 +50,12 @@ function WriteReviewContent() {
         method: "POST",
         body: JSON.stringify({ display_name: displayName, rating, comment }),
       });
-      setMessage("Your review has been published on the public CompatFlow reviews page.");
+      setHasExistingReview(true);
+      setRating(0);
+      setComment("");
+      setMessage(hasExistingReview
+        ? "Review sent — your existing review has been updated. The form is ready for another edit."
+        : "Review sent successfully. The form is ready. You can update this review any time from Profile settings → Your reviews.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not publish your review.");
     } finally { setLoading(false); }
@@ -76,7 +83,7 @@ function WriteReviewContent() {
         <p className="settings-description">Your display name, star rating and comment will be published publicly. Do not include confidential company information or personal data.</p>
         {error && <p className="auth-error" role="alert">{error}</p>}
         {message && <p className="auth-success" role="status">{message}</p>}
-        <button className="button auth-submit" disabled={loading || rating === 0}>{loading ? "Publishing…" : "Publish review"}</button>
+        <button className="button auth-submit" disabled={loading || rating === 0}>{loading ? "Publishing…" : hasExistingReview ? "Update review" : "Publish review"}</button>
       </form>}
     </section>
   </div></main>;
