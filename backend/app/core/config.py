@@ -29,6 +29,8 @@ class Settings(BaseSettings):
     sftp_known_hosts_path: str = ""
     connector_rate_limit_per_minute: int = 20
     connector_credential_encryption_key: str = ""
+    connector_credential_encryption_key_version: str = "v1"
+    connector_credential_encryption_previous_keys: str = "{}"
 
     razorpay_key_id: str = ""
     razorpay_key_secret: str = ""
