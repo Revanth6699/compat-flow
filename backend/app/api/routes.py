@@ -37,7 +37,6 @@ from app.schemas import (
 from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
 from app.services.catalog_ingestion import persist_validated_import
-from app.services.mapping_assistant import suggest_field_mappings
 from app.services.dataset_rules import profile_dataset_rules
 from app.services.industry_catalog import IndustryCSVError, validate_industry_records
 from app.services.catalog_csv import (
@@ -543,62 +542,6 @@ async def validate_multiformat_records(
         "persisted": False,
         "validation_scope": "schema_and_in_file_duplicates",
         "referential_checks": "not_run",
-    }
-
-
-@router.post("/catalog/import/suggest-mappings")
-async def suggest_multiformat_mappings(
-    file: UploadFile = File(...),
-    record_type: str = Form(...),
-    ai_opt_in: bool = Form(False),
-    sheet_name: str | None = Form(None),
-    header_row: int = Form(1, ge=1, le=1000),
-    json_record_path: str | None = Form(None),
-    xml_record_tag: str | None = Form(None),
-    _current: AuthenticatedUser = Depends(require_permission("catalog:read")),
-    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
-    db: Session = Depends(get_db),
-):
-    """Return optional AI mapping suggestions; data leaves CompatFlow only after explicit opt-in."""
-    limits = resolve_import_limits(_plan, db)
-    filename = (file.filename or "").strip()
-    if not filename or len(filename) > 255:
-        await file.close()
-        raise HTTPException(status_code=400, detail="A valid filename is required.")
-    try:
-        raw = await file.read(limits["max_upload_bytes"] + 1) if limits["max_upload_bytes"] is not None else await file.read()
-    finally:
-        await file.close()
-    if limits["max_upload_bytes"] is not None and len(raw) > limits["max_upload_bytes"]:
-        raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
-    try:
-        parsed = parse_source(
-            raw, filename, sheet_name=sheet_name, max_records=limits["max_records"], header_row=header_row,
-            json_record_path=json_record_path, xml_record_tag=xml_record_tag,
-        )
-        result = await suggest_field_mappings(
-            record_type=record_type,
-            headers=parsed.headers,
-            sample_records=[record.values for record in parsed.records[:5]],
-            user_opted_in=ai_opt_in,
-        )
-    except (IngestionParseError, ValueError) as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from None
-    return {
-        "status": result.status,
-        "message": result.message,
-        "suggestions": [
-            {
-                "source_header": item.source_header,
-                "candidate_field": item.candidate_field,
-                "confidence": item.confidence,
-                "rationale": item.rationale,
-                "evidence": item.evidence,
-                "requires_confirmation": True,
-            }
-            for item in result.suggestions
-        ],
-        "source_data_sent": ai_opt_in and result.status != "provider_unconfigured",
     }
 
 
