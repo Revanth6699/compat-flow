@@ -38,6 +38,7 @@ from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.mapping_assistant import suggest_field_mappings
+from app.services.dataset_rules import profile_dataset_rules
 from app.services.industry_catalog import IndustryCSVError, validate_industry_records
 from app.services.catalog_csv import (
     CatalogCSVValidationError,
@@ -246,15 +247,8 @@ async def profile_public_dataset(
         })
     normalized = {re.sub(r"[^a-z0-9]+", "_", header.casefold()).strip("_") for header in headers}
     product_headers = {"sku", "product_sku", "item_sku", "product_code", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category"}
-    order_headers = {"order_id", "order_status", "order_purchase_timestamp", "customer_id", "order_item_id"}
-    if normalized & order_headers:
-        dataset_type = "orders / transactions"
-    elif normalized & product_headers:
-        dataset_type = "product catalog"
-    elif {"customer_id", "customer_unique_id", "customer_zip_code_prefix"} & normalized:
-        dataset_type = "customer records"
-    else:
-        dataset_type = "general dataset"
+    domain_profile = profile_dataset_rules(headers, rows)
+    dataset_type = domain_profile["dataset_type"]
 
     relationship_checks = []
     purchase_header = next((h for h in headers if re.sub(r"[^a-z0-9]+", "_", h.casefold()).strip("_") in {"order_purchase_timestamp", "purchase_date", "created_at", "order_date"}), None)
@@ -294,6 +288,12 @@ async def profile_public_dataset(
     if any(column["completeness_pct"] < 80 for column in columns):
         low = sorted((column for column in columns if column["completeness_pct"] < 80), key=lambda c: c["completeness_pct"])
         findings.append({"severity": "warning", "title": "Low-completeness columns", "detail": ", ".join(f"{c['name']} ({c['completeness_pct']}%)" for c in low[:5])})
+    for issue in domain_profile["domain_issues"]:
+        findings.append({
+            "severity": issue["severity"],
+            "title": issue["title"],
+            "detail": f'{issue["detail"]} Recommended action: {issue["recommendation"]}',
+        })
     if not findings:
         findings.append({"severity": "info", "title": "No structural red flags detected", "detail": "No missing cells or exact duplicate rows were found in the uploaded sample."})
 
@@ -317,6 +317,7 @@ async def profile_public_dataset(
         "date_columns": date_columns,
         "numeric_columns": numeric_columns,
         "relationship_checks": relationship_checks,
+        "domain_checks": domain_profile["domain_checks"],
         "findings": findings,
         "preview": rows[:10],
         "is_product_catalog": bool(normalized & product_headers),
