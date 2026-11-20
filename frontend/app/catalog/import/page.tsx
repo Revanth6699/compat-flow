@@ -563,7 +563,7 @@ export default function CatalogImportPage() {
             <p className="import-disclaimer">The score is a transparent rule-based heuristic, not a statistical accuracy measurement. It reflects only the current product-catalog validation rules.</p>
           </section>
         )}
-        <p className="import-disclaimer">Demonstration only. Do not upload confidential supplier files, personal information or production catalog data.</p>
+        {accessType !== "subscription" && <p className="import-disclaimer">Demonstration only. Do not upload confidential supplier files, personal information or production catalog data.</p>}
       </div>
     </main>
   );
