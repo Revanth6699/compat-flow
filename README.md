@@ -10,7 +10,7 @@ Connector code has mocked coverage but no REST, SFTP or SQL Server source has be
 
 The public demo described below remains a separate stateless workflow. It does not expose the full authenticated backend implementation.
 
-Saved REST API, SFTP, and SQL Server configurations now have an organization-scoped AES-256-GCM credential vault. The vault requires `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY` and fails closed when it is absent; this does not constitute live connector verification or production readiness.
+Saved REST API, SFTP, and SQL Server configurations use an organization-scoped AES-256-GCM credential vault with versioned key rotation and secret-free configuration audit events. The vault requires an active `CONNECTOR_CREDENTIAL_ENCRYPTION_KEY`; this does not constitute live connector verification or production readiness.
 
 ## What the public demo does
 
