@@ -259,7 +259,7 @@ export default function CatalogImportPage() {
         [], ["Row", "Field", "Severity", "Code", "Issue"],
         ...industryResult.issues.map((item) => [item.row_number, item.field ?? "Record", item.severity, item.error_code, item.message]),
       ];
-      const csv = rows.map((row) => row.map((value) => '"' + String(value ?? "").replace(/"/g, '""') + '"').join(",")).join("\\n");
+      const csv = rows.map((row) => row.map((value) => '"' + String(value ?? "").replace(/"/g, '""') + '"').join(",")).join("\n");
       saveBlob("compatflow-industry-report.csv", csv, "text/csv;charset=utf-8");
       return;
     }
@@ -275,7 +275,7 @@ export default function CatalogImportPage() {
         [], ["Source location", "Field", "Code", "Issue"],
         ...multiResult.errors.map((item) => [item.source_location, item.field ?? "Record", item.error_code, item.message]),
       ];
-      const csv = rows.map((row) => row.map((value) => '"' + String(value ?? "").replace(/"/g, '""') + '"').join(",")).join("\\n");
+      const csv = rows.map((row) => row.map((value) => '"' + String(value ?? "").replace(/"/g, '""') + '"').join(",")).join("\n");
       saveBlob("compatflow-multiformat-report.csv", csv, "text/csv;charset=utf-8");
       return;
     }
