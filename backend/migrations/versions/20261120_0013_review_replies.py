@@ -28,6 +28,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
+    op.execute("ALTER TABLE review_replies ENABLE ROW LEVEL SECURITY")
     op.create_index(
         "ix_review_replies_review_created",
         "review_replies",
