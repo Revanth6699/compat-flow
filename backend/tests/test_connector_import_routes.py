@@ -516,7 +516,8 @@ def test_file_ai_endpoint_returns_record_classification_and_mapping(monkeypatch)
 
 
 def test_saved_configuration_rotation_is_tenant_scoped_and_audited(monkeypatch):
-    organization_id, _, _ = install_connector_auth(monkeypatch)
+    organization_id, current, _ = install_connector_auth(monkeypatch)
+    current.profile.role = "admin"
     old_key = base64.urlsafe_b64encode(b"o" * 32).decode("ascii")
     new_key = base64.urlsafe_b64encode(b"n" * 32).decode("ascii")
     configuration_id = uuid4()
@@ -600,7 +601,8 @@ def test_saved_configuration_rotation_is_tenant_scoped_and_audited(monkeypatch):
 
 
 def test_saved_configuration_audit_lookup_does_not_cross_tenant(monkeypatch):
-    install_connector_auth(monkeypatch)
+    _, current, _ = install_connector_auth(monkeypatch)
+    current.profile.role = "admin"
 
     class TenantDB:
         subscription = SimpleNamespace(status="active", plan_code="growth", current_period_end=None)
@@ -625,5 +627,36 @@ def test_saved_configuration_audit_lookup_does_not_cross_tenant(monkeypatch):
             f"/api/v1/catalog/import/connectors/configurations/{uuid4()}/audit"
         )
         assert response.status_code == 404
+    finally:
+        clear_connector_auth()
+
+
+
+def test_member_cannot_manage_saved_connector_configurations(monkeypatch):
+    install_connector_auth(monkeypatch)
+    configuration_id = uuid4()
+    config_payload = {
+        "name": "Supplier API",
+        "source_type": "rest_api",
+        "source_settings": {"api_url": "https://supplier.example/catalog"},
+        "credentials": {"api_headers": {"X-API-Key": "secret"}},
+    }
+    try:
+        create = TestClient(app).post(
+            "/api/v1/catalog/import/connectors/configurations",
+            json=config_payload,
+        )
+        delete = TestClient(app).delete(
+            f"/api/v1/catalog/import/connectors/configurations/{configuration_id}"
+        )
+        rotate = TestClient(app).post(
+            f"/api/v1/catalog/import/connectors/configurations/{configuration_id}/rotate-credentials"
+        )
+        audit = TestClient(app).get(
+            f"/api/v1/catalog/import/connectors/configurations/{configuration_id}/audit"
+        )
+        assert [create.status_code, delete.status_code, rotate.status_code, audit.status_code] == [
+            403, 403, 403, 403
+        ]
     finally:
         clear_connector_auth()
