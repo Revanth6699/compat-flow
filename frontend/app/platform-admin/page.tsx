@@ -110,8 +110,8 @@ export default function PlatformAdminPage() {
   }
 
   return (
-    <main className="page" style={{ background: "#F5F7FA", padding: "38px 0 72px" }}>
-      <div className="container" style={{ maxWidth: 1320 }}>
+    <main className="page platform-admin-page">
+      <div className="container platform-admin-container">
         <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, flexWrap: "wrap", marginBottom: 28 }}>
           <div>
             <div className="eyebrow">COMPATFLOW / ADMINISTRATION</div>
@@ -143,7 +143,7 @@ export default function PlatformAdminPage() {
           </div>
         </section>
 
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.7fr) minmax(290px,1fr)", alignItems: "start", gap: 18 }}>
+        <div className="platform-admin-layout">
           <section className="panel" aria-label="Demo access requests" style={{ padding: 24, borderRadius: 11, borderColor: "#E2E8F0", boxShadow: "0 2px 8px rgba(15,23,42,.025)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 18 }}>
               <div><h2 style={{ margin: 0, color: "#1E293B", fontSize: 18 }}>Demo access requests</h2><p style={{ margin: "4px 0 0", color: "#64748B", fontSize: 12 }}>Review requests and control demo access.</p></div>
