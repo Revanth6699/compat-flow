@@ -54,15 +54,15 @@ def upgrade() -> None:
         ),
     )
     op.create_index(
-        "ix_connector_configuration_audit_org_created",
+        "ix_connector_configuration_audit_org_config_created",
         "connector_configuration_audit_events",
-        ["organization_id", "created_at"],
+        ["organization_id", "configuration_id", "created_at"],
     )
 
 
 def downgrade() -> None:
     op.drop_index(
-        "ix_connector_configuration_audit_org_created",
+        "ix_connector_configuration_audit_org_config_created",
         table_name="connector_configuration_audit_events",
     )
     op.drop_table("connector_configuration_audit_events")
