@@ -18,7 +18,6 @@ The frontend signup form collects full name, organization name, work email, and 
 - SFTP_KNOWN_HOSTS_PATH: path to the managed SSH known-hosts file mounted in the backend runtime.
 - CONNECTOR_RATE_LIMIT_PER_MINUTE: per-organization connector preview/commit limit; defaults to 20 and must be 1–1000.
 - IMPORT_MAX_UPLOAD_BYTES: upload/connector byte limit; defaults to 25 MiB and cannot exceed 50 MiB.
-- MAPPING_AI_BASE_URL, MAPPING_AI_API_KEY, MAPPING_AI_MODEL: optional server-side mapping provider configuration. Do not set these unless the provider, retention terms, and cost are approved.
 
 Do not configure or expose a Supabase service-role key for onboarding. Never commit credentials.
 
