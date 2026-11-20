@@ -56,7 +56,7 @@ function WriteReviewContent() {
         {error && <p className="auth-error" role="alert">{error}</p>}
         {message && <p className="auth-success" role="status">{message}</p>}
         <button className="button auth-submit" disabled={loading}>{loading ? "Publishing…" : "Publish review"}</button>
-      </form>
+      </form>}
     </section>
   </div></main>;
 }
