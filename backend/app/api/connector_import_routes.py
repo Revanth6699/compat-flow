@@ -19,7 +19,14 @@ from starlette.concurrency import run_in_threadpool
 from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import ConnectorConfiguration, ImportJob, ImportRowError, ImportRecordLineage, RolePermission
+from app.models import (
+    ConnectorConfiguration,
+    ConnectorConfigurationAuditEvent,
+    ImportJob,
+    ImportRowError,
+    ImportRecordLineage,
+    RolePermission,
+)
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
@@ -28,6 +35,9 @@ from app.services.connector_credentials import (
     CredentialVaultError,
     decrypt_credentials,
     encrypt_credentials,
+    active_connector_encryption_key,
+    connector_encryption_key_for_version,
+    reencrypt_credentials,
     validate_connector_configuration,
 )
 from app.services.source_connectors import (
@@ -96,8 +106,30 @@ def _configuration_public(item: ConnectorConfiguration) -> dict:
         "source_type": item.source_type,
         "source_descriptor": item.source_descriptor,
         "source_settings": item.source_settings,
+        "encryption_key_version": item.encryption_key_version,
         "created_at": item.created_at,
     }
+
+
+def _configuration_audit_event(
+    *,
+    item: ConnectorConfiguration,
+    action: str,
+    actor_user_id: UUID | None,
+    key_version_from: str | None = None,
+    key_version_to: str | None = None,
+) -> ConnectorConfigurationAuditEvent:
+    """Build an audit event using only sanitized connector metadata."""
+    return ConnectorConfigurationAuditEvent(
+        organization_id=item.organization_id,
+        configuration_id=item.id,
+        actor_user_id=actor_user_id,
+        action=action,
+        source_type=item.source_type,
+        source_descriptor=item.source_descriptor,
+        key_version_from=key_version_from,
+        key_version_to=key_version_to,
+    )
 
 
 def _resolve_connector_request(
@@ -144,9 +176,15 @@ def _resolve_connector_request(
         raise HTTPException(status_code=404, detail="Connector configuration not found.")
 
     try:
+        encryption_key = connector_encryption_key_for_version(
+            item.encryption_key_version,
+            active_key=settings.connector_credential_encryption_key,
+            active_version=settings.connector_credential_encryption_key_version,
+            previous_keys_json=settings.connector_credential_encryption_previous_keys,
+        )
         credentials = decrypt_credentials(
             item.encrypted_credentials,
-            encryption_key=settings.connector_credential_encryption_key,
+            encryption_key=encryption_key,
             organization_id=organization_id,
             configuration_id=item.id,
             source_type=item.source_type,
@@ -189,19 +227,20 @@ def create_connector_configuration(
     except CredentialVaultError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
 
-    if not settings.connector_credential_encryption_key:
-        raise HTTPException(
-            status_code=503,
-            detail="Connector credential encryption is not configured; no credentials were stored.",
-        )
     configuration_id = uuid4()
     try:
+        active_version, active_key = active_connector_encryption_key(
+            active_key=settings.connector_credential_encryption_key,
+            active_version=settings.connector_credential_encryption_key_version,
+            previous_keys_json=settings.connector_credential_encryption_previous_keys,
+        )
         encrypted = encrypt_credentials(
             credentials,
-            encryption_key=settings.connector_credential_encryption_key,
+            encryption_key=active_key,
             organization_id=current.profile.organization_id,
             configuration_id=configuration_id,
             source_type=payload.source_type,
+            key_version=active_version,
         )
     except CredentialVaultError:
         raise HTTPException(
@@ -228,9 +267,17 @@ def create_connector_configuration(
         source_descriptor=descriptor,
         source_settings=source_settings,
         encrypted_credentials=encrypted,
-        encryption_key_version="v1",
+        encryption_key_version=active_version,
     )
     db.add(item)
+    db.add(
+        _configuration_audit_event(
+            item=item,
+            action="created",
+            actor_user_id=current.profile.id,
+            key_version_to=active_version,
+        )
+    )
     try:
         db.commit()
         db.refresh(item)
@@ -277,10 +324,110 @@ def delete_connector_configuration(
     )
     if item is None:
         raise HTTPException(status_code=404, detail="Connector configuration not found.")
+    db.add(
+        _configuration_audit_event(
+            item=item,
+            action="deleted",
+            actor_user_id=current.profile.id,
+            key_version_from=item.encryption_key_version,
+        )
+    )
     item.encrypted_credentials = ""
     item.deleted_at = func.now()
     db.commit()
     return {"deleted": True}
+
+
+@router.post("/connectors/configurations/{configuration_id}/rotate-credentials")
+def rotate_connector_configuration_credentials(
+    configuration_id: UUID,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    item = db.scalar(
+        select(ConnectorConfiguration)
+        .where(
+            ConnectorConfiguration.id == configuration_id,
+            ConnectorConfiguration.organization_id == current.profile.organization_id,
+            ConnectorConfiguration.deleted_at.is_(None),
+        )
+        .with_for_update()
+    )
+    if item is None:
+        raise HTTPException(status_code=404, detail="Connector configuration not found.")
+    previous_version = item.encryption_key_version
+    try:
+        encrypted, active_version, rotated = reencrypt_credentials(
+            item.encrypted_credentials,
+            current_key_version=previous_version,
+            active_key=settings.connector_credential_encryption_key,
+            active_version=settings.connector_credential_encryption_key_version,
+            previous_keys_json=settings.connector_credential_encryption_previous_keys,
+            organization_id=item.organization_id,
+            configuration_id=item.id,
+            source_type=item.source_type,
+        )
+    except CredentialVaultError:
+        raise HTTPException(
+            status_code=503,
+            detail="Connector credentials could not be re-encrypted; verify active and previous key configuration.",
+        ) from None
+    if not rotated:
+        return {"rotated": False, "key_version": previous_version}
+    item.encrypted_credentials = encrypted
+    item.encryption_key_version = active_version
+    db.add(
+        _configuration_audit_event(
+            item=item,
+            action="credentials_rotated",
+            actor_user_id=current.profile.id,
+            key_version_from=previous_version,
+            key_version_to=active_version,
+        )
+    )
+    db.commit()
+    return {"rotated": True, "key_version": active_version}
+
+
+@router.get("/connectors/configurations/{configuration_id}/audit")
+def list_connector_configuration_audit(
+    configuration_id: UUID,
+    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
+):
+    configuration = db.scalar(
+        select(ConnectorConfiguration.id).where(
+            ConnectorConfiguration.id == configuration_id,
+            ConnectorConfiguration.organization_id == current.profile.organization_id,
+        )
+    )
+    if configuration is None:
+        raise HTTPException(status_code=404, detail="Connector configuration not found.")
+    events = db.scalars(
+        select(ConnectorConfigurationAuditEvent)
+        .where(
+            ConnectorConfigurationAuditEvent.organization_id == current.profile.organization_id,
+            ConnectorConfigurationAuditEvent.configuration_id == configuration_id,
+        )
+        .order_by(ConnectorConfigurationAuditEvent.created_at.desc())
+        .limit(100)
+    ).all()
+    return {
+        "items": [
+            {
+                "action": event.action,
+                "source_type": event.source_type,
+                "source_descriptor": event.source_descriptor,
+                "key_version_from": event.key_version_from,
+                "key_version_to": event.key_version_to,
+                "actor_user_id": str(event.actor_user_id) if event.actor_user_id else None,
+                "created_at": event.created_at,
+            }
+            for event in events
+        ]
+    }
 
 
 async def _enforce_connector_rate_limit(organization_id: UUID) -> None:
