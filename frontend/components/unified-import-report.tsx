@@ -104,34 +104,38 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
 
       {datasetResult && <DatasetCharts profile={datasetResult} />}
 
-      {mappings.length > 0 && <div className="panel result-section">
+      {mappings.length > 0 && <details className="panel result-section report-detail">
+        <summary><span>Column mapping</span><small>{mappings.length} mapped fields{((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length ? ` · ${((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length} unmapped` : ""}</small></summary>
         <h3>Column mapping</h3>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical field</th><th>Source column</th><th>Confidence</th></tr></thead><tbody>{mappings.map((item) => <tr key={item.field}><td>{item.field.replaceAll("_", " ")}</td><td>{item.source_header}</td><td>{(item.confidence * 100).toFixed(0)}%</td></tr>)}</tbody></table></div>
         {((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length > 0 && <p className="import-description">Unmapped source columns retained: {(industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers ?? []).join(", ")}</p>}
-      </div>}
+      </details>}
 
-      {fieldMetrics.length > 0 && <div className="panel result-section">
+      {fieldMetrics.length > 0 && <details className="panel result-section report-detail">
+        <summary><span>Column completeness and data types</span><small>{fieldMetrics.length} columns</small></summary>
         <h3>Column completeness and data types</h3>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead><tbody>{fieldMetrics.map((item) => <tr key={item.field}><td>{item.field}</td><td>{"inferred_type" in item ? String(item.inferred_type) : "—"}</td><td>{item.populated.toLocaleString()}</td><td>{item.missing.toLocaleString()}</td><td>{item.completeness_pct.toFixed(2)}%</td></tr>)}</tbody></table></div>
-      </div>}
+      </details>}
 
-      {datasetResult && datasetResult.domain_checks && datasetResult.domain_checks.length > 0 && <div className="panel result-section">
+      {datasetResult && datasetResult.domain_checks && datasetResult.domain_checks.length > 0 && <details className="panel result-section report-detail">
+        <summary><span>Dataset-specific validation checks</span><small>{datasetResult.domain_checks.length} checks</small></summary>
         <h3>Dataset-specific validation checks</h3>
         <p className="import-description">These rules were selected from the detected dataset type and available columns. A zero issue count means the check ran and did not flag a record; it does not certify external or business-specific correctness.</p>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Check</th><th>Severity</th><th>Records flagged</th><th>Finding</th><th>Recommended action</th></tr></thead><tbody>{datasetResult.domain_checks.map((check) => <tr key={check.code}><td>{check.title}</td><td>{check.severity}</td><td>{check.issue_records.toLocaleString()}</td><td>{check.detail}</td><td>{check.recommendation}</td></tr>)}</tbody></table></div>
-      </div>}
+      </details>}
 
-      <div className="panel result-section">
+      <div className="panel result-section report-findings">
         <h3>Findings and issues</h3>
         {issues.length === 0 ? <p>No issues were returned by the current analysis.</p> : <div className="table-scroll"><table className="preview-table"><thead><tr><th>Location</th><th>Field / finding</th><th>Severity</th><th>Code</th><th>Details</th></tr></thead><tbody>{issues.slice(0, 100).map((issue, index) => <tr key={index}><td>{issue.location}</td><td>{issue.field}</td><td>{issue.severity}</td><td>{issue.code}</td><td>{issue.message}</td></tr>)}</tbody></table></div>}
         <p className="import-description">The report includes only checks performed by the current analysis path. Unavailable external reference checks are not inferred.</p>
       </div>
 
-      <div className="panel result-section">
+      <details className="panel result-section report-detail">
+        <summary><span>Source record preview</span><small>Up to 10 sample rows</small></summary>
         <h3>Source record preview</h3>
         <p className="import-description">Showing up to the first 10 records returned by the analysis endpoint. This is a preview, not a full-data export.</p>
         <Table headers={previewHeaders} rows={preview.slice(0, 10)} />
-      </div>
+      </details>
       {industryResult && <p className="import-disclaimer">External vehicle fitment, certification, taxonomy and compatibility reference checks are not included unless explicitly provided by the active validation rules.</p>}
       {result && <p className="import-disclaimer">The score is a transparent rule-based heuristic, not a statistical accuracy measurement. It reflects only the current product-catalog validation rules.</p>}
     </section>
