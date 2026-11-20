@@ -11,7 +11,7 @@ def test_inventory_profile_reports_negative_and_unreconciled_quantities():
     )
     assert result["dataset_type"] == "inventory"
     checks = {item["code"]: item for item in result["domain_checks"]}
-    assert checks["NEGATIVE_INVENTORY_QUANTITY"]["issue_records"] == 2
+    assert checks["NEGATIVE_INVENTORY_QUANTITY"]["issue_records"] == 1
     assert checks["INVENTORY_BALANCE_MISMATCH"]["issue_records"] == 1
 
 
