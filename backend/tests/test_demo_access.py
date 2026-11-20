@@ -72,3 +72,24 @@ def test_revoked_demo_user_is_denied_after_access_status_changes(client_factory)
     with client_factory(FakeDb(approved=False)) as client:
         response = client.post("/api/v1/catalog/import/profile", files=csv_file())
     assert response.status_code == 403
+
+
+@pytest.mark.parametrize(
+    ("filename", "payload", "content_type", "expected_format"),
+    [
+        ("orders.json", b'[{"order_id":"O1","order_status":"delivered"}]', "application/json", "json"),
+        ("orders.xml", b'<orders><order><order_id>O1</order_id><order_status>delivered</order_status></order></orders>', "application/xml", "xml"),
+    ],
+)
+def test_approved_demo_user_can_profile_json_and_xml_datasets(
+    client_factory, filename, payload, content_type, expected_format
+):
+    with client_factory(FakeDb(approved=True)) as client:
+        response = client.post(
+            "/api/v1/catalog/import/profile",
+            files={"file": (filename, payload, content_type)},
+        )
+    assert response.status_code == 200
+    assert response.json()["format"] == expected_format
+    assert response.json()["total_records"] == 1
+    assert response.json()["dataset_type"] == "orders / transactions"
