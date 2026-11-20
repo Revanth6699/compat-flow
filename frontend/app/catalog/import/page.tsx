@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/auth-client";
-import DatasetCharts from "@/components/dataset-charts";
+import UnifiedImportReport from "@/components/unified-import-report";
 
 
 type DatasetProfile = {
@@ -246,6 +246,39 @@ export default function CatalogImportPage() {
       saveBlob("compatflow-dataset-profile.csv", csv, "text/csv;charset=utf-8");
       return;
     }
+    if (industryResult) {
+      const rows: unknown[][] = [
+        ["CompatFlow Industry Validation Report", industryResult.filename],
+        ["Profile", industryResult.profile_id ?? "Not confirmed"],
+        ["Total records", industryResult.total_rows], ["Valid records", industryResult.valid_rows],
+        ["Invalid records", industryResult.invalid_rows], ["Pass rate (%)", industryResult.validation_pass_rate],
+        [], ["Field", "Source column", "Confidence"],
+        ...industryResult.column_mappings.map((item) => [item.field, item.source_header, item.confidence]),
+        [], ["Field", "Populated", "Missing", "Completeness (%)"],
+        ...industryResult.field_metrics.map((item) => [item.field, item.populated, item.missing, item.completeness_pct]),
+        [], ["Row", "Field", "Severity", "Code", "Issue"],
+        ...industryResult.issues.map((item) => [item.row_number, item.field ?? "Record", item.severity, item.error_code, item.message]),
+      ];
+      const csv = rows.map((row) => row.map((value) => '"' + String(value ?? "").replace(/"/g, '""') + '"').join(",")).join("\\n");
+      saveBlob("compatflow-industry-report.csv", csv, "text/csv;charset=utf-8");
+      return;
+    }
+    if (multiResult) {
+      const rows: unknown[][] = [
+        ["CompatFlow Multi-format Validation Report", multiResult.filename],
+        ["Record type", multiResult.record_type], ["Total records", multiResult.total_records],
+        ["Valid records", multiResult.valid_records], ["Invalid records", multiResult.invalid_records],
+        [], ["Field", "Source column", "Confidence"],
+        ...multiResult.mappings.map((item) => [item.field, item.source_header, item.confidence]),
+        [], ["Field", "Populated", "Missing", "Completeness (%)"],
+        ...multiResult.field_completeness.map((item) => [item.field, item.populated, item.missing, item.completeness_pct]),
+        [], ["Source location", "Field", "Code", "Issue"],
+        ...multiResult.errors.map((item) => [item.source_location, item.field ?? "Record", item.error_code, item.message]),
+      ];
+      const csv = rows.map((row) => row.map((value) => '"' + String(value ?? "").replace(/"/g, '""') + '"').join(",")).join("\\n");
+      saveBlob("compatflow-multiformat-report.csv", csv, "text/csv;charset=utf-8");
+      return;
+    }
     if (!result) return;
     const report = [
       ["CompatFlow Catalog Validation Report", result.filename],
@@ -268,8 +301,9 @@ export default function CatalogImportPage() {
   }
 
   function downloadProfileJson() {
-    if (!datasetResult) return;
-    saveBlob("compatflow-dataset-profile.json", JSON.stringify(datasetResult, null, 2), "application/json;charset=utf-8");
+    const report = datasetResult ?? industryResult ?? multiResult ?? result;
+    if (!report) return;
+    saveBlob("compatflow-report.json", JSON.stringify(report, null, 2), "application/json;charset=utf-8");
   }
 
   function printReport() {
@@ -348,221 +382,7 @@ export default function CatalogImportPage() {
             </>}
           </section>
         )}
-        {industryResult && (
-          <section className="import-results" aria-live="polite">
-            <div className="results-heading"><div><div className="eyebrow">Industry validation complete</div><h2>{industryResult.profile_id ? industryResult.profile_id.replaceAll("_", " ") : "Industry needs confirmation"}</h2><p>{industryResult.filename} · {industryResult.total_rows.toLocaleString()} rows · Stateless preview</p></div><span className={industryResult.profile_id ? "result-status success" : "result-status warning"}>{industryResult.profile_id ? "Profile applied" : "Choose an industry profile"}</span></div>
-            {industryResult.requires_profile_confirmation && <p className="column-hint">Automatic detection did not find enough distinct evidence. Select the correct profile and validate again.</p>}
-            {industryResult.profile_id && <>
-              <div className="result-stats">
-                <div className="panel stat-card"><span>Total rows</span><strong>{industryResult.total_rows.toLocaleString()}</strong></div>
-                <div className="panel stat-card"><span>Valid rows</span><strong className="metric-valid">{industryResult.valid_rows.toLocaleString()}</strong></div>
-                <div className="panel stat-card"><span>Invalid rows</span><strong className="metric-invalid">{industryResult.invalid_rows.toLocaleString()}</strong></div>
-                <div className="panel stat-card"><span>Mapping coverage</span><strong>{industryResult.metrics.mapping_coverage_pct.toFixed(1)}%</strong></div>
-                <div className="panel stat-card"><span>Pass rate</span><strong>{industryResult.validation_pass_rate.toFixed(1)}%</strong></div>
-                <div className="panel stat-card"><span>Issues</span><strong>{industryResult.metrics.issue_count.toLocaleString()}</strong></div>
-              </div>
-              <div className="panel result-section"><h3>Detected column mappings</h3><div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical field</th><th>Source column</th><th>Confidence</th></tr></thead><tbody>{industryResult.column_mappings.map((item) => <tr key={item.field}><td>{item.field}</td><td>{item.source_header}</td><td>{(item.confidence * 100).toFixed(0)}%</td></tr>)}</tbody></table></div>{industryResult.unmapped_headers.length > 0 && <p className="import-description">Unmapped source columns retained: {industryResult.unmapped_headers.join(", ")}</p>}</div>
-              <div className="panel result-section"><h3>Applicable field completeness</h3><div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead><tbody>{industryResult.field_metrics.map((item) => <tr key={item.field}><td>{item.field}</td><td>{item.populated}</td><td>{item.missing}</td><td>{item.completeness_pct.toFixed(1)}%</td></tr>)}</tbody></table></div></div>
-              <div className="panel result-section"><h3>Validation issues</h3>{industryResult.issues.length === 0 ? <p>No issues detected by the current profile rules.</p> : <ul className="error-list">{industryResult.issues.slice(0, 50).map((item, index) => <li key={index}><strong>Row {item.row_number} · {item.field ?? "Record"}</strong>: {item.message} ({item.severity})</li>)}</ul>}<h3>Source-preserving preview</h3>{industryResult.preview.map((row, index) => <pre key={index} className="code-preview">{JSON.stringify(row, null, 2)}</pre>)}<p className="import-disclaimer">External vehicle fitment, certification, taxonomy and compatibility reference checks are not included. No records are saved.</p></div>
-            </>}
-          </section>
-        )}
-        {datasetResult && (
-          <section className="import-results premium-report" aria-live="polite">
-            <div className="results-heading">
-              <div><div className="eyebrow">DATA INTELLIGENCE REPORT</div><h2>{datasetResult.dataset_type} overview</h2><p>{datasetResult.filename} · {datasetResult.format.toUpperCase()} · Stateless analysis</p></div>
-              <span className="result-status success">Analysis complete</span>
-            </div>
-            <div className="report-actions no-print">
-              <button className="button" type="button" onClick={downloadReport}>Download CSV report</button>
-              <button className="button button-secondary" type="button" onClick={downloadProfileJson}>Download JSON</button>
-              <button className="button button-secondary" type="button" onClick={printReport}>Print / Save PDF</button>
-            </div>
-            <div className="result-stats premium-kpis">
-              <div className="panel stat-card"><span>Total records</span><strong>{datasetResult.total_records.toLocaleString()}</strong><small>{datasetResult.total_columns} columns analysed</small></div>
-              <div className="panel stat-card"><span>Completeness</span><strong>{datasetResult.completeness_pct.toFixed(2)}%</strong><small>{datasetResult.populated_cells.toLocaleString()} populated cells</small></div>
-              <div className="panel stat-card"><span>Incomplete records</span><strong className={datasetResult.incomplete_records ? "metric-warning" : "metric-valid"}>{datasetResult.incomplete_records === null ? "Not calculated" : datasetResult.incomplete_records.toLocaleString()}</strong><small>{datasetResult.complete_records_pct === null ? "Record-level completeness unavailable" : datasetResult.complete_records_pct.toFixed(1) + "% fully populated"}</small></div>
-              <div className="panel stat-card"><span>Duplicate rows</span><strong className={datasetResult.duplicate_rows ? "metric-warning" : "metric-valid"}>{datasetResult.duplicate_rows.toLocaleString()}</strong><small>{datasetResult.duplicate_rate_pct.toFixed(2)}% duplicate rate</small></div>
-            </div>
-            <div className="premium-dashboard-grid">
-              <div className="panel result-section">
-                <div className="section-heading"><div><h3>Record health</h3><p>Completeness and exact duplicate checks</p></div></div>
-                {datasetResult.complete_records === null || datasetResult.incomplete_records === null || datasetResult.complete_records_pct === null ? (
-                  <p className="import-description">Record-level completeness is not provided by the connected backend version. Cell-level completeness is shown below.</p>
-                ) : <>
-                  <div className="health-row"><span>Complete records</span><strong>{datasetResult.complete_records.toLocaleString()}</strong></div>
-                  <div className="metric-bar"><span style={{width: `${datasetResult.complete_records_pct}%`}} /></div>
-                  <div className="health-row"><span>Incomplete records</span><strong>{datasetResult.incomplete_records.toLocaleString()}</strong></div>
-                  <div className="metric-bar"><span className="bar-warning" style={{width: `${100-datasetResult.complete_records_pct}%`}} /></div>
-                </>}
-                <p className="import-description">{datasetResult.missing_cells.toLocaleString()} missing cells across {datasetResult.total_cells.toLocaleString()} possible cells.</p>
-              </div>
-              <div className="panel result-section">
-                <div className="section-heading"><div><h3>Key findings</h3><p>Prioritized observations from this file</p></div></div>
-                <div className="finding-list">{datasetResult.findings.map((finding,index)=><div className={`finding-item finding-${finding.severity}`} key={index}><span>{finding.severity.toUpperCase()}</span><div><strong>{finding.title}</strong><p>{finding.detail}</p></div></div>)}</div>
-              </div>
-            </div>
-            <DatasetCharts profile={datasetResult} />
-            {datasetResult.categorical_distributions.length > 0 && (
-              <div className="panel result-section">
-                <div className="section-heading"><div><h3>Category distribution</h3><p>Most frequent values in categorical columns</p></div></div>
-                <div className="distribution-grid">{datasetResult.categorical_distributions.slice(0,6).map(group=><div className="distribution-card" key={group.name}><h4>{group.name}</h4>{group.values.slice(0,6).map(item=><div className="distribution-row" key={item.value}><div><span>{item.value}</span><strong>{item.count.toLocaleString()}</strong></div><div className="metric-bar"><span style={{width:`${item.pct}%`}} /></div><small>{item.pct.toFixed(1)}%</small></div>)}</div>)}</div>
-              </div>
-            )}
-            {datasetResult.relationship_checks.length > 0 && (
-              <div className="panel result-section">
-                <div className="section-heading"><div><h3>Relationship analysis</h3><p>Cross-column checks supported by detected date fields</p></div></div>
-                {datasetResult.relationship_checks.map(check=><div className="relationship-card" key={check.name}><h4>{check.name}</h4><p>{check.from_column} → {check.to_column}</p><div className="relationship-metrics"><div><span>Matched records</span><strong>{check.matched_records.toLocaleString()}</strong></div><div><span>Average duration</span><strong>{check.average_days === null ? "—" : `${check.average_days} days`}</strong></div><div><span>Range</span><strong>{check.minimum_days === null || check.maximum_days === null ? "—" : `${check.minimum_days}–${check.maximum_days} days`}</strong></div><div><span>Negative durations</span><strong className={check.negative_duration_records ? "metric-warning" : "metric-valid"}>{check.negative_duration_records.toLocaleString()}</strong></div></div></div>)}
-              </div>
-            )}
-            <div className="panel result-section report-wide-page">
-              <div className="section-heading"><div><h3>Column intelligence</h3><p>Inferred type, completeness, cardinality and distribution statistics</p></div></div>
-              <div className="table-scroll"><table className="preview-table"><thead><tr><th>Column</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th><th>Distinct</th><th>Min / start</th><th>Max / end</th><th>Average</th></tr></thead><tbody>
-                {datasetResult.columns.map(column=><tr key={column.name}><td>{column.name}</td><td>{column.inferred_type}</td><td>{column.populated.toLocaleString()}</td><td className={column.missing ? "metric-warning" : "metric-valid"}>{column.missing.toLocaleString()}</td><td><div className="metric-bar metric-bar-small"><span style={{width:`${column.completeness_pct}%`}} /></div>{column.completeness_pct.toFixed(1)}%</td><td>{column.distinct_values.toLocaleString()}</td><td>{column.minimum ?? "—"}</td><td>{column.maximum ?? "—"}</td><td>{column.average ?? "—"}</td></tr>)}
-              </tbody></table></div>
-            </div>
-            <div className="panel result-section report-wide-page">
-              <div className="section-heading"><div><h3>Record sample</h3><p>First 10 records from the uploaded file</p></div></div>
-              <div className="table-scroll"><table className="preview-table"><thead><tr>{datasetResult.columns.map(column=><th key={column.name}>{column.name}</th>)}</tr></thead><tbody>{datasetResult.preview.map((row,index)=><tr key={index}>{datasetResult.columns.map(column=><td key={column.name}>{String(row[column.name] ?? "—")}</td>)}</tr>)}</tbody></table></div>
-            </div>
-            <p className="import-disclaimer">This report measures structural completeness, exact duplicates, inferred types and supported column relationships. It does not claim business accuracy or apply product rules to non-product data. No file or record was saved.</p>
-          </section>
-        )}
-        {multiResult && (
-          <section className="import-results" aria-live="polite">
-            <div className="results-heading">
-              <div><div className="eyebrow">Validation complete</div><h2>{multiResult.record_type.replaceAll("_", " ")} results</h2><p>{multiResult.filename} · {multiResult.format.toUpperCase()}</p></div>
-              <span className={multiResult.invalid_records === 0 ? "result-status success" : "result-status warning"}>{multiResult.invalid_records === 0 ? "All records passed schema checks" : "Review required"}</span>
-            </div>
-            <div className="result-stats">
-              <div className="panel stat-card"><span>Total records</span><strong>{multiResult.total_records.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Valid records</span><strong className="metric-valid">{multiResult.valid_records.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Invalid records</span><strong className="metric-invalid">{multiResult.invalid_records.toLocaleString()}</strong></div>
-            </div>
-            <div className="panel result-section">
-              <h3>Validation outcome</h3>
-              <div className="validation-chart"><span className="chart-valid" style={{ width: `${multiResult.total_records ? multiResult.valid_records / multiResult.total_records * 100 : 0}%` }} /><span className="chart-invalid" style={{ width: `${multiResult.total_records ? multiResult.invalid_records / multiResult.total_records * 100 : 0}%` }} /></div>
-              <p><span className="metric-valid">Valid: {multiResult.valid_records.toLocaleString()}</span> · <span className="metric-invalid">Invalid: {multiResult.invalid_records.toLocaleString()}</span></p>
-            </div>
-            <div className="panel result-section">
-              <h3>Field mapping</h3>
-              <p className="import-description">Automatic matches are conservative. Review and confirm every mapping before revalidating.</p>
-              <div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical field</th><th>Source column</th><th>Confidence</th></tr></thead><tbody>
-                {recordFields[recordType].map((field) => <tr key={field}><td>{field.replaceAll("_", " ")}</td><td>
-                  <select aria-label={"Source column for " + field} value={manualMapping[field] ?? ""} onChange={(event) => setManualMapping((current) => ({ ...current, [field]: event.target.value }))}>
-                    <option value="">Not mapped</option>{[...new Set([...multiResult.mappings.map((item) => item.source_header), ...multiResult.unmapped_headers])].map((header) => <option key={header} value={header}>{header}</option>)}
-                  </select>
-                </td><td>{(multiResult.mappings.find((item) => item.field === field)?.confidence ?? 0) * 100}%</td></tr>)}
-              </tbody></table></div>
-              <button className="button button-secondary" type="button" onClick={handleValidate} disabled={loading || !file}>Revalidate with selected mapping</button>
-              {multiResult.unmapped_headers.length > 0 && <p className="import-description">Unmapped columns: {multiResult.unmapped_headers.join(", ")}</p>}
-            </div>
-            <div className="panel result-section">
-              <h3>Required field completeness</h3>
-              <div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead><tbody>
-                {multiResult.field_completeness.map((item) => <tr key={item.field}><td>{item.field}</td><td>{item.populated}</td><td>{item.missing}</td><td>{item.completeness_pct.toFixed(2)}%</td></tr>)}
-              </tbody></table></div>
-            </div>
-            <div className="panel result-section">
-              <h3>Validation issues</h3>
-              {multiResult.errors.length === 0 ? <p>No schema or in-file duplicate issues found. Referential checks have not run.</p> : <ul className="error-list">{multiResult.errors.map((item, index) => <li key={index}><strong>{item.source_location} · {item.field ?? "Record"}</strong>: {item.message} ({item.error_code})</li>)}</ul>}
-              <h3>Valid record preview</h3>
-              <p className="import-description">These records passed schema and in-file duplicate checks only. Nothing has been saved.</p>
-              {multiResult.preview.map((item, index) => <pre key={index} className="code-preview">{JSON.stringify(item, null, 2)}</pre>)}
-              <p className="import-disclaimer">Persistence is not implemented in this workflow. Referential checks are not run.</p>
-            </div>
-          </section>
-        )}
-        {result && (
-          <section className="import-results" aria-live="polite">
-            <div className="results-heading">
-              <div><div className="eyebrow">Validation complete</div><h2>Validation results</h2><p>{result.filename}</p></div>
-              <span className={result.invalid_rows === 0 ? "result-status success" : "result-status warning"}>
-                {result.invalid_rows === 0 ? "All records passed" : "Review required"}
-              </span>
-            </div>
-
-            <div className="result-stats">
-              <div className="panel stat-card"><span>Total records</span><strong>{result.total_rows.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Valid records</span><strong className="metric-valid">{result.valid_rows.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Invalid records</span><strong className="metric-invalid">{result.invalid_rows.toLocaleString()}</strong></div>
-              <div className="panel stat-card"><span>Quality score</span><strong>{result.data_quality_score.toFixed(2)}%</strong></div>
-              <div className="panel stat-card"><span>Pass rate</span><strong>{result.validation_pass_rate.toFixed(2)}%</strong></div>
-              <div className="panel stat-card"><span>Total issues</span><strong>{result.total_issues.toLocaleString()}</strong></div>
-            </div>
-
-            <div className="panel result-section">
-              <h3>Validation outcome</h3>
-              <div className="validation-chart"><span className="chart-valid" style={{ width: `${result.total_rows ? result.valid_rows / result.total_rows * 100 : 0}%` }} /><span className="chart-invalid" style={{ width: `${result.total_rows ? result.invalid_rows / result.total_rows * 100 : 0}%` }} /></div>
-              <p><span className="metric-valid">Valid: {result.valid_rows.toLocaleString()}</span> · <span className="metric-invalid">Invalid: {result.invalid_rows.toLocaleString()}</span> · <span className="metric-warning">Warnings: {result.warning_issues.toLocaleString()}</span></p>
-              <h3>Required-field completeness by column</h3>
-              <div className="field-chart-list">{result.field_metrics.map(metric => <div key={metric.field}><span>{metric.field.replaceAll("_", " ")}</span><div className="metric-bar"><span style={{ width: `${metric.completeness_pct}%` }} /></div><strong>{metric.completeness_pct.toFixed(1)}%</strong></div>)}</div>
-            </div>
-            <div className="panel result-section">
-              <h3>Column mapping</h3>
-              <p className="import-description">Confidence indicates how closely a source header matches a known alias. It is not a measure of data accuracy. Unrecognized columns are preserved in the source file but are not part of this product validation check.</p>
-              <div className="table-scroll"><table className="preview-table"><thead><tr><th>Product field</th><th>Source column</th><th>Mapping confidence</th></tr></thead>
-                <tbody>{result.column_mappings.map((mapping) => <tr key={mapping.field}>
-                  <td>{mapping.field.replaceAll("_", " ")}</td><td>{mapping.source_header}</td><td>{(mapping.confidence * 100).toFixed(0)}%</td>
-                </tr>)}</tbody></table></div>
-              <p className="import-description">Adjust source columns below and revalidate. Each source column can map to only one canonical field.</p>
-              <div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical field</th><th>Source column</th></tr></thead><tbody>{canonicalFields.map((field) => <tr key={field}><td>{field.replaceAll("_", " ")}</td><td><select aria-label={"Source column for " + field} value={manualMapping[field] ?? ""} onChange={(event) => setManualMapping((current) => ({ ...current, [field]: event.target.value }))}><option value="">Not mapped</option>{[...new Set([...result.column_mappings.map((item) => item.source_header), ...result.unmapped_headers])].map((header) => <option key={header} value={header}>{header}</option>)}</select></td></tr>)}</tbody></table></div>
-              <button className="button button-secondary" type="button" onClick={handleValidate} disabled={loading || !file}>Revalidate with selected mapping</button>
-              {result.unmapped_headers.length > 0 && <p className="import-description">Unmapped columns: {result.unmapped_headers.join(", ")}</p>}
-            </div>
-
-            <div className="panel result-section">
-              <div className="results-heading"><div><h3>Issue overview</h3><p className="import-description">Critical: blocks the record from passing. Warning: requires review but does not block it.</p></div>
-                {user ? <button className="button button-secondary" type="button" onClick={downloadReport}>Download report</button> : <span className="import-description">Report downloads are available with a Starter subscription.</span>}
-              </div>
-              <div className="result-stats">
-                <div className="stat-card"><span>Records with issues</span><strong>{result.records_with_issues}</strong></div>
-                <div className="stat-card"><span>Duplicate SKU rate</span><strong>{result.duplicate_rate.toFixed(2)}%</strong></div>
-                <div className="stat-card"><span>Issue density</span><strong>{result.issue_density.toFixed(3)}</strong></div>
-                <div className="stat-card"><span>Critical record rate</span><strong>{result.critical_record_rate.toFixed(2)}%</strong></div>
-                <div className="stat-card"><span>Critical issues</span><strong>{result.critical_issues}</strong></div>
-                <div className="stat-card"><span>Warnings</span><strong>{result.warning_issues}</strong></div>
-              </div>
-              {result.issue_categories.length > 0 ? (
-                <ul className="error-list">{result.issue_categories.map((item) =>
-                  <li key={item.category}><strong>{item.category.replaceAll("_", " ")}</strong>: {item.count}</li>
-                )}</ul>
-              ) : <p>No issues detected by the current rule set.</p>}
-            </div>
-
-            <div className="panel result-section">
-              <h3>Required-field completeness</h3>
-              <p className="import-description">Completeness is the percentage of records with a non-empty value for each required field.</p>
-              <div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead>
-                <tbody>{result.field_metrics.map((metric) => <tr key={metric.field}>
-                  <td>{metric.field}</td><td>{metric.populated}</td><td>{metric.missing}</td><td>{metric.completeness_pct.toFixed(2)}%</td>
-                </tr>)}</tbody></table></div>
-            </div>
-
-            <div className="panel result-section">
-              <h3>Issues requiring review</h3>
-              <p className="import-description">Showing up to 50 issue details. The downloadable report contains the returned issue set.</p>
-              {result.row_errors.length === 0 ? <p>No row-level issues were found.</p> : (
-                <div className="table-scroll"><table className="preview-table"><thead><tr><th>Row</th><th>Field</th><th>Severity</th><th>Category</th><th>Reason</th><th>Recommended action</th></tr></thead>
-                  <tbody>{result.row_errors.slice(0, 50).map((item, index) => <tr key={`${item.row_number}-${item.error_code}-${index}`}>
-                    <td>{item.row_number}</td><td>{item.field ?? "General"}</td><td className={item.severity === "critical" ? "metric-invalid" : "metric-warning"}>{item.severity}</td><td>{item.category.replaceAll("_", " ")}</td><td>{item.message}</td><td>{item.recommendation}</td>
-                  </tr>)}</tbody></table></div>
-              )}
-            </div>
-
-            <div className="panel result-section">
-              <h3>Valid record preview</h3>
-              <p className="import-description">Showing up to the first 10 accepted records.</p>
-              {result.preview.length === 0 ? <p>No valid records to preview.</p> : (
-                <div className="table-scroll"><table className="preview-table"><thead><tr><th>SKU</th><th>Product</th><th>Manufacturer</th><th>Part number</th><th>Category</th><th>Compatibility</th><th>Replacement SKU</th></tr></thead>
-                  <tbody>{result.preview.map((row, index) => <tr key={`${row.sku}-${index}`}>
-                    <td>{row.sku}</td><td>{row.name}</td><td>{row.manufacturer}</td><td>{row.part_number}</td><td>{row.category}</td><td>{row.compatibility || "—"}</td><td>{row.replacement_sku || "—"}</td>
-                  </tr>)}</tbody></table></div>
-              )}
-            </div>
-            <p className="import-disclaimer">The score is a transparent rule-based heuristic, not a statistical accuracy measurement. It reflects only the current product-catalog validation rules.</p>
-          </section>
-        )}
+        <UnifiedImportReport datasetResult={datasetResult} industryResult={industryResult} multiResult={multiResult} result={result} onDownloadCsv={downloadReport} onDownloadJson={downloadProfileJson} onPrint={printReport} />
         {accessType !== "subscription" && <p className="import-disclaimer">Demonstration only. Do not upload confidential supplier files, personal information or production catalog data.</p>}
       </div>
     </main>
