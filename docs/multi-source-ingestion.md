@@ -92,14 +92,6 @@ An optional incremental watermark is supported only for a selected single-column
 
 No real SQL Server connection or least-privilege permission test has passed. Do not label SQL Server operational until a live connection and permission test succeeds.
 
-## AI-assisted mapping
-
-POST /api/v1/catalog/import/suggest-mappings is an explicit opt-in suggestion endpoint. It sends headers and at most five bounded sample values per header to a configured HTTPS OpenAI-compatible provider. Candidate fields are allowlisted by record type; evidence must match the submitted headers or sample values; confidence is model-reported and uncalibrated; every suggestion requires human confirmation.
-
-Provider configuration uses MAPPING_AI_BASE_URL, MAPPING_AI_API_KEY, and MAPPING_AI_MODEL. No provider credentials are configured in the current environment, so live AI suggestions are not verified. Manual and deterministic mapping remain available. No model is trained.
-
-The reviewed benchmark seed has 72 examples and is an evaluation seed, not a training corpus. Keep source families separated in any held-out evaluation; do not train on the seed or unconfirmed AI predictions.
-
 ## UI and rollout boundary
 
 The file upload UI currently performs validation/preview; it does not expose the backend file commit endpoint. The connector UI exposes one-shot preview and commit, but does not expose all API pagination or SQL watermark settings yet. UI wording and controls must be updated before claiming complete multi-format or connector support.
