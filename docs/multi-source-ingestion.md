@@ -128,7 +128,7 @@ Do not change subscription entitlements or pricing as part of ingestion work. Mu
 
 ## Remaining work
 
-- Add planned key rotation/re-encryption and formal audit events for connector configuration changes; the initial encrypted vault uses one operator-managed application key.
+- Add a bulk organization-scoped rotation workflow and operator verification tooling; rotation is currently per saved configuration and requires old keys to remain configured until all records have been re-encrypted.
 - Add API cursor/next-link adapters where supplier contracts require them, with source-specific pagination tests.
 - Add SFTP polling/trigger, remote-file deduplication, and retry/recovery orchestration.
 - Add durable SQL Server watermark checkpoint management. Composite-key watermark pagination is deliberately unsupported until a safe tie-breaking cursor is designed.
