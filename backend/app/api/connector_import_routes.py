@@ -16,7 +16,7 @@ from redis.asyncio import Redis
 from redis.exceptions import RedisError
 from starlette.concurrency import run_in_threadpool
 
-from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
+from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature, require_roles
 from app.core.config import settings
 from app.core.database import get_db
 from app.models import (
@@ -209,7 +209,7 @@ def _resolve_connector_request(
 @router.post("/connectors/configurations", status_code=201)
 def create_connector_configuration(
     payload: ConnectorConfigurationCreate,
-    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
@@ -311,7 +311,7 @@ def list_connector_configurations(
 @router.delete("/connectors/configurations/{configuration_id}")
 def delete_connector_configuration(
     configuration_id: UUID,
-    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
@@ -341,7 +341,7 @@ def delete_connector_configuration(
 @router.post("/connectors/configurations/{configuration_id}/rotate-credentials")
 def rotate_connector_configuration_credentials(
     configuration_id: UUID,
-    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
@@ -393,7 +393,7 @@ def rotate_connector_configuration_credentials(
 @router.get("/connectors/configurations/{configuration_id}/audit")
 def list_connector_configuration_audit(
     configuration_id: UUID,
-    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
