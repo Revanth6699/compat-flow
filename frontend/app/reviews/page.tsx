@@ -14,6 +14,7 @@ export default function ReviewsPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (user) { setLoading(false); return; }
     let active = true;
     fetch(`${API_BASE.endsWith("/") ? API_BASE.slice(0, -1) : API_BASE}/api/v1/reviews`)
       .then(async response => {
@@ -26,17 +27,15 @@ export default function ReviewsPage() {
     return () => { active = false; };
   }, [user]);
 
-  if (user) return <main id="main" className="page"><div className="container panel"><h1>Customer reviews</h1><p>The public reviews page is available to visitors only.</p><Link className="button button-secondary" href="/workspace">Return to workspace</Link></div></main>;
+  if (user) return <main id="main" className="page"><div className="container panel"><span className="eyebrow">CUSTOMER FEEDBACK</span><h1>Share your experience</h1><p>The public reviews page is for visitors. You can submit or update your own review while signed in.</p><Link className="button" href="/reviews/write">Write a review</Link></div></main>;
 
   const average = reviews.length ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length : 0;
   return <main id="main" className="page"><div className="container reviews-page">
-    <header className="reviews-heading"><span className="eyebrow">CUSTOMER FEEDBACK</span><h1>Reviews from CompatFlow users</h1><p>Read feedback shared by people using CompatFlow for their catalog and data workflows.</p>
-      {user && <Link className="button" href="/reviews/write">Write a review</Link>}
-    </header>
+    <header className="reviews-heading"><span className="eyebrow">CUSTOMER FEEDBACK</span><h1>Reviews from CompatFlow users</h1><p>Read feedback shared by people using CompatFlow for their catalog and data workflows.</p></header>
     {loading && <p>Loading customer reviews…</p>}
     {error && <p className="auth-error" role="alert">{error}</p>}
     {!loading && !error && reviews.length > 0 && <div className="reviews-summary"><strong>{average.toFixed(1)} / 5</strong><span aria-label={`${average.toFixed(1)} out of 5 stars`} className="review-stars">{"★".repeat(Math.round(average))}{"☆".repeat(5-Math.round(average))}</span><span>{reviews.length} published {reviews.length === 1 ? "review" : "reviews"}</span></div>}
-    {!loading && !error && reviews.length === 0 && <section className="panel review-empty"><h2>No reviews published yet</h2><p>Customer feedback will appear here after users share their experience.</p>{user && <Link className="button button-secondary" href="/reviews/write">Be the first to review</Link>}</section>}
+    {!loading && !error && reviews.length === 0 && <section className="panel review-empty"><h2>No reviews published yet</h2><p>Customer feedback will appear here after users share their experience.</p></section>}
     <section className="reviews-grid">{reviews.map(review => <article className="panel review-card" key={review.id}>
       <div className="review-card-top"><strong>{review.display_name}</strong><time dateTime={review.created_at}>{new Date(review.created_at).toLocaleDateString()}</time></div>
       <div className="review-stars" aria-label={`${review.rating} out of 5 stars`}>{"★".repeat(review.rating)}{"☆".repeat(5-review.rating)}</div>
