@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import AuthenticatedUser, get_current_user, is_platform_admin, resolve_import_limits, require_verified_supabase_email
 from app.core.config import settings
 from app.core.database import get_db
-from app.models import DemoAccessRequest, Organization, Review, Subscription, User
+from app.models import DemoAccessRequest, Organization, Review, Subscription, User, SupportComplaint, SubscriptionUsageEvent
 from app.api.gmail_notifications import notify_demo_request
 
 logger = logging.getLogger(__name__)
@@ -269,8 +269,8 @@ def platform_admin_overview(
         "demo_requests": count(DemoAccessRequest),
         "pending_demo_requests": int(db.scalar(select(func.count()).select_from(DemoAccessRequest).where(DemoAccessRequest.status == "pending")) or 0),
         "approved_demo_requests": int(db.scalar(select(func.count()).select_from(DemoAccessRequest).where(DemoAccessRequest.status == "approved")) or 0),
-        "complaints": None,
-        "complaints_note": "Complaint tracking is not implemented yet.",
-        "subscription_usage": None,
-        "subscription_usage_note": "Monthly validation/storage usage is not yet persisted as a usage ledger, so usage totals are unavailable.",
+        "complaints": count(SupportComplaint),
+        "complaints_note": "Tracked support requests across all statuses.",
+        "subscription_usage": int(db.scalar(select(func.coalesce(func.sum(SubscriptionUsageEvent.quantity), 0))) or 0),
+        "subscription_usage_note": "Persisted usage events since ledger launch; historical usage is not backfilled.",
     }
