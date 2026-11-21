@@ -31,7 +31,8 @@ export default function PlatformAdminPage() {
   const authorizationChecked = !user || (authorization.userId === user.id && authorization.checked);
   const isPlatformAdmin = !!user && authorization.userId === user.id && authorization.isPlatformAdmin;
   const [overview, setOverview] = useState<Overview | null>(null);
-  const [requests, setRequests] = useState<DemoRequest[]>([]);\n  const [reviews, setReviews] = useState<AdminReview[]>([]);
+  const [requests, setRequests] = useState<DemoRequest[]>([]);
+  const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -41,12 +42,14 @@ export default function PlatformAdminPage() {
   const [passwordBusy, setPasswordBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [summary, items] = await Promise.all([
+    const [summary, items, reviewItems] = await Promise.all([
       apiRequest<Overview>("/api/v1/platform-admin/overview"),
       apiRequest<DemoRequest[]>("/api/v1/platform-admin/demo-requests"),
+      apiRequest<AdminReview[]>("/api/v1/reviews/platform-admin/reviews"),
     ]);
     setOverview(summary);
     setRequests(items);
+    setReviews(reviewItems);
   }, []);
 
   useEffect(() => {
@@ -61,8 +64,9 @@ export default function PlatformAdminPage() {
         Promise.all([
           apiRequest<Overview>("/api/v1/platform-admin/overview"),
           apiRequest<DemoRequest[]>("/api/v1/platform-admin/demo-requests"),
-        ]).then(([summary, items]) => {
-          if (active) { setOverview(summary); setRequests(items); }
+          apiRequest<AdminReview[]>("/api/v1/reviews/platform-admin/reviews"),
+        ]).then(([summary, items, reviewItems]) => {
+          if (active) { setOverview(summary); setRequests(items); setReviews(reviewItems); }
         }).catch((err) => {
           if (active) setError(err instanceof Error ? err.message : "Platform administrator access denied.");
         });
@@ -93,7 +97,16 @@ export default function PlatformAdminPage() {
     } finally { setPasswordBusy(false); }
   }
 
-  async function moderateReview(id: string, decision: "publish" | "hide" | "delete") {\n    setBusy(id); setError("");\n    try {\n      await apiRequest(`/api/v1/reviews/platform-admin/reviews/${id}/${decision}`, { method: "PATCH" });\n      await load();\n    } catch (err) { setError(err instanceof Error ? err.message : "Could not update the review."); }\n    finally { setBusy(""); }\n  }\n\n  async function decide(id: string, decision: "approve" | "revoke" | "reject") {
+  async function moderateReview(id: string, decision: "publish" | "hide" | "delete") {
+    setBusy(id); setError("");
+    try {
+      await apiRequest(`/api/v1/reviews/platform-admin/reviews/${id}/${decision}`, { method: "PATCH" });
+      await load();
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not update the review."); }
+    finally { setBusy(""); }
+  }
+
+  async function decide(id: string, decision: "approve" | "revoke" | "reject") {
     setBusy(id); setError("");
     try {
       await apiRequest<DemoRequest>("/api/v1/platform-admin/demo-requests/" + id + "/" + decision, { method: "PATCH" });
