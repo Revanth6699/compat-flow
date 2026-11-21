@@ -93,8 +93,8 @@ def test_platform_owner_has_no_plan_level_upload_limits():
 
     current = SimpleNamespace(identity=SimpleNamespace(email=settings.platform_admin_email))
     limits = resolve_import_limits(current, db=None)
-    assert limits["max_records"] is None
-    assert limits["max_upload_bytes"] is None
+    assert limits["max_records"] == 100_000
+    assert limits["max_upload_bytes"] == settings.import_max_upload_bytes
 
 
 def test_paid_plan_upload_limits_come_from_active_plan_entitlements(monkeypatch):
