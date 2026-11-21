@@ -665,7 +665,7 @@ def test_postgres_role_permission_matrix_for_catalog_read_and_write():
     try:
         db.add_all([organization, plan])
         db.flush()
-        for role in ("owner", "admin", "member", "viewer"):
+        for role in ("admin", "member", "viewer"):
             user = User(
                 organization_id=organization.id,
                 auth_user_id=uuid4(),

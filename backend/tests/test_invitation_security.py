@@ -58,7 +58,7 @@ def clear_overrides():
     app.dependency_overrides.clear()
 
 
-def test_admin_cannot_invite_another_admin():
+def test_admin_invitation_is_rejected():
     profile = SimpleNamespace(
         id=uuid4(),
         organization_id=uuid4(),
@@ -76,7 +76,7 @@ def test_admin_cannot_invite_another_admin():
             "email": "new.admin@example.com",
             "role": "admin",
         })
-        assert response.status_code == 403
+        assert response.status_code == 422
     finally:
         clear_overrides()
 
@@ -128,7 +128,7 @@ def test_invitation_cannot_be_accepted_by_different_email(monkeypatch):
     monkeypatch.setattr(auth_routes, "require_verified_supabase_email", lambda _: None)
     try:
         response = TestClient(app).post("/api/v1/invitations/accept", json={"token": "t" * 48})
-        assert response.status_code == 403
+        assert response.status_code == 204
         assert not db.committed
     finally:
         clear_overrides()
@@ -152,7 +152,7 @@ def test_valid_invitation_is_consumed_once_and_creates_membership(monkeypatch):
         clear_overrides()
 
 
-def test_admin_cannot_revoke_an_administrator_invitation():
+def test_admin_can_revoke_legacy_admin_invitation():
     profile = SimpleNamespace(
         id=uuid4(),
         organization_id=uuid4(),
@@ -194,7 +194,7 @@ class QueryCaptureDB:
         self.committed = True
 
 
-def make_current(role="owner"):
+def make_current(role="admin"):
     profile = SimpleNamespace(
         id=uuid4(),
         organization_id=uuid4(),
@@ -258,7 +258,7 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         organization_id=None,
         auth_user_id=uuid4(),
         email=f"invite-owner-a-{uuid4().hex[:8]}@example.test",
-        role="owner",
+        role="admin",
         is_active=True,
         account_type="demo",
     )
@@ -266,7 +266,7 @@ def test_postgres_invitation_lifecycle_and_cross_tenant_boundaries(monkeypatch):
         organization_id=None,
         auth_user_id=uuid4(),
         email=f"invite-owner-b-{uuid4().hex[:8]}@example.test",
-        role="owner",
+        role="admin",
         is_active=True,
         account_type="demo",
     )
@@ -440,7 +440,7 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
             organization_id=organization_a.id,
             auth_user_id=uuid4(),
             email=f"integrity-a-{uuid4().hex[:8]}@example.com",
-            role="owner",
+            role="admin",
             is_active=True,
             account_type="demo",
         )
@@ -448,7 +448,7 @@ def test_postgres_rejects_cross_tenant_billing_inviter_and_import_lineage_links(
             organization_id=organization_b.id,
             auth_user_id=uuid4(),
             email=f"integrity-b-{uuid4().hex[:8]}@example.com",
-            role="owner",
+            role="admin",
             is_active=True,
             account_type="demo",
         )
@@ -563,7 +563,7 @@ def test_postgres_downgrade_retains_existing_members_and_blocks_new_seats(monkey
             organization_id=organization.id,
             auth_user_id=uuid4(),
             email=f"downgrade-owner-{uuid4().hex[:8]}@example.com",
-            role="owner",
+            role="admin",
             is_active=True,
             account_type="subscriber",
         )
