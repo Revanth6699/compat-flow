@@ -128,7 +128,7 @@ def test_invitation_cannot_be_accepted_by_different_email(monkeypatch):
     monkeypatch.setattr(auth_routes, "require_verified_supabase_email", lambda _: None)
     try:
         response = TestClient(app).post("/api/v1/invitations/accept", json={"token": "t" * 48})
-        assert response.status_code == 204
+        assert response.status_code == 403
         assert not db.committed
     finally:
         clear_overrides()
@@ -170,9 +170,9 @@ def test_admin_can_revoke_legacy_admin_invitation():
     app.dependency_overrides[get_db] = lambda: db
     try:
         response = TestClient(app).delete(f"/api/v1/invitations/{invitation.id}")
-        assert response.status_code == 403
-        assert not db.committed
-        assert invitation.revoked_at is None
+        assert response.status_code == 204
+        assert db.committed
+        assert invitation.revoked_at is not None
     finally:
         clear_overrides()
 
