@@ -425,7 +425,7 @@ def fetch_sql_server_rows(
         raise SourceConnectorError(
             "SQL Server row limit must be between 1 and 100,000."
         )
-    if not 1 <= max_bytes <= 50 * 1024 * 1024:
+    if not 1 <= max_bytes <= 100 * 1024 * 1024:
         raise SourceConnectorError("SQL Server result-size limit is invalid.")
     if bool(watermark_column) != bool(watermark_after):
         raise SourceConnectorError(
