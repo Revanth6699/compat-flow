@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AuthRequired } from "@/components/auth-required";
 import { useAuth } from "@/components/auth-provider";
 import { ApiRequestError, apiRequest } from "@/lib/auth-client";
+import { BrandedLoading } from "@/components/branded-loading";
 
 type Profile = {
   id: string; organization_id: string; email: string; role: string; is_active: boolean;
@@ -85,7 +86,7 @@ function WorkspaceContent() {
           </div>
         </header>
 
-        {loading && <p>Loading your organization workspace…</p>}
+        {loading && <BrandedLoading label="Loading your workspace" detail="Retrieving your organization profile and access." />}
         {!loading && needsOrganization && (
           <section className="panel settings-panel">
             <span className="eyebrow">ONE-TIME SETUP</span>
