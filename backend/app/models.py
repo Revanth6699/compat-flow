@@ -525,44 +525,6 @@ class PaymentWebhookEvent(Base):
 
 
 
-
-class SupportComplaint(Base):
-    __tablename__ = "support_complaints"
-    __table_args__ = (
-        Index("ix_support_complaints_status_created", "status", "created_at"),
-        CheckConstraint("status IN ('open', 'in_progress', 'resolved', 'closed')", name="ck_support_complaints_status"),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL"))
-    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
-    requester_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    requester_email: Mapped[str] = mapped_column(String(320), nullable=False)
-    subject: Mapped[str] = mapped_column(String(200), nullable=False)
-    message: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[str] = mapped_column(String(24), nullable=False, default="open", server_default="open")
-    admin_notes: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
-
-class SubscriptionUsageEvent(Base):
-    __tablename__ = "subscription_usage_events"
-    __table_args__ = (
-        Index("ix_subscription_usage_org_created", "organization_id", "created_at"),
-        CheckConstraint("event_type IN ('validation', 'storage')", name="ck_usage_event_type"),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    organization_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
-    subscription_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="SET NULL"))
-    event_type: Mapped[str] = mapped_column(String(24), nullable=False)
-    quantity: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, server_default="0")
-    source: Mapped[str] = mapped_column(String(80), nullable=False)
-    source_id: Mapped[str | None] = mapped_column(String(160))
-    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-
 class Review(Base):
     __tablename__ = "reviews"
     __table_args__ = (
