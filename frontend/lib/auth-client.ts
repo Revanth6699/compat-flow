@@ -10,6 +10,9 @@ let accessToken: string | null = null;
 let currentUser: AuthUser | null = null;
 let accessTokenExpiresAt = 0;
 const listeners = new Set<() => void>();
+let profileRequest: Promise<{ is_platform_admin?: boolean; [key: string]: unknown }> | null = null;
+let profileCachedAt = 0;
+let profileCache: { is_platform_admin?: boolean; [key: string]: unknown } | null = null;
 const STORAGE_KEY = "compatflow_refresh_token";
 const ACCESS_TOKEN_KEY = "compatflow_access_token";
 const USER_KEY = "compatflow_user";
@@ -48,6 +51,7 @@ async function authRequest<T>(path: string, body?: unknown, token?: string): Pro
   return data as T;
 }
 function applySession(session: AuthSession) {
+  profileRequest = null; profileCache = null; profileCachedAt = 0;
   accessToken = session.access_token;
   currentUser = session.user;
   accessTokenExpiresAt = session.expires_at ?? (Date.now() / 1000 + (session.expires_in ?? 3600));
@@ -146,6 +150,7 @@ export async function updateProfile(fullName: string, profileDetails: { job_titl
   return currentUser;
 }
 export async function signOut() {
+  profileRequest = null; profileCache = null; profileCachedAt = 0;
   const token = accessToken;
   accessToken = null; currentUser = null;
   if (typeof window !== "undefined") {
@@ -241,4 +246,16 @@ export async function apiRequest<T>(path: string, init: RequestInit = {}): Promi
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new ApiRequestError(response.status, data.detail || data.message || "The request could not be completed.");
   return data as T;
+}
+
+
+/** Shares the current user's profile request across the header and destination page. */
+export function getCurrentProfile<T extends { is_platform_admin?: boolean } = { is_platform_admin?: boolean }>(): Promise<T> {
+  if (profileCache && Date.now() - profileCachedAt < 10_000) return Promise.resolve(profileCache as T);
+  if (!profileRequest) {
+    profileRequest = apiRequest<{ is_platform_admin?: boolean; [key: string]: unknown }>("/api/v1/auth/me")
+      .then((profile) => { profileCache = profile; profileCachedAt = Date.now(); return profile; })
+      .finally(() => { profileRequest = null; });
+  }
+  return profileRequest as Promise<T>;
 }
