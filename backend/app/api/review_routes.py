@@ -181,7 +181,7 @@ def list_reviews_for_moderation(
     )
 
 
-@router.patch("/platform-admin/reviews/{review_id}/{decision}", response_model=AdminReviewResponse)
+@router.patch("/platform-admin/reviews/{review_id}/{decision}", response_model=None)
 def moderate_review(
     review_id: UUID,
     decision: str,
@@ -196,7 +196,7 @@ def moderate_review(
     if decision == "delete":
         db.delete(review)
         db.commit()
-        raise HTTPException(status_code=204, detail="Review deleted.")
+        return {"deleted": True}
     review.is_published = decision == "publish"
     db.commit()
     db.refresh(review)
