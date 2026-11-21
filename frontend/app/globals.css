@@ -1183,3 +1183,165 @@ button:disabled, .button:disabled {
 
 /* Data visualization and report presentation refresh */
 .report-chart-section{display:grid;gap:16px}.report-section-title>span{color:#64748b;font-size:.7rem;font-weight:800;letter-spacing:.12em}.report-section-title h3{margin:7px 0 4px;color:#172b45;font-size:1.45rem}.report-section-title p{margin:0;color:#64748b;font-size:.84rem}.report-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.report-chart-card{min-width:0;padding:20px;border:1px solid #dbe3ec;border-radius:10px;background:#fff}.report-chart-card h4{margin:0 0 4px;color:#183b60;font-size:1rem;text-transform:capitalize}.report-chart-card>p{margin:0 0 18px;color:#64748b;font-size:.78rem}.viz-rows{display:grid;gap:13px}.viz-row{display:grid;gap:6px;min-width:0}.viz-row-label{display:flex;justify-content:space-between;gap:12px;font-size:.78rem}.viz-row-label span{min-width:0;overflow-wrap:anywhere;color:#475569}.viz-row-label strong{flex:none;color:#243b53;font-variant-numeric:tabular-nums;font-size:.75rem}.viz-track{height:12px;overflow:hidden;border-radius:3px;background:#edf2f7}.viz-track span{display:block;height:100%;min-width:2px;border-radius:3px;background:#2875a8}@media(max-width:760px){.report-chart-grid{grid-template-columns:1fr}.report-chart-card{padding:16px}}@media print{@page{size:A4 portrait;margin:14mm 13mm 16mm}.premium-report .report-chart-grid,.premium-report .premium-dashboard-grid,.premium-report .distribution-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8pt!important}.premium-report .report-wide-page{page:auto!important;break-before:page!important}.premium-report .report-wide-page .preview-table{table-layout:auto!important;width:100%!important;font-size:7.5pt!important}.premium-report .report-wide-page .preview-table th,.premium-report .report-wide-page .preview-table td{font-size:7.5pt!important;padding:5pt 4pt!important;overflow-wrap:anywhere!important}.premium-report .report-chart-card,.premium-report .result-section{break-inside:avoid-page}.premium-report .report-chart-card{padding:10pt!important}.premium-report .viz-track{height:7pt!important}}
+
+
+/* Workspace dashboard refresh — compact white canvas, clear information hierarchy */
+.workspace-page {
+  min-height: calc(100vh - 76px);
+  padding: 30px 0 36px;
+  background: #F1F5F9;
+}
+.workspace-page > .container {
+  width: min(1280px, calc(100% - 56px));
+}
+.workspace-page-header {
+  align-items: center;
+  margin-bottom: 20px;
+}
+.workspace-page-header h1 {
+  margin: 3px 0 2px;
+  color: #17365D;
+  font-size: 32px;
+  line-height: 1.2;
+  letter-spacing: -.035em;
+}
+.workspace-page-header p {
+  margin: 0;
+  color: #64748B;
+  font-size: 13px;
+}
+.workspace-page-header .workspace-actions {
+  gap: 8px;
+}
+.workspace-page-header .button {
+  min-height: 38px;
+  padding-inline: 14px;
+  font-size: 12px;
+}
+.workspace-overview-card {
+  width: 100%;
+  max-width: none;
+  margin: 0 0 18px;
+  padding: 20px 22px;
+  border: 1px solid #E2E8F0;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(23,54,93,.035);
+}
+.workspace-profile-heading {
+  margin: 0;
+  align-items: center;
+}
+.workspace-profile-heading h2 {
+  margin: 3px 0 2px;
+  color: #17365D;
+  font-size: 19px;
+  letter-spacing: -.02em;
+}
+.workspace-profile-heading p {
+  margin: 0;
+  color: #64748B;
+  font-size: 12px;
+}
+.workspace-overview-card dl {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid #EEF2F6;
+}
+.workspace-overview-card dl div {
+  display: block;
+  min-width: 0;
+  padding: 0 14px;
+  border: 0;
+  border-right: 1px solid #EEF2F6;
+}
+.workspace-overview-card dl div:first-child { padding-left: 0; }
+.workspace-overview-card dl div:last-child { padding-right: 0; border-right: 0; }
+.workspace-overview-card dt {
+  margin-bottom: 4px;
+  color: #64748B;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+.workspace-overview-card dd {
+  color: #263B53;
+  font-size: 12px;
+  font-weight: 650;
+  text-align: left;
+  line-height: 1.45;
+}
+.workspace-area-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 12px;
+  padding: 0;
+}
+.workspace-area-grid > .panel {
+  min-width: 0;
+  max-width: none;
+  min-height: 166px;
+  margin: 0;
+  padding: 18px;
+  border: 1px solid #E2E8F0;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(23,54,93,.025);
+}
+.workspace-area-grid > .panel h2 {
+  margin: 7px 0 6px;
+  color: #17365D;
+  font-size: 17px;
+  letter-spacing: -.02em;
+}
+.workspace-area-grid > .panel p {
+  min-height: 42px;
+  margin: 0 0 13px;
+  color: #64748B;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.workspace-area-grid > .panel .button {
+  min-height: 35px;
+  padding-inline: 12px;
+  font-size: 11px;
+}
+.workspace-page .notice {
+  margin-top: 14px;
+  padding: 12px 14px;
+  font-size: 12px;
+}
+.workspace-page .notice p { margin: 3px 0 8px; }
+
+@media (max-width: 1050px) {
+  .workspace-overview-card dl { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 14px; }
+  .workspace-overview-card dl div:nth-child(3) { border-right: 0; }
+  .workspace-area-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .workspace-page { padding: 26px 0 34px; }
+  .workspace-page > .container { width: calc(100% - 28px); }
+  .workspace-page-header { align-items: flex-start; }
+  .workspace-page-header h1 { font-size: 29px; }
+  .workspace-page-header .workspace-actions { width: 100%; }
+  .workspace-page-header .workspace-actions .button { flex: 1; }
+  .workspace-overview-card { padding: 17px; }
+  .workspace-profile-heading { align-items: flex-start; }
+  .workspace-overview-card dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 0; }
+  .workspace-overview-card dl div,
+  .workspace-overview-card dl div:first-child,
+  .workspace-overview-card dl div:last-child {
+    padding: 0 10px;
+    border-right: 1px solid #EEF2F6;
+  }
+  .workspace-overview-card dl div:nth-child(odd) { padding-left: 0; }
+  .workspace-overview-card dl div:nth-child(even) { border-right: 0; }
+  .workspace-area-grid { grid-template-columns: 1fr; }
+  .workspace-area-grid > .panel { min-height: 0; }
+  .workspace-area-grid > .panel p { min-height: 0; }
+}
