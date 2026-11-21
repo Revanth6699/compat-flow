@@ -197,6 +197,8 @@ def _require_allowed_host(host: str | None) -> str:
 
 async def _load_source(payload: ConnectorImportRequest, limits: dict) -> tuple[bytes, str]:
     allowed = _allowed_hosts()
+    max_upload_bytes = limits["max_upload_bytes"] or settings.import_max_upload_bytes
+    max_records = limits["max_records"] or 100_000
     if payload.source_type == "rest_api":
         if not payload.api_url:
             raise HTTPException(status_code=422, detail="api_url is required.")
@@ -214,8 +216,8 @@ async def _load_source(payload: ConnectorImportRequest, limits: dict) -> tuple[b
         records = await fetch_api_records(
             payload.api_url, allowed_hosts=allowed,
             headers=payload.api_headers, records_key=payload.api_records_path,
-            max_bytes=limits["max_upload_bytes"],
-            max_records=limits["max_records"],
+            max_bytes=max_upload_bytes,
+            max_records=max_records,
             page_param=payload.api_page_param,
             page_size_param=payload.api_page_size_param,
             page_size=payload.api_page_size,
@@ -241,7 +243,7 @@ async def _load_source(payload: ConnectorImportRequest, limits: dict) -> tuple[b
             password=payload.sftp_password, private_key=payload.sftp_private_key,
             remote_path=payload.sftp_remote_path,
             known_hosts_path=settings.sftp_known_hosts_path,
-            max_bytes=limits["max_upload_bytes"],
+            max_bytes=max_upload_bytes,
         )
         return content, filename
 
@@ -257,8 +259,8 @@ async def _load_source(payload: ConnectorImportRequest, limits: dict) -> tuple[b
         raise HTTPException(status_code=422, detail="At least one SQL Server column must be selected.")
     rows = fetch_sql_server_rows(
         payload.sql_server_url, schema=payload.sql_schema, table=payload.sql_table,
-        columns=payload.sql_columns, limit=min(payload.sql_row_limit, limits["max_records"]),
-        max_bytes=limits["max_upload_bytes"],
+        columns=payload.sql_columns, limit=min(payload.sql_row_limit, max_records),
+        max_bytes=max_upload_bytes,
         watermark_column=payload.sql_watermark_column,
         watermark_after=payload.sql_watermark_after,
     )
@@ -266,7 +268,7 @@ async def _load_source(payload: ConnectorImportRequest, limits: dict) -> tuple[b
 
 
 def _prepare(payload: ConnectorImportRequest, raw: bytes, filename: str, limits: dict):
-    parsed = parse_source(raw, filename, max_records=limits["max_records"])
+    parsed = parse_source(raw, filename, max_records=limits["max_records"] or 100_000)
     result = validate_parsed_records(parsed, payload.record_type, payload.column_mapping)
     return parsed, result
 
@@ -276,8 +278,9 @@ async def preview_connector_import(
     payload: ConnectorImportRequest,
     _current: AuthenticatedUser = Depends(require_permission("catalog:read")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
+    db: Session = Depends(get_db),
 ):
-    limits = resolve_import_limits(_current, None)
+    limits = resolve_import_limits(_current, db)
     await _enforce_connector_rate_limit(_current.profile.organization_id)
     try:
         raw, filename = await _load_source(payload, limits)
