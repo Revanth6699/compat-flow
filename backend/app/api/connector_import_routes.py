@@ -13,7 +13,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.core.auth import AuthenticatedUser, require_permission, require_plan_feature
+from app.core.auth import AuthenticatedUser, resolve_import_limits, require_permission, require_plan_feature
 from app.core.config import settings
 from app.core.database import SessionLocal, get_db
 from app.models import ImportJob, ImportRowError, ImportRecordLineage
@@ -63,7 +63,7 @@ class ConnectorImportRequest(BaseModel):
     sql_schema: str | None = None
     sql_table: str | None = None
     sql_columns: list[str] = Field(default_factory=list)
-    sql_row_limit: int = Field(default=10000, ge=1, le=10000)
+    sql_row_limit: int = Field(default=100000, ge=1, le=100000)
     sql_watermark_column: str | None = None
     sql_watermark_after: str | None = None
 
@@ -195,7 +195,7 @@ def _require_allowed_host(host: str | None) -> str:
     return normalized
 
 
-async def _load_source(payload: ConnectorImportRequest) -> tuple[bytes, str]:
+async def _load_source(payload: ConnectorImportRequest, limits: dict) -> tuple[bytes, str]:
     allowed = _allowed_hosts()
     if payload.source_type == "rest_api":
         if not payload.api_url:
@@ -214,7 +214,8 @@ async def _load_source(payload: ConnectorImportRequest) -> tuple[bytes, str]:
         records = await fetch_api_records(
             payload.api_url, allowed_hosts=allowed,
             headers=payload.api_headers, records_key=payload.api_records_path,
-            max_bytes=settings.import_max_upload_bytes,
+            max_bytes=limits["max_upload_bytes"],
+            max_records=limits["max_records"],
             page_param=payload.api_page_param,
             page_size_param=payload.api_page_size_param,
             page_size=payload.api_page_size,
@@ -240,7 +241,7 @@ async def _load_source(payload: ConnectorImportRequest) -> tuple[bytes, str]:
             password=payload.sftp_password, private_key=payload.sftp_private_key,
             remote_path=payload.sftp_remote_path,
             known_hosts_path=settings.sftp_known_hosts_path,
-            max_bytes=settings.import_max_upload_bytes,
+            max_bytes=limits["max_upload_bytes"],
         )
         return content, filename
 
@@ -256,16 +257,16 @@ async def _load_source(payload: ConnectorImportRequest) -> tuple[bytes, str]:
         raise HTTPException(status_code=422, detail="At least one SQL Server column must be selected.")
     rows = fetch_sql_server_rows(
         payload.sql_server_url, schema=payload.sql_schema, table=payload.sql_table,
-        columns=payload.sql_columns, limit=payload.sql_row_limit,
-        max_bytes=settings.import_max_upload_bytes,
+        columns=payload.sql_columns, limit=min(payload.sql_row_limit, limits["max_records"]),
+        max_bytes=limits["max_upload_bytes"],
         watermark_column=payload.sql_watermark_column,
         watermark_after=payload.sql_watermark_after,
     )
     return json.dumps(rows, ensure_ascii=False, default=str).encode("utf-8"), "connector.json"
 
 
-def _prepare(payload: ConnectorImportRequest, raw: bytes, filename: str):
-    parsed = parse_source(raw, filename)
+def _prepare(payload: ConnectorImportRequest, raw: bytes, filename: str, limits: dict):
+    parsed = parse_source(raw, filename, max_records=limits["max_records"])
     result = validate_parsed_records(parsed, payload.record_type, payload.column_mapping)
     return parsed, result
 
@@ -276,10 +277,11 @@ async def preview_connector_import(
     _current: AuthenticatedUser = Depends(require_permission("catalog:read")),
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
 ):
+    limits = resolve_import_limits(_current, None)
     await _enforce_connector_rate_limit(_current.profile.organization_id)
     try:
-        raw, filename = await _load_source(payload)
-        parsed, result = _prepare(payload, raw, filename)
+        raw, filename = await _load_source(payload, limits)
+        parsed, result = _prepare(payload, raw, filename, limits)
     except (SourceConnectorError, IngestionParseError, RecordMappingError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     return {
@@ -301,10 +303,11 @@ async def commit_connector_import(
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
+    limits = resolve_import_limits(current, db)
     await _enforce_connector_rate_limit(current.profile.organization_id)
     try:
-        raw, filename = await _load_source(payload)
-        parsed, result = _prepare(payload, raw, filename)
+        raw, filename = await _load_source(payload, limits)
+        parsed, result = _prepare(payload, raw, filename, limits)
     except (SourceConnectorError, IngestionParseError, RecordMappingError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     return persist_validated_import(
