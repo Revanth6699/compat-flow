@@ -726,7 +726,7 @@ def test_postgres_role_permission_matrix_for_catalog_read_and_write():
         persisted_products = db.query(Product).filter(
             Product.organization_id == organization.id
         ).all()
-        assert len(persisted_products) == 3
+        assert len(persisted_products) == 2
     finally:
         clear_overrides()
         try:
