@@ -9,6 +9,7 @@ from app.api.connector_import_routes import router as connector_import_router
 from app.api.billing_routes import router as billing_router
 from app.api.review_routes import router as review_router
 from app.api.demo_routes import router as demo_router
+from app.api.platform_operations_routes import router as platform_operations_router
 from app.api.gmail_notifications import router as gmail_notifications_router
 from app.core.config import settings
 
@@ -161,6 +162,7 @@ app.include_router(connector_import_router, prefix="/api/v1")
 app.include_router(billing_router, prefix="/api/v1")
 app.include_router(review_router, prefix="/api/v1")
 app.include_router(demo_router, prefix="/api/v1")
+app.include_router(platform_operations_router, prefix="/api/v1")
 app.include_router(gmail_notifications_router, prefix="/api/v1")
 
 
