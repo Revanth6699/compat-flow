@@ -207,3 +207,15 @@ def test_all_five_catalog_record_types_validate_across_all_supported_formats():
             assert result.total_records == 1, (record_type, extension)
             assert result.invalid_records == 0, (record_type, extension, result.errors)
             assert len(result.valid_records) == 1, (record_type, extension)
+
+
+def test_all_supported_file_formats_enforce_the_supplied_record_limit():
+    from app.services.ingestion_adapters import IngestionParseError
+
+    for filename, payload in _input_cases():
+        try:
+            parse_source(payload, filename, max_records=0)
+        except IngestionParseError as exc:
+            assert "record limit" in str(exc), (filename, str(exc))
+        else:
+            raise AssertionError(f"{filename} accepted a record beyond its configured limit")
