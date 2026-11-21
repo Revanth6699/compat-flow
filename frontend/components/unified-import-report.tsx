@@ -62,7 +62,11 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
   const total = datasetResult?.total_records ?? industryResult?.total_rows ?? multiResult?.total_records ?? result?.total_rows ?? 0;
   const valid = industryResult?.valid_rows ?? multiResult?.valid_records ?? result?.valid_rows ?? null;
   const invalid = industryResult?.invalid_rows ?? multiResult?.invalid_records ?? result?.invalid_rows ?? null;
+  const hasValidationCounts = valid !== null && invalid !== null;
   const completeness = datasetResult?.completeness_pct ?? null;
+  const completeRecords = datasetResult?.complete_records ?? null;
+  const incompleteRecords = datasetResult?.incomplete_records ?? null;
+  const recordCompleteness = datasetResult?.complete_records_pct ?? null;
   const passRate = industryResult?.validation_pass_rate ?? result?.validation_pass_rate ?? (multiResult && total ? multiResult.valid_records / total * 100 : null);
   const profileTitle = datasetResult?.dataset_type ?? industryResult?.profile_id?.replaceAll("_", " ") ?? multiResult?.record_type.replaceAll("_", " ") ?? "Product catalog";
   const mappings = industryResult?.column_mappings ?? multiResult?.mappings ?? result?.column_mappings ?? [];
@@ -89,17 +93,26 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
 
       <div className="result-stats premium-kpis">
         <div className="panel stat-card"><span>Total records</span><strong>{total.toLocaleString()}</strong><small>Rows analysed</small></div>
-        <div className="panel stat-card"><span>Accepted records</span><strong className="metric-valid">{valid === null ? "Not calculated" : valid.toLocaleString()}</strong><small>{valid === null ? "Structural profile only" : "Passed current validation"}</small></div>
-        <div className="panel stat-card"><span>Records needing review</span><strong className={invalid ? "metric-invalid" : "metric-valid"}>{invalid === null ? "Not calculated" : invalid.toLocaleString()}</strong><small>{invalid === null ? "No schema validation run" : "Failed current validation"}</small></div>
-        <div className="panel stat-card"><span>Quality indicator</span><strong>{completeness !== null ? completeness.toFixed(2) + "%" : passRate !== null ? passRate.toFixed(2) + "%" : "Not available"}</strong><small>{completeness !== null ? "Cell completeness" : passRate !== null ? "Validation pass rate" : "Not calculated"}</small></div>
+        {datasetResult ? <>
+          <div className="panel stat-card"><span>Complete records</span><strong className="metric-valid">{completeRecords === null ? "Unavailable" : completeRecords.toLocaleString()}</strong><small>{recordCompleteness === null ? "Record-level completeness not returned by API" : recordCompleteness.toFixed(2) + "% of rows fully populated"}</small></div>
+          <div className="panel stat-card"><span>Incomplete records</span><strong className={incompleteRecords ? "metric-warning" : "metric-valid"}>{incompleteRecords === null ? "Unavailable" : incompleteRecords.toLocaleString()}</strong><small>{incompleteRecords === null ? "Record-level completeness not returned by API" : "At least one empty field"}</small></div>
+        </> : <>
+          <div className="panel stat-card"><span>Accepted records</span><strong className="metric-valid">{valid === null ? "—" : valid.toLocaleString()}</strong><small>{hasValidationCounts ? "Passed current validation" : "Not applicable to this result"}</small></div>
+          <div className="panel stat-card"><span>Records needing review</span><strong className={invalid ? "metric-invalid" : "metric-valid"}>{invalid === null ? "—" : invalid.toLocaleString()}</strong><small>{hasValidationCounts ? "Failed current validation" : "Not applicable to this result"}</small></div>
+        </>}
+        <div className="panel stat-card"><span>Quality indicator</span><strong>{completeness !== null ? completeness.toFixed(2) + "%" : passRate !== null ? passRate.toFixed(2) + "%" : "Unavailable"}</strong><small>{completeness !== null ? "Cell completeness" : passRate !== null ? "Validation pass rate" : "No quality metric returned"}</small></div>
       </div>
 
       <div className="panel result-section">
         <div className="section-heading"><div><h3>Analysis summary</h3><p>Common report structure; metrics depend on the checks applicable to this dataset.</p></div></div>
-        {valid !== null && invalid !== null ? <>
-          <div className="validation-chart"><span className="chart-valid" style={{ width: `${total ? valid / total * 100 : 0}%` }} /><span className="chart-invalid" style={{ width: `${total ? invalid / total * 100 : 0}%` }} /></div>
-          <p><span className="metric-valid">Accepted: {valid.toLocaleString()}</span> · <span className="metric-invalid">Needs review: {invalid.toLocaleString()}</span></p>
-        </> : <><div className="metric-bar"><span style={{ width: `${completeness ?? 0}%` }} /></div><p>{datasetResult ? `${datasetResult.populated_cells.toLocaleString()} populated cells of ${datasetResult.total_cells.toLocaleString()} total cells.` : "Schema-level accepted and rejected counts are not available for this analysis."}</p></>}
+        {datasetResult && completeRecords !== null && incompleteRecords !== null && recordCompleteness !== null ? <>
+          <div className="metric-bar"><span style={{ width: `${recordCompleteness}%` }} /></div>
+          <p><span className="metric-valid">Complete: {completeRecords.toLocaleString()}</span> · <span className="metric-warning">Incomplete: {incompleteRecords.toLocaleString()}</span> · {recordCompleteness.toFixed(2)}% of records have every field populated.</p>
+          <p>{datasetResult.populated_cells.toLocaleString()} populated cells of {datasetResult.total_cells.toLocaleString()} total cells.</p>
+        </> : hasValidationCounts ? <>
+          <div className="validation-chart"><span className="chart-valid" style={{ width: `${total ? valid! / total * 100 : 0}%` }} /><span className="chart-invalid" style={{ width: `${total ? invalid! / total * 100 : 0}%` }} /></div>
+          <p><span className="metric-valid">Accepted: {valid!.toLocaleString()}</span> · <span className="metric-invalid">Needs review: {invalid!.toLocaleString()}</span></p>
+        </> : <><div className="metric-bar"><span style={{ width: `${completeness ?? 0}%` }} /></div><p>{datasetResult ? `${datasetResult.populated_cells.toLocaleString()} populated cells of ${datasetResult.total_cells.toLocaleString()} total cells.` : "Schema-level accepted and rejected counts are not applicable to this analysis."}</p></>}
       </div>
 
       {datasetResult && <DatasetCharts profile={datasetResult} />}
