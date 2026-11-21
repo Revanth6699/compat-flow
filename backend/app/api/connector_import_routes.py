@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.auth import AuthenticatedUser, resolve_import_limits, require_permission, require_plan_feature
 from app.core.config import settings
 from app.core.database import SessionLocal, get_db
-from app.models import ImportJob, ImportRowError, ImportRecordLineage, SubscriptionUsageEvent, Subscription
+from app.models import ImportJob, ImportRowError, ImportRecordLineage
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
@@ -313,28 +313,13 @@ async def commit_connector_import(
         parsed, result = _prepare(payload, raw, filename, limits)
     except (SourceConnectorError, IngestionParseError, RecordMappingError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
-    outcome = persist_validated_import(
+    return persist_validated_import(
         db=db, organization_id=current.profile.organization_id,
         filename=filename, parsed=parsed, result=result,
         source_type=payload.source_type,
         source_descriptor=_source_descriptor(payload),
         source_metadata=_source_metadata(payload, parsed),
     )
-    if outcome["imported_records"] > 0:
-        active_subscription = db.scalar(select(Subscription).where(
-            Subscription.organization_id == current.profile.organization_id,
-            Subscription.status.in_(("active", "trialing")),
-        ))
-        db.add(SubscriptionUsageEvent(
-            organization_id=current.profile.organization_id,
-            subscription_id=active_subscription.id if active_subscription else None,
-            event_type="validation",
-            quantity=outcome["imported_records"],
-            source="catalog_import",
-            source_id=outcome["import_id"],
-        ))
-        db.commit()
-    return outcome
 
 
 @router.get("/history")
