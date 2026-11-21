@@ -99,14 +99,12 @@ def submit_review(
             display_name=payload.display_name,
             rating=payload.rating,
             comment=payload.comment,
-            is_published=False,
         )
         db.add(review)
     else:
         review.display_name = payload.display_name
         review.rating = payload.rating
         review.comment = payload.comment
-        review.is_published = False
     db.commit()
     db.refresh(review)
     return review
