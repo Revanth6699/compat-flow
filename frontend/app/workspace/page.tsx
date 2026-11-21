@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthRequired } from "@/components/auth-required";
 import { useAuth } from "@/components/auth-provider";
-import { ApiRequestError, apiRequest } from "@/lib/auth-client";
+import { ApiRequestError, apiRequest, getCurrentProfile } from "@/lib/auth-client";
 import { BrandedLoading } from "@/components/branded-loading";
 
 type Profile = {
@@ -27,7 +27,7 @@ function WorkspaceContent() {
     setError("");
     setNeedsOrganization(false);
     try {
-      const data = await apiRequest<Profile>("/api/v1/auth/me");
+      const data = await getCurrentProfile<Profile>();
       setProfile(data);
       const requestedPlan = new URLSearchParams(window.location.search).get("plan");
       if (requestedPlan && ["starter", "growth", "business"].includes(requestedPlan)) {
