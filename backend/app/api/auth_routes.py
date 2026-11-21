@@ -72,7 +72,7 @@ def delete_account(
     identity: SupabaseIdentity = Depends(get_supabase_identity),
     db: Session = Depends(get_db),
 ):
-    """Delete the authenticated identity; owners delete their entire organization and its history."""
+    """Delete the authenticated identity; organization admins delete their entire organization and its history."""
     profile = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
     if profile is None:
         if payload.confirmation != "DELETE MY ACCOUNT":
@@ -80,9 +80,9 @@ def delete_account(
         _delete_supabase_user(identity.auth_user_id)
         return {"deleted": True, "scope": "account"}
 
-    if profile.role == "owner":
+    if profile.role == "admin":
         if payload.confirmation != "DELETE ORGANIZATION":
-            raise HTTPException(status_code=422, detail="As the organization owner, type DELETE ORGANIZATION to remove the company workspace and all associated data.")
+            raise HTTPException(status_code=422, detail="As the organization admin, type DELETE ORGANIZATION to remove the company workspace and all associated data.")
         db.scalar(select(Organization.id).where(Organization.id == profile.organization_id).with_for_update())
         members = list(db.scalars(select(User).where(User.organization_id == profile.organization_id)).all())
         subscriptions = list(db.scalars(
@@ -155,7 +155,7 @@ def create_organization_for_current_user(
         organization_id=organization.id,
         auth_user_id=identity.auth_user_id,
         email=identity.email,
-        role="owner",
+        role="admin",
         is_active=True,
         account_type="demo",
     )
@@ -179,7 +179,7 @@ def create_organization_for_current_user(
 
 class InvitationCreateRequest(BaseModel):
     email: EmailStr
-    role: str = Field(pattern="^(admin|member|viewer)$")
+    role: str = Field(pattern="^(member|viewer)$")
     expires_in_hours: int = Field(default=72, ge=1, le=168)
 
 
@@ -240,7 +240,7 @@ def _member_seat_limit(db: Session, organization_id: UUID, current: Authenticate
             Subscription.current_period_end > now,
         ).order_by(Subscription.created_at.desc())
     )
-    # An unsubscribed organization gets one seat for its owner only.
+    # An unsubscribed organization gets one seat for its admin only.
     # Missing entitlement data fails closed; explicit JSON null means unlimited
     # seats (reserved for the Enterprise plan).
     if subscription is None:
@@ -330,7 +330,7 @@ def _ensure_invitation_seat_available(
 
 @invitation_router.get("/seats")
 def get_member_seat_usage(
-    current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ):
     """Report seat usage without disabling existing members after a downgrade."""
@@ -340,7 +340,7 @@ def get_member_seat_usage(
 @invitation_router.post("", response_model=InvitationCreatedResponse, status_code=201)
 def create_invitation(
     payload: InvitationCreateRequest,
-    current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ):
     email = str(payload.email).strip().lower()
@@ -354,8 +354,8 @@ def create_invitation(
     _ensure_invitation_seat_available(
         db, current.profile.organization_id, include_pending_invitations=True, current=current
     )
-    if current.profile.role != "owner" and payload.role == "admin":
-        raise HTTPException(status_code=403, detail="Only an organization owner can invite administrators.")
+    if payload.role == "admin":
+        raise HTTPException(status_code=403, detail="Administrator access is reserved for the existing organization admin.")
     existing = db.scalar(select(User).where(func.lower(User.email) == email))
     if existing:
         raise HTTPException(
@@ -471,13 +471,13 @@ class MemberResponse(BaseModel):
 
 
 class MemberUpdateRequest(BaseModel):
-    role: str | None = Field(default=None, pattern="^(admin|member|viewer)$")
+    role: str | None = Field(default=None, pattern="^(member|viewer)$")
     is_active: bool | None = None
 
 
 @invitation_router.get("/members", response_model=list[MemberResponse])
 def list_organization_members(
-    current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ):
     return list(
@@ -493,7 +493,7 @@ def list_organization_members(
 def update_organization_member(
     member_id: UUID,
     payload: MemberUpdateRequest,
-    current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ):
     if payload.role is None and payload.is_active is None:
@@ -509,15 +509,13 @@ def update_organization_member(
     )
     if member is None:
         raise HTTPException(status_code=404, detail="Organization member not found.")
-    if member.role == "owner":
-        raise HTTPException(status_code=403, detail="The organization owner cannot be modified through member management.")
+    if member.role == "admin":
+        raise HTTPException(status_code=403, detail="The organization admin cannot be modified through member management.")
     if member.id == current.profile.id:
         raise HTTPException(status_code=403, detail="You cannot change your own organization access.")
-    if current.profile.role != "owner" and member.role == "admin":
+    if current.profile.role != "admin" and member.role == "admin":
         raise HTTPException(status_code=403, detail="Only the organization owner can modify an administrator.")
     if payload.role is not None:
-        if payload.role == "admin" and current.profile.role != "owner":
-            raise HTTPException(status_code=403, detail="Only the organization owner can assign administrator access.")
         member.role = payload.role
     if payload.is_active is not None:
         if payload.is_active and not member.is_active:
@@ -533,7 +531,7 @@ def update_organization_member(
 
 @invitation_router.get("", response_model=list[InvitationResponse])
 def list_invitations(
-    current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ):
     return list(
@@ -548,7 +546,7 @@ def list_invitations(
 @invitation_router.delete("/{invitation_id}", status_code=204)
 def revoke_invitation(
     invitation_id: UUID,
-    current: AuthenticatedUser = Depends(require_roles("owner", "admin")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ):
     invitation = db.scalar(
@@ -561,10 +559,10 @@ def revoke_invitation(
         raise HTTPException(status_code=404, detail="Invitation not found.")
     if invitation.accepted_at is not None:
         raise HTTPException(status_code=409, detail="An accepted invitation cannot be revoked.")
-    if current.profile.role != "owner" and invitation.role == "admin":
+    if current.profile.role != "admin" and invitation.role == "admin":
         raise HTTPException(
             status_code=403,
-            detail="Only an organization owner can revoke an administrator invitation.",
+            detail="Only the organization admin can revoke an administrator invitation.",
         )
     if invitation.revoked_at is None:
         invitation.revoked_at = datetime.now(timezone.utc)

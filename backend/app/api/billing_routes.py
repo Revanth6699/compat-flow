@@ -63,7 +63,7 @@ def _subscription_status(event_type: str) -> str | None:
 @router.post("/subscriptions", status_code=201)
 def create_subscription(
     payload: CreateSubscriptionRequest,
-    current: AuthenticatedUser = Depends(require_roles("owner")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ):
     if is_platform_admin(current):
@@ -156,7 +156,7 @@ def create_subscription(
 @router.post("/subscriptions/verify-checkout")
 def verify_subscription_checkout(
     payload: VerifyCheckoutRequest,
-    current: AuthenticatedUser = Depends(require_roles("owner")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ):
     subscription = db.scalar(
@@ -191,7 +191,7 @@ def verify_subscription_checkout(
 def cancel_subscription(
     subscription_id: UUID,
     payload: CancelSubscriptionRequest,
-    current: AuthenticatedUser = Depends(require_roles("owner")),
+    current: AuthenticatedUser = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ):
     subscription = db.scalar(

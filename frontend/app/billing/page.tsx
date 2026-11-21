@@ -194,7 +194,7 @@ function BillingContent() {
     }
   }
 
-  const isOwner = role === "owner";
+  const isOwner = role === "admin";
   const subscriptionLocked = !!(subscription && ["active", "trialing", "pending", "past_due"].includes(subscription.status));
 
   if (!loading && isPlatformAdmin) {
@@ -202,12 +202,12 @@ function BillingContent() {
       <main id="main" className="page">
         <div className="container account-settings billing-page">
           <header className="workspace-heading">
-            <div><span className="eyebrow">PLATFORM ADMINISTRATOR</span><h1>Subscription exemption</h1><p>Your owner account does not require a customer subscription.</p></div>
+            <div><span className="eyebrow">PLATFORM ADMINISTRATOR</span><h1>Subscription exemption</h1><p>Your platform-admin account does not require a customer subscription.</p></div>
             <Link className="button button-secondary" href="/workspace">Back to workspace</Link>
           </header>
           <section className="panel settings-panel">
             <h2>Full platform testing access</h2>
-            <p>Your platform-owner account is exempt from plan selection, checkout, and subscription entitlement checks. You can test the platform without purchasing a plan.</p>
+            <p>Your platform-admin account is exempt from plan selection, checkout, and subscription entitlement checks. You can test the platform without purchasing a plan.</p>
             <p className="settings-description">Customer organizations remain subject to their selected subscription, entitlements, seat limits, and billing status.</p>
           </section>
         </div>
@@ -256,8 +256,8 @@ function BillingContent() {
 
           <section className="panel settings-panel billing-section billing-plans-section">
             <div className="billing-section-heading"><div><span className="eyebrow">PLANS</span><h2>Choose a monthly plan</h2></div></div>
-            <p className="settings-description">Checkout is available to the organization owner only. Prices below are the current reference prices in USD; payment availability and final currency depend on your Razorpay merchant account and configured plan IDs.</p>
-            {!isOwner && <p className="notice">Only the organization owner can create or cancel a subscription. Contact your owner to manage billing.</p>}
+            <p className="settings-description">Checkout is available to the organization admin only. Prices below are the current reference prices in USD; payment availability and final currency depend on your Razorpay merchant account and configured plan IDs.</p>
+            {!isOwner && <p className="notice">Only the organization admin can create or cancel a subscription. Contact your organization admin to manage billing.</p>}
             {subscriptionLocked && <p className="notice">Your organization already has a subscription in progress. Self-service upgrades and downgrades are not enabled yet; plan selection is locked until the current subscription is resolved.</p>}
             <div className="pricing-grid">
               {plans.map((plan) => (
