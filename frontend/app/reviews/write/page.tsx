@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { AuthRequired } from "@/components/auth-required";
 import { useAuth } from "@/components/auth-provider";
 import { apiRequest, ApiRequestError } from "@/lib/auth-client";
+import { BrandedLoading } from "@/components/branded-loading";
 
 type Review = { id: string; display_name: string; rating: number; comment: string; created_at: string };
 
@@ -64,7 +65,7 @@ function WriteReviewContent() {
   return <main id="main" className="page"><div className="container review-form-page">
     <header className="workspace-heading"><div><span className="eyebrow">YOUR FEEDBACK</span><h1>Write a review</h1><p>Share an honest account of your experience with CompatFlow.</p></div><Link className="button button-secondary" href="/reviews">View published reviews</Link></header>
     <section className="panel settings-panel review-compose-panel">
-      {checkingReview ? <p>Checking your existing review…</p> : <form className="auth-form" onSubmit={submit}>
+      {checkingReview ? <BrandedLoading label="Checking your review" detail="Loading your existing feedback before opening the form." /> : <form className="auth-form" onSubmit={submit}>
         <label htmlFor="review-display-name">Display name</label>
         <input id="review-display-name" required minLength={2} maxLength={80} value={displayName} onChange={event => setDisplayName(event.target.value)} />
         <fieldset className="review-star-field">

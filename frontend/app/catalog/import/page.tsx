@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/auth-client";
 import UnifiedImportReport from "@/components/unified-import-report";
+import { BrandedLoading } from "@/components/branded-loading";
 
 
 type DatasetProfile = {
@@ -276,7 +277,7 @@ export default function CatalogImportPage() {
     window.print();
   }
 
-  if (authLoading) return <main id="main" className="page"><div className="container"><p>Checking your account...</p></div></main>;
+  if (authLoading) return <main id="main" className="page"><div className="container"><BrandedLoading label="Checking your account" detail="Securely verifying your sign-in session." /></div></main>;
   if (!user) return (
     <main id="main" className="page"><div className="container">
       <section className="panel import-panel">
@@ -287,7 +288,7 @@ export default function CatalogImportPage() {
       </section>
     </div></main>
   );
-  if (accessType === "checking") return <main id="main" className="page"><div className="container"><p>Checking your upload entitlement...</p></div></main>;
+  if (accessType === "checking") return <main id="main" className="page"><div className="container"><BrandedLoading label="Checking upload access" detail="Confirming your demo approval or active subscription." /></div></main>;
   if (accessType === "none") return (
     <main id="main" className="page"><div className="container">
       <section className="panel import-panel"><div className="eyebrow">UPLOAD ACCESS REQUIRED</div><h1>Your account does not have upload access</h1>
