@@ -49,3 +49,18 @@ def test_general_dataset_does_not_claim_domain_checks():
     assert result["dataset_type"] == "general dataset"
     assert result["domain_checks"] == []
     assert result["domain_issues"] == []
+
+
+
+def test_orders_do_not_assume_a_universal_status_vocabulary():
+    result = profile_dataset_rules(
+        ["order_id", "order_status"],
+        [
+            {"order_id": "O1", "order_status": "delivered"},
+            {"order_id": "O2", "order_status": "unavailable"},
+        ],
+    )
+    assert result["dataset_type"] == "orders / transactions"
+    assert "UNRECOGNIZED_ORDER_STATUS" not in {
+        item["code"] for item in result["domain_checks"]
+    }
