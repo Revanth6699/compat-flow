@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
-import { apiRequest, updatePassword } from "@/lib/auth-client";
+import { apiRequest, getCurrentProfile, updatePassword } from "@/lib/auth-client";
 import { BrandedLoading, LoadingMetricCards, LoadingSkeleton } from "@/components/branded-loading";
 
 type Overview = {
@@ -57,7 +57,7 @@ export default function PlatformAdminPage() {
   useEffect(() => {
     if (!user) return;
     let active = true;
-    apiRequest<{ is_platform_admin?: boolean }>("/api/v1/auth/me")
+    getCurrentProfile<{ is_platform_admin?: boolean }>()
       .then((profile) => {
         if (!active) return;
         const allowed = profile.is_platform_admin === true;
