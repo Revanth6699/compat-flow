@@ -10,6 +10,7 @@ type Overview = {
   demo_requests: number; pending_demo_requests: number; approved_demo_requests: number;
   complaints: number | null; complaints_note: string; subscription_usage: number | null; subscription_usage_note: string;
 };
+type AdminReview = { id: string; display_name: string; rating: number; comment: string; created_at: string; organization_id: string; user_id: string; is_published: boolean; };
 type DemoRequest = {
   id: string; name: string; email: string; organization: string; role: string;
   message: string; status: string; created_at: string;
@@ -31,6 +32,7 @@ export default function PlatformAdminPage() {
   const isPlatformAdmin = !!user && authorization.userId === user.id && authorization.isPlatformAdmin;
   const [overview, setOverview] = useState<Overview | null>(null);
   const [requests, setRequests] = useState<DemoRequest[]>([]);
+  const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -40,12 +42,14 @@ export default function PlatformAdminPage() {
   const [passwordBusy, setPasswordBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const [summary, items] = await Promise.all([
+    const [summary, items, reviewItems] = await Promise.all([
       apiRequest<Overview>("/api/v1/platform-admin/overview"),
       apiRequest<DemoRequest[]>("/api/v1/platform-admin/demo-requests"),
+      apiRequest<AdminReview[]>("/api/v1/reviews/platform-admin/reviews"),
     ]);
     setOverview(summary);
     setRequests(items);
+    setReviews(reviewItems);
   }, []);
 
   useEffect(() => {
@@ -60,8 +64,9 @@ export default function PlatformAdminPage() {
         Promise.all([
           apiRequest<Overview>("/api/v1/platform-admin/overview"),
           apiRequest<DemoRequest[]>("/api/v1/platform-admin/demo-requests"),
-        ]).then(([summary, items]) => {
-          if (active) { setOverview(summary); setRequests(items); }
+          apiRequest<AdminReview[]>("/api/v1/reviews/platform-admin/reviews"),
+        ]).then(([summary, items, reviewItems]) => {
+          if (active) { setOverview(summary); setRequests(items); setReviews(reviewItems); }
         }).catch((err) => {
           if (active) setError(err instanceof Error ? err.message : "Platform administrator access denied.");
         });
@@ -90,6 +95,15 @@ export default function PlatformAdminPage() {
     } catch (cause) {
       setPasswordError(cause instanceof Error ? cause.message : "Could not update your password.");
     } finally { setPasswordBusy(false); }
+  }
+
+  async function moderateReview(id: string, decision: "publish" | "hide" | "delete") {
+    setBusy(id); setError("");
+    try {
+      await apiRequest(`/api/v1/reviews/platform-admin/reviews/${id}/${decision}`, { method: "PATCH" });
+      await load();
+    } catch (err) { setError(err instanceof Error ? err.message : "Could not update the review."); }
+    finally { setBusy(""); }
   }
 
   async function decide(id: string, decision: "approve" | "revoke" | "reject") {
@@ -205,6 +219,25 @@ export default function PlatformAdminPage() {
             </section>
           </div>
         </div>
+        <section className="panel" aria-label="Customer reviews" style={{ marginTop: 18, padding: 24, borderRadius: 11, borderColor: "#E2E8F0", boxShadow: "0 2px 8px rgba(15,23,42,.025)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, marginBottom: 18 }}>
+            <div><h2 style={{ margin: 0, color: "#1E293B", fontSize: 18 }}>Customer reviews</h2><p style={{ margin: "4px 0 0", color: "#64748B", fontSize: 12 }}>Review submitted feedback, then publish, hide, or delete it.</p></div>
+            <span style={{ padding: "5px 9px", borderRadius: 20, background: "#EFF6FF", color: "#1D4ED8", fontSize: 11, fontWeight: 750 }}>{reviews.length} reviews</span>
+          </div>
+          {reviews.length === 0 ? <div style={{ padding: "30px 16px", border: "1px dashed #CBD5E1", borderRadius: 9, textAlign: "center", color: "#64748B", fontSize: 13 }}>No customer reviews found.</div> :
+            <div className="table-scroll"><table className="preview-table"><thead><tr><th>Reviewer</th><th>Rating</th><th>Review</th><th>Submitted</th><th>Visibility</th><th>Actions</th></tr></thead><tbody>
+              {reviews.map((review) => <tr key={review.id}>
+                <td>{review.display_name}<br /><span style={{ color: "#94A3B8", fontSize: 11 }}>{review.user_id.slice(0, 8)}…</span></td>
+                <td>{review.rating}/5</td><td style={{ minWidth: 240, whiteSpace: "pre-wrap" }}>{review.comment}</td>
+                <td>{new Date(review.created_at).toLocaleDateString()}</td>
+                <td>{review.is_published ? "Published" : "Hidden"}</td>
+                <td style={{ minWidth: 170 }}>
+                  <button className="button button-secondary" style={{ minHeight: 34, padding: "0 10px", margin: 2, fontSize: 11 }} disabled={!!busy} onClick={() => void moderateReview(review.id, review.is_published ? "hide" : "publish")}>{review.is_published ? "Hide" : "Publish"}</button>
+                  <button className="button button-secondary" style={{ minHeight: 34, padding: "0 10px", margin: 2, fontSize: 11 }} disabled={!!busy} onClick={() => { if (window.confirm("Permanently delete this review?")) void moderateReview(review.id, "delete"); }}>Delete</button>
+                </td>
+              </tr>)}
+            </tbody></table></div>}
+        </section>
         <p style={{ margin: "18px 0 0", color: "#94A3B8", fontSize: 11 }}>Administrative actions are validated by the platform API. Account credentials are managed securely by the authentication provider.</p>
       </div>
     </main>

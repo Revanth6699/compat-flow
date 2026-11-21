@@ -7,6 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.auth import AuthenticatedUser, get_current_user
+from app.api.demo_routes import require_platform_admin
 from app.core.database import get_db
 from app.models import Review, ReviewReply
 
@@ -98,14 +99,12 @@ def submit_review(
             display_name=payload.display_name,
             rating=payload.rating,
             comment=payload.comment,
-            is_published=True,
         )
         db.add(review)
     else:
         review.display_name = payload.display_name
         review.rating = payload.rating
         review.comment = payload.comment
-        review.is_published = True
     db.commit()
     db.refresh(review)
     return review
@@ -162,3 +161,41 @@ def create_review_reply(
     db.commit()
     db.refresh(reply)
     return reply
+
+
+class AdminReviewResponse(ReviewResponse):
+    organization_id: UUID
+    user_id: UUID
+    is_published: bool
+
+
+@router.get("/platform-admin/reviews", response_model=list[AdminReviewResponse])
+def list_reviews_for_moderation(
+    _admin: AuthenticatedUser = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    return list(
+        db.scalars(select(Review).order_by(Review.created_at.desc()).limit(500)).all()
+    )
+
+
+@router.patch("/platform-admin/reviews/{review_id}/{decision}", response_model=None)
+def moderate_review(
+    review_id: UUID,
+    decision: str,
+    _admin: AuthenticatedUser = Depends(require_platform_admin),
+    db: Session = Depends(get_db),
+):
+    if decision not in {"publish", "hide", "delete"}:
+        raise HTTPException(status_code=422, detail="Decision must be publish, hide or delete.")
+    review = db.get(Review, review_id)
+    if review is None:
+        raise HTTPException(status_code=404, detail="Review not found.")
+    if decision == "delete":
+        db.delete(review)
+        db.commit()
+        return {"deleted": True}
+    review.is_published = decision == "publish"
+    db.commit()
+    db.refresh(review)
+    return review
