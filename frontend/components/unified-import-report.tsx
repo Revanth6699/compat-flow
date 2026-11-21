@@ -60,8 +60,8 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
   const filename = datasetResult?.filename ?? industryResult?.filename ?? multiResult?.filename ?? result?.filename ?? "Uploaded dataset";
   const format = datasetResult?.format ?? multiResult?.format ?? filename.split(".").pop() ?? "unknown";
   const total = datasetResult?.total_records ?? industryResult?.total_rows ?? multiResult?.total_records ?? result?.total_rows ?? 0;
-  const valid = industryResult?.valid_rows ?? multiResult?.valid_records ?? result?.valid_rows ?? null;
-  const invalid = industryResult?.invalid_rows ?? multiResult?.invalid_records ?? result?.invalid_rows ?? null;
+  const valid = datasetResult?.complete_records ?? industryResult?.valid_rows ?? multiResult?.valid_records ?? result?.valid_rows ?? null;
+  const invalid = datasetResult?.incomplete_records ?? industryResult?.invalid_rows ?? multiResult?.invalid_records ?? result?.invalid_rows ?? null;
   const completeness = datasetResult?.completeness_pct ?? null;
   const passRate = industryResult?.validation_pass_rate ?? result?.validation_pass_rate ?? (multiResult && total ? multiResult.valid_records / total * 100 : null);
   const profileTitle = datasetResult?.dataset_type ?? industryResult?.profile_id?.replaceAll("_", " ") ?? multiResult?.record_type.replaceAll("_", " ") ?? "Product catalog";
@@ -89,8 +89,8 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
 
       <div className="result-stats premium-kpis">
         <div className="panel stat-card"><span>Total records</span><strong>{total.toLocaleString()}</strong><small>Rows analysed</small></div>
-        <div className="panel stat-card"><span>Accepted records</span><strong className="metric-valid">{valid === null ? "Not calculated" : valid.toLocaleString()}</strong><small>{valid === null ? "Structural profile only" : "Passed current validation"}</small></div>
-        <div className="panel stat-card"><span>Records needing review</span><strong className={invalid ? "metric-invalid" : "metric-valid"}>{invalid === null ? "Not calculated" : invalid.toLocaleString()}</strong><small>{invalid === null ? "No schema validation run" : "Failed current validation"}</small></div>
+        <div className="panel stat-card"><span>{datasetResult ? "Complete records" : "Accepted records"}</span><strong className="metric-valid">{valid === null ? "Not calculated" : valid.toLocaleString()}</strong><small>{valid === null ? "Structural profile only" : datasetResult ? "All fields populated" : "Passed current validation"}</small></div>
+        <div className="panel stat-card"><span>{datasetResult ? "Incomplete records" : "Records needing review"}</span><strong className={invalid ? "metric-invalid" : "metric-valid"}>{invalid === null ? "Not calculated" : invalid.toLocaleString()}</strong><small>{invalid === null ? "No schema validation run" : datasetResult ? "At least one field is missing" : "Failed current validation"}</small></div>
         <div className="panel stat-card"><span>Quality indicator</span><strong>{completeness !== null ? completeness.toFixed(2) + "%" : passRate !== null ? passRate.toFixed(2) + "%" : "Not available"}</strong><small>{completeness !== null ? "Cell completeness" : passRate !== null ? "Validation pass rate" : "Not calculated"}</small></div>
       </div>
 
@@ -98,7 +98,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
         <div className="section-heading"><div><h3>Analysis summary</h3><p>Common report structure; metrics depend on the checks applicable to this dataset.</p></div></div>
         {valid !== null && invalid !== null ? <>
           <div className="validation-chart"><span className="chart-valid" style={{ width: `${total ? valid / total * 100 : 0}%` }} /><span className="chart-invalid" style={{ width: `${total ? invalid / total * 100 : 0}%` }} /></div>
-          <p><span className="metric-valid">Accepted: {valid.toLocaleString()}</span> · <span className="metric-invalid">Needs review: {invalid.toLocaleString()}</span></p>
+          <p><span className="metric-valid">{datasetResult ? "Complete records" : "Accepted"}: {valid.toLocaleString()}</span> · <span className="metric-invalid">{datasetResult ? "Incomplete records" : "Needs review"}: {invalid.toLocaleString()}</span></p>
         </> : <><div className="metric-bar"><span style={{ width: `${completeness ?? 0}%` }} /></div><p>{datasetResult ? `${datasetResult.populated_cells.toLocaleString()} populated cells of ${datasetResult.total_cells.toLocaleString()} total cells.` : "Schema-level accepted and rejected counts are not available for this analysis."}</p></>}
       </div>
 
