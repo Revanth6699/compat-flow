@@ -45,7 +45,7 @@ def test_provision_first_admin_creates_organization_and_admin():
 
     organization = next(item for item in db.added if isinstance(item, Organization))
     assert profile.auth_user_id == auth_user_id
-    assert profile.email == "admin@example.com"
+    assert profile.email == "owner@example.com"
     assert profile.role == "admin"
     assert profile.is_active is True
     assert profile.organization_id == organization.id
