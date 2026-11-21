@@ -32,6 +32,7 @@ export default function PlatformAdminPage() {
   const authorizationChecked = !user || (authorization.userId === user.id && authorization.checked);
   const isPlatformAdmin = !!user && authorization.userId === user.id && authorization.isPlatformAdmin;
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [requests, setRequests] = useState<DemoRequest[]>([]);
   const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [error, setError] = useState("");
@@ -67,9 +68,9 @@ export default function PlatformAdminPage() {
           apiRequest<DemoRequest[]>("/api/v1/platform-admin/demo-requests"),
           apiRequest<AdminReview[]>("/api/v1/reviews/platform-admin/reviews"),
         ]).then(([summary, items, reviewItems]) => {
-          if (active) { setOverview(summary); setRequests(items); setReviews(reviewItems); }
+          if (active) { setOverview(summary); setRequests(items); setReviews(reviewItems); setDashboardLoading(false); }
         }).catch((err) => {
-          if (active) setError(err instanceof Error ? err.message : "Platform administrator access denied.");
+          if (active) { setError(err instanceof Error ? err.message : "Platform administrator access denied."); setDashboardLoading(false); }
         });
       })
       .catch((err) => {
@@ -155,7 +156,7 @@ export default function PlatformAdminPage() {
                 <div style={{ color: "#94A3B8", fontSize: 11 }}>{metric.note}</div>
               </article>
             ))}
-          </div> : <LoadingMetricCards />}
+          </div> : dashboardLoading ? <LoadingMetricCards /> : <p role="status">Platform metrics could not be loaded. {error || "Refresh the page to try again."}</p>}
         </section>
 
         <div className="platform-admin-layout">
@@ -164,7 +165,7 @@ export default function PlatformAdminPage() {
               <div><h2 style={{ margin: 0, color: "#1E293B", fontSize: 18 }}>Demo access requests</h2><p style={{ margin: "4px 0 0", color: "#64748B", fontSize: 12 }}>Review requests and control demo access.</p></div>
               <span style={{ padding: "5px 9px", borderRadius: 20, background: "#FFF7ED", color: "#C2410C", fontSize: 11, fontWeight: 750 }}>{overview?.pending_demo_requests ?? "—"} pending</span>
             </div>
-            {!overview ? <LoadingSkeleton rows={4} /> : requests.length === 0 ? (
+            {!overview && dashboardLoading ? <LoadingSkeleton rows={4} /> : !overview ? <p role="status">Demo requests could not be loaded.</p> : requests.length === 0 ? (
               <div style={{ padding: "38px 16px", border: "1px dashed #CBD5E1", borderRadius: 9, textAlign: "center", background: "#FAFCFE" }}>
                 <div style={{ marginBottom: 8, color: "#64748B", fontSize: 13, fontWeight: 700 }}>No demo requests yet</div>
                 <p style={{ margin: 0, color: "#94A3B8", fontSize: 12 }}>New customer requests will appear here when submitted.</p>
@@ -225,7 +226,7 @@ export default function PlatformAdminPage() {
             <div><h2 style={{ margin: 0, color: "#1E293B", fontSize: 18 }}>Customer reviews</h2><p style={{ margin: "4px 0 0", color: "#64748B", fontSize: 12 }}>Review submitted feedback, then publish, hide, or delete it.</p></div>
             <span style={{ padding: "5px 9px", borderRadius: 20, background: "#EFF6FF", color: "#1D4ED8", fontSize: 11, fontWeight: 750 }}>{reviews.length} reviews</span>
           </div>
-          {!overview ? <LoadingSkeleton rows={4} /> : reviews.length === 0 ? <div style={{ padding: "30px 16px", border: "1px dashed #CBD5E1", borderRadius: 9, textAlign: "center", color: "#64748B", fontSize: 13 }}>No customer reviews found.</div> :
+          {!overview && dashboardLoading ? <LoadingSkeleton rows={4} /> : !overview ? <p role="status">Customer reviews could not be loaded.</p> : reviews.length === 0 ? <div style={{ padding: "30px 16px", border: "1px dashed #CBD5E1", borderRadius: 9, textAlign: "center", color: "#64748B", fontSize: 13 }}>No customer reviews found.</div> :
             <div className="table-scroll"><table className="preview-table"><thead><tr><th>Reviewer</th><th>Rating</th><th>Review</th><th>Submitted</th><th>Visibility</th><th>Actions</th></tr></thead><tbody>
               {reviews.map((review) => <tr key={review.id}>
                 <td>{review.display_name}<br /><span style={{ color: "#94A3B8", fontSize: 11 }}>{review.user_id.slice(0, 8)}…</span></td>
