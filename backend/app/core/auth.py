@@ -231,7 +231,10 @@ def resolve_import_limits(current: AuthenticatedUser, db: Session) -> dict:
         return {"access_type": "subscription", "max_records": None, "max_upload_bytes": None}
 
     subscription, plan = get_active_plan(current, db)
-    if subscription is not None and plan is not None and bool((plan.entitlements or {}).get("csv_validation", False)):
+    if subscription is not None and plan is not None and any(
+        bool((plan.entitlements or {}).get(feature, False))
+        for feature in ("csv_validation", "supplier_catalogs")
+    ):
         entitlements = plan.entitlements or {}
         max_records = entitlements.get("upload_max_records")
         max_upload_bytes = entitlements.get("upload_max_bytes")
