@@ -123,7 +123,7 @@ def test_authenticated_connector_preview_runs_validation_without_persisting(monk
 def test_authenticated_connector_commit_persists_for_authenticated_tenant(monkeypatch):
     organization_id, _, _ = install_connector_auth(monkeypatch)
     calls = {}
-    async def fake_load_source(payload):
+    async def fake_load_source(payload, limits):
         return (
             b'[{"sku":"001","name":"Widget","manufacturer":"Acme","part_number":"A-1","category":"Parts"}]',
             "supplier.json",
