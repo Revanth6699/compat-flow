@@ -42,6 +42,7 @@ class Organization(Base):
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
+        Index("uq_users_auth_user_id", "auth_user_id", unique=True),
         UniqueConstraint("organization_id", "email", name="uq_users_org_email"),
         UniqueConstraint("organization_id", "id", name="uq_users_org_id"),
     )
@@ -53,7 +54,7 @@ class User(Base):
         UUID(as_uuid=True),
         ForeignKey("organizations.id", ondelete="CASCADE"),
     )
-    auth_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), unique=True)
+    auth_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     password_hash: Mapped[str | None] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(32), default="member")

@@ -20,7 +20,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18
+        # Match the PostgreSQL major version used by the Supabase production target.
+        image: postgres:17
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -50,6 +51,10 @@ jobs:
         env:
           PYTHONPATH: .
         run: alembic upgrade head
+      - name: Detect SQLAlchemy model drift against the migrated schema
+        env:
+          PYTHONPATH: .
+        run: alembic check
       - name: Run the complete backend regression suite
         env:
           PYTHONPATH: .
