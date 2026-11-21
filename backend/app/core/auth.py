@@ -228,10 +228,13 @@ def require_demo_or_paid_access():
 def resolve_import_limits(current: AuthenticatedUser, db: Session) -> dict:
     """Resolve per-file upload limits from the authenticated account's actual access."""
     if is_platform_admin(current):
-        return {"access_type": "subscription", "max_records": None, "max_upload_bytes": None}
+        return {"access_type": "subscription", "max_records": 100_000, "max_upload_bytes": settings.import_max_upload_bytes}
 
     subscription, plan = get_active_plan(current, db)
-    if subscription is not None and plan is not None and bool((plan.entitlements or {}).get("csv_validation", False)):
+    if subscription is not None and plan is not None and any(
+        bool((plan.entitlements or {}).get(feature, False))
+        for feature in ("csv_validation", "supplier_catalogs")
+    ):
         entitlements = plan.entitlements or {}
         max_records = entitlements.get("upload_max_records")
         max_upload_bytes = entitlements.get("upload_max_bytes")

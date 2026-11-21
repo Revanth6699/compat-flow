@@ -191,7 +191,7 @@ async def fetch_api_records(
     truncated and fails instead of silently importing an incomplete feed.
     """
     _validate_https_url(url, allowed_hosts)
-    if not 0 < timeout_seconds <= 60 or not 1 <= max_bytes <= 50 * 1024 * 1024:
+    if not 0 < timeout_seconds <= 60 or not 1 <= max_bytes <= 100 * 1024 * 1024:
         raise SourceConnectorError("API timeout or response-size limit is invalid.")
     if not 1 <= max_pages <= 20 or not 1 <= page_size <= 1000:
         raise SourceConnectorError("API pagination limits are outside the supported bounds.")
@@ -280,7 +280,7 @@ def fetch_sftp_file(
         raise SourceConnectorError(
             "Provide a username and exactly one SFTP authentication method."
         )
-    if not 1 <= max_bytes <= 50 * 1024 * 1024:
+    if not 1 <= max_bytes <= 100 * 1024 * 1024:
         raise SourceConnectorError("SFTP file-size limit is invalid.")
     client = None
     try:
@@ -421,11 +421,11 @@ def fetch_sql_server_rows(
         raise SourceConnectorError(
             "Provide 1 to 200 unique, valid column identifiers."
         )
-    if not 1 <= limit <= 10_000:
+    if not 1 <= limit <= 100_000:
         raise SourceConnectorError(
-            "SQL Server row limit must be between 1 and 10,000."
+            "SQL Server row limit must be between 1 and 100,000."
         )
-    if not 1 <= max_bytes <= 50 * 1024 * 1024:
+    if not 1 <= max_bytes <= 100 * 1024 * 1024:
         raise SourceConnectorError("SQL Server result-size limit is invalid.")
     if bool(watermark_column) != bool(watermark_after):
         raise SourceConnectorError(

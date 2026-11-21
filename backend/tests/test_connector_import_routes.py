@@ -47,7 +47,7 @@ def test_connector_file_pipeline_runs_parse_and_deterministic_validation():
         column_mapping=None,
     )
     raw = b'[{"sku":"001","name":"Widget","manufacturer":"Acme","part_number":"A-1","category":"Parts"}]'
-    parsed, result = _prepare(payload, raw, "supplier.json")
+    parsed, result = _prepare(payload, raw, "supplier.json", {"max_records": 10_000})
     assert parsed.format == "json"
     assert result.total_records == 1
     assert len(result.valid_records) == 1
@@ -63,7 +63,7 @@ class ConnectorRouteDB:
     def __init__(self, permission_granted=True):
         self.permission_granted = permission_granted
         self.subscription = SimpleNamespace(status="active", plan_code="growth", current_period_end=None)
-        self.plan = SimpleNamespace(code="growth", is_active=True, entitlements={"supplier_catalogs": True})
+        self.plan = SimpleNamespace(code="growth", is_active=True, entitlements={"supplier_catalogs": True, "upload_max_records": 40_000, "upload_max_bytes": 20 * 1024 * 1024})
 
     def scalar(self, statement):
         if not self.permission_granted:
@@ -99,7 +99,7 @@ def clear_connector_auth():
 
 def test_authenticated_connector_preview_runs_validation_without_persisting(monkeypatch):
     _, _, _ = install_connector_auth(monkeypatch)
-    async def fake_load_source(payload):
+    async def fake_load_source(payload, limits):
         return (
             b'[{"sku":"001","name":"Widget","manufacturer":"Acme","part_number":"A-1","category":"Parts"}]',
             "supplier.json",
@@ -123,7 +123,7 @@ def test_authenticated_connector_preview_runs_validation_without_persisting(monk
 def test_authenticated_connector_commit_persists_for_authenticated_tenant(monkeypatch):
     organization_id, _, _ = install_connector_auth(monkeypatch)
     calls = {}
-    async def fake_load_source(payload):
+    async def fake_load_source(payload, limits):
         return (
             b'[{"sku":"001","name":"Widget","manufacturer":"Acme","part_number":"A-1","category":"Parts"}]',
             "supplier.json",
