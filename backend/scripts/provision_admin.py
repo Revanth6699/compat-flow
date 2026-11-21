@@ -1,7 +1,7 @@
-"""Provision the first CompatFlow organization owner from a verified Supabase account.
+"""Provision the first CompatFlow organization admin from a verified Supabase account.
 
 Run from the backend directory:
-    python -m scripts.provision_owner --organization-name "Your Organization"
+    python -m scripts.provision_admin --organization-name "Your Organization"
 
 Required environment:
     DATABASE_URL
@@ -58,13 +58,13 @@ def get_verified_supabase_identity(access_token: str) -> tuple[UUID, str]:
         raise RuntimeError("Supabase returned an invalid user identifier.") from None
 
 
-def provision_first_owner(
+def provision_first_admin(
     db: Session,
     auth_user_id: UUID,
     email: str,
     organization_name: str,
 ) -> User:
-    """Create the initial organization and owner in one database transaction."""
+    """Create the initial organization and admin in one database transaction."""
     normalized_email = email.strip().lower()
     normalized_name = organization_name.strip()
 
@@ -82,24 +82,13 @@ def provision_first_owner(
     if existing_profile is not None:
         raise RuntimeError("This Supabase account is already linked to a CompatFlow user.")
 
-    existing_owner = db.scalar(
-        select(User.id)
-        .where(User.role == "owner", User.is_active.is_(True))
-        .limit(1)
-    )
-    if existing_owner is not None:
-        raise RuntimeError(
-            "An active organization owner already exists. "
-            "First-owner provisioning is disabled after initial setup."
-        )
-
     organization = Organization(id=uuid4(), name=normalized_name)
     profile = User(
         id=uuid4(),
         organization_id=organization.id,
         auth_user_id=auth_user_id,
         email=normalized_email,
-        role="owner",
+        role="admin",
         is_active=True,
     )
     db.add(organization)
@@ -110,7 +99,7 @@ def provision_first_owner(
     except IntegrityError:
         db.rollback()
         raise RuntimeError(
-            "Owner provisioning conflicted with an existing database record; no changes were committed."
+            "Admin provisioning conflicted with an existing database record; no changes were committed."
         ) from None
 
     db.refresh(profile)
@@ -119,7 +108,7 @@ def provision_first_owner(
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Provision the first CompatFlow organization owner."
+        description="Provision the first CompatFlow organization admin."
     )
     parser.add_argument(
         "--organization-name",
@@ -136,20 +125,20 @@ def main() -> int:
     try:
         auth_user_id, email = get_verified_supabase_identity(access_token)
         with SessionLocal() as db:
-            profile = provision_first_owner(
+            profile = provision_first_admin(
                 db,
                 auth_user_id=auth_user_id,
                 email=email,
                 organization_name=args.organization_name,
             )
         print(
-            "Initial owner provisioned successfully. "
+            "Initial admin provisioned successfully. "
             f"Organization ID: {profile.organization_id}; "
             f"User profile ID: {profile.id}; Role: {profile.role}."
         )
         return 0
     except (RuntimeError, ValueError) as exc:
-        print(f"Owner provisioning failed: {exc}", file=sys.stderr)
+        print(f"Admin provisioning failed: {exc}", file=sys.stderr)
         return 1
 
 
