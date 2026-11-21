@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
 import { apiRequest, updatePassword } from "@/lib/auth-client";
+import { BrandedLoading, LoadingMetricCards, LoadingSkeleton } from "@/components/branded-loading";
 
 type Overview = {
   users: number; active_users: number; organizations: number; subscriptions: number; active_subscriptions: number; reviews: number;
@@ -116,9 +117,9 @@ export default function PlatformAdminPage() {
     } finally { setBusy(""); }
   }
 
-  if (loading) return <main className="page"><div className="container">Checking account...</div></main>;
+  if (loading) return <main className="page"><div className="container"><BrandedLoading label="Checking your account" detail="Preparing secure platform administration." /></div></main>;
   if (!user) return <main className="page"><div className="container panel"><h1>Platform administration</h1><p>Sign in with the configured platform-owner account.</p><Link className="button" href="/sign-in?next=%2Fplatform-admin">Sign in</Link></div></main>;
-  if (!authorizationChecked) return <main className="page"><div className="container">Verifying platform-owner access...</div></main>;
+  if (!authorizationChecked) return <main className="page"><div className="container"><BrandedLoading label="Verifying platform-owner access" detail="Confirming administrative permissions with the platform." /></div></main>;
   if (!isPlatformAdmin) {
     return <main className="page"><div className="container panel"><h1>Access denied</h1><p>This account is not authorized to access platform administration.</p><Link className="button button-secondary" href="/">Return to website</Link></div></main>;
   }
@@ -146,15 +147,15 @@ export default function PlatformAdminPage() {
             <h2 style={{ margin: 0, color: "#1E293B", fontSize: 18 }}>Platform at a glance</h2>
             <span style={{ color: "#64748B", fontSize: 12 }}>{overview ? "Live platform data" : "Loading platform data…"}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(175px,1fr))", gap: 14 }}>
-            {metricCards(overview || { users: 0, active_users: 0, organizations: 0, subscriptions: 0, active_subscriptions: 0, reviews: 0, demo_requests: 0, pending_demo_requests: 0, approved_demo_requests: 0, complaints: null, complaints_note: "", subscription_usage: null, subscription_usage_note: "" }).map((metric) => (
+          {overview ? <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(175px,1fr))", gap: 14 }}>
+            {metricCards(overview).map((metric) => (
               <article key={metric.label} style={{ padding: "19px 20px", border: "1px solid #E5EAF0", borderRadius: 11, background: "#fff", boxShadow: "0 2px 8px rgba(15,23,42,.025)" }}>
                 <div style={{ color: "#64748B", fontSize: 12, fontWeight: 650 }}>{metric.label}</div>
                 <div style={{ margin: "9px 0 4px", color: "#172B4D", fontSize: 30, lineHeight: 1.1, fontWeight: 750 }}>{overview ? metric.value.toLocaleString() : "—"}</div>
                 <div style={{ color: "#94A3B8", fontSize: 11 }}>{metric.note}</div>
               </article>
             ))}
-          </div>
+          </div> : <LoadingMetricCards />}
         </section>
 
         <div className="platform-admin-layout">
@@ -163,7 +164,7 @@ export default function PlatformAdminPage() {
               <div><h2 style={{ margin: 0, color: "#1E293B", fontSize: 18 }}>Demo access requests</h2><p style={{ margin: "4px 0 0", color: "#64748B", fontSize: 12 }}>Review requests and control demo access.</p></div>
               <span style={{ padding: "5px 9px", borderRadius: 20, background: "#FFF7ED", color: "#C2410C", fontSize: 11, fontWeight: 750 }}>{overview?.pending_demo_requests ?? "—"} pending</span>
             </div>
-            {requests.length === 0 ? (
+            {!overview ? <LoadingSkeleton rows={4} /> : requests.length === 0 ? (
               <div style={{ padding: "38px 16px", border: "1px dashed #CBD5E1", borderRadius: 9, textAlign: "center", background: "#FAFCFE" }}>
                 <div style={{ marginBottom: 8, color: "#64748B", fontSize: 13, fontWeight: 700 }}>No demo requests yet</div>
                 <p style={{ margin: 0, color: "#94A3B8", fontSize: 12 }}>New customer requests will appear here when submitted.</p>
@@ -224,7 +225,7 @@ export default function PlatformAdminPage() {
             <div><h2 style={{ margin: 0, color: "#1E293B", fontSize: 18 }}>Customer reviews</h2><p style={{ margin: "4px 0 0", color: "#64748B", fontSize: 12 }}>Review submitted feedback, then publish, hide, or delete it.</p></div>
             <span style={{ padding: "5px 9px", borderRadius: 20, background: "#EFF6FF", color: "#1D4ED8", fontSize: 11, fontWeight: 750 }}>{reviews.length} reviews</span>
           </div>
-          {reviews.length === 0 ? <div style={{ padding: "30px 16px", border: "1px dashed #CBD5E1", borderRadius: 9, textAlign: "center", color: "#64748B", fontSize: 13 }}>No customer reviews found.</div> :
+          {!overview ? <LoadingSkeleton rows={4} /> : reviews.length === 0 ? <div style={{ padding: "30px 16px", border: "1px dashed #CBD5E1", borderRadius: 9, textAlign: "center", color: "#64748B", fontSize: 13 }}>No customer reviews found.</div> :
             <div className="table-scroll"><table className="preview-table"><thead><tr><th>Reviewer</th><th>Rating</th><th>Review</th><th>Submitted</th><th>Visibility</th><th>Actions</th></tr></thead><tbody>
               {reviews.map((review) => <tr key={review.id}>
                 <td>{review.display_name}<br /><span style={{ color: "#94A3B8", fontSize: 11 }}>{review.user_id.slice(0, 8)}…</span></td>
