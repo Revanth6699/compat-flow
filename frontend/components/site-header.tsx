@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/components/auth-provider";
-import { apiRequest } from "@/lib/auth-client";
+import { getCurrentProfile } from "@/lib/auth-client";
 import { useEffect, useState } from "react";
 
 export function SiteHeader() {
@@ -13,7 +13,7 @@ export function SiteHeader() {
   useEffect(() => {
     if (!user) return;
     let active = true;
-    apiRequest<{ is_platform_admin?: boolean }>("/api/v1/auth/me")
+    getCurrentProfile<{ is_platform_admin?: boolean }>()
       .then((profile) => { if (active) setPlatformAdminForUser({ userId: user.id, isAdmin: profile.is_platform_admin === true }); })
       .catch(() => { if (active) setPlatformAdminForUser({ userId: user.id, isAdmin: false }); });
     return () => { active = false; };
