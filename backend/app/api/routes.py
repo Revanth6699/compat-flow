@@ -447,7 +447,8 @@ async def profile_public_dataset(
         values = [row.get(header) for row in rows]
         present = [value for value in values if value is not None and str(value).strip() != ""]
         populated_cells += len(present)
-        normalized_header = re.sub(r"[^a-z0-9]+", "_", header.casefold()).strip("_")
+        camel_separated_header = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", header)
+        normalized_header = re.sub(r"[^a-z0-9]+", "_", camel_separated_header.casefold()).strip("_")
         identifier_field = (
             normalized_header == "id"
             or normalized_header.endswith("_id")
