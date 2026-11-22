@@ -1,13 +1,13 @@
 """Remove customer-facing record-count entitlements.
 
 Revision ID: 20261122_0012
-Revises: 20261116_0011
+Revises: 20261121_0014
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "20261122_0012"
-down_revision = "20261116_0011"
+down_revision = "20261121_0014"
 branch_labels = None
 depends_on = None
 
