@@ -1,6 +1,11 @@
 import pytest
+from types import SimpleNamespace
 
-from app.services.custom_validation import CustomRuleError, validate_rule_config
+from app.services.custom_validation import (
+    CustomRuleError,
+    evaluate_custom_rules,
+    validate_rule_config,
+)
 
 
 @pytest.mark.parametrize("rule_type", ["required", "unique"])
@@ -45,10 +50,6 @@ def test_custom_rule_config_rejects_unknown_rule_type_and_unknown_settings():
         validate_rule_config("numeric_min", {"value": 1, "field": "sku"})
 
 
-
-from types import SimpleNamespace
-
-from app.services.custom_validation import evaluate_custom_rules
 
 
 def make_rule(rule_id, code, field_name, rule_type, config=None, enabled=True, severity="warning"):
