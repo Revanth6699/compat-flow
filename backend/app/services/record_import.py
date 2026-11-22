@@ -3,8 +3,6 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-
-from app.services.batch_processing import DiskBackedDuplicateTracker, iter_batches
 from dataclasses import dataclass
 from typing import Any
 
@@ -141,85 +139,80 @@ def validate_parsed_records(
     valid_source_locations: list[str] = []
     valid_source_keys: list[str | None] = []
     errors: list[dict[str, Any]] = []
+    seen: dict[tuple[Any, ...], str] = {}
     populated: Counter[str] = Counter()
     required_fields = [
         name for name, field in model.model_fields.items() if field.is_required()
     ]
 
-    with DiskBackedDuplicateTracker() as duplicate_tracker:
-        for batch in iter_batches(parsed.records, batch_size=500):
-            for record in batch:
+    for record in parsed.records:
         row = {
-                    field: record.values.get(source)
-                    for field, source in mapping.items()
-                    if source in record.values
-                }
-                if "attributes" in model.model_fields:
-                    attributes = row.get("attributes")
-                    if isinstance(attributes, str):
-                        import json
-                        try:
-                            row["attributes"] = json.loads(attributes)
-                        except json.JSONDecodeError:
-                            pass
-                    nested_attributes = {
-                        key.removeprefix("attributes."): value
-                        for key, value in record.values.items()
-                        if key.startswith("attributes.")
-                    }
-                    if nested_attributes:
-                        row["attributes"] = nested_attributes
-                for field in required_fields:
-                    if row.get(field) not in (None, ""):
-                        populated[field] += 1
+            field: record.values.get(source)
+            for field, source in mapping.items()
+            if source in record.values
+        }
+        if "attributes" in model.model_fields:
+            attributes = row.get("attributes")
+            if isinstance(attributes, str):
+                import json
                 try:
-                    parsed_model = model.model_validate(row)
-                except ValidationError as exc:
-                    if len(errors) < error_limit:
-                        for detail in exc.errors():
-                            errors.append({
-                                "source_location": record.source_location,
-                                "source_key": record.source_key,
-                                "field": ".".join(str(part) for part in detail.get("loc", ())) or None,
-                                "error_code": str(detail.get("type", "invalid_value")).upper(),
-                                "message": detail.get("msg", "Invalid value."),
-                            })
-                            if len(errors) >= error_limit:
-                                break
-                    continue
+                    row["attributes"] = json.loads(attributes)
+                except json.JSONDecodeError:
+                    pass
+            nested_attributes = {
+                key.removeprefix("attributes."): value
+                for key, value in record.values.items()
+                if key.startswith("attributes.")
+            }
+            if nested_attributes:
+                row["attributes"] = nested_attributes
+        for field in required_fields:
+            if row.get(field) not in (None, ""):
+                populated[field] += 1
+        try:
+            parsed_model = model.model_validate(row)
+        except ValidationError as exc:
+            if len(errors) < error_limit:
+                for detail in exc.errors():
+                    errors.append({
+                        "source_location": record.source_location,
+                        "source_key": record.source_key,
+                        "field": ".".join(str(part) for part in detail.get("loc", ())) or None,
+                        "error_code": str(detail.get("type", "invalid_value")).upper(),
+                        "message": detail.get("msg", "Invalid value."),
+                    })
+                    if len(errors) >= error_limit:
+                        break
+            continue
 
-                values = parsed_model.model_dump(mode="json")
-                duplicate_key: tuple[Any, ...] | None = None
-                if record_type == "products":
-                    duplicate_key = ("sku", str(values["sku"]).casefold())
-                elif record_type == "product_variants" and values.get("variant_sku"):
-                    duplicate_key = ("variant_sku", str(values["variant_sku"]).casefold())
-                elif record_type == "supplier_offers" and values.get("supplier_sku"):
-                    duplicate_key = ("supplier_sku", str(values["supplier_id"]), str(values["supplier_sku"]).casefold())
-                elif record_type == "product_identifiers":
-                    duplicate_key = (
-                        "identifier", values["identifier_type"], values.get("namespace", "global"),
-                        str(values["value"]).casefold(),
-                    )
-                if duplicate_key:
-                    match = duplicate_tracker.check_and_add(duplicate_key, record.source_location)
-                    if match.duplicate:
-                        if len(errors) < error_limit:
-                            errors.append({
-                                "source_location": record.source_location,
-                                "source_key": record.source_key,
-                                "field": duplicate_key[0],
-                                "error_code": "DUPLICATE_IN_FILE",
-                                "message": f"Duplicate key matches {match.first_source_location}.",
-                            })
-                        continue
-                        })
-                    continue
-                if duplicate_key:
-                    seen[duplicate_key] = record.source_location
-                valid.append(values)
-                valid_source_locations.append(record.source_location)
-                valid_source_keys.append(record.source_key)
+        values = parsed_model.model_dump(mode="json")
+        duplicate_key: tuple[Any, ...] | None = None
+        if record_type == "products":
+            duplicate_key = ("sku", str(values["sku"]).casefold())
+        elif record_type == "product_variants" and values.get("variant_sku"):
+            duplicate_key = ("variant_sku", str(values["variant_sku"]).casefold())
+        elif record_type == "supplier_offers" and values.get("supplier_sku"):
+            duplicate_key = ("supplier_sku", str(values["supplier_id"]), str(values["supplier_sku"]).casefold())
+        elif record_type == "product_identifiers":
+            duplicate_key = (
+                "identifier", values["identifier_type"], values.get("namespace", "global"),
+                str(values["value"]).casefold(),
+            )
+        if duplicate_key and duplicate_key in seen:
+            if len(errors) < error_limit:
+                errors.append({
+                    "source_location": record.source_location,
+                    "source_key": record.source_key,
+                    "field": duplicate_key[0],
+                    "error_code": "DUPLICATE_IN_FILE",
+                    "message": f"Duplicate key matches {seen[duplicate_key]}.",
+                })
+            continue
+        if duplicate_key:
+            seen[duplicate_key] = record.source_location
+        valid.append(values)
+        valid_source_locations.append(record.source_location)
+        valid_source_keys.append(record.source_key)
 
     completeness = [
         {
