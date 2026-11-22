@@ -35,20 +35,32 @@ def profile_dataset_rules(
     """Return a conservative dataset classification and applicable rule findings."""
     by_name = {_norm(header): header for header in headers}
     names = set(by_name)
-    # Some real product masters use source-system product IDs and descriptive
-    # attributes without exposing a seller SKU or a conventional "name" column.
-    # Require multiple product-specific signals (or product_id plus one such
-    # attribute) so a generic ID column alone cannot force product classification.
-    olist_product_signals = {
-        "product_category_name", "product_name_lenght", "product_name_length",
-        "product_description_lenght", "product_description_length",
-        "product_photos_qty", "product_weight_g", "product_length_cm",
-        "product_height_cm", "product_width_cm",
+    # Detect product catalogs from combinations of common commerce, PIM,
+    # marketplace, ERP, and supplier-catalog fields. Do not depend on filenames
+    # or one vendor's export vocabulary, and do not classify on a generic ID alone.
+    product_identity_fields = {
+        "product_id", "source_product_id", "item_id", "sku", "product_sku",
+        "item_sku", "seller_sku", "variant_sku", "product_code", "item_code",
+        "barcode", "ean", "upc", "gtin", "mpn", "manufacturer_part_number",
+        "part_number", "asin",
     }
+    product_attribute_fields = {
+        "product_name", "item_name", "name", "title", "product_title",
+        "item_title", "description", "product_description", "short_description",
+        "long_description", "product_category", "product_category_name",
+        "category", "category_name", "brand", "brand_name", "manufacturer",
+        "manufacturer_name", "vendor", "product_type", "product_type_name",
+        "product_weight", "weight", "weight_g", "product_weight_g",
+        "length", "width", "height", "product_length", "product_width",
+        "product_height", "product_length_cm", "product_width_cm",
+        "product_height_cm", "product_photos_qty", "image_url", "image",
+        "price", "unit_price", "compare_at_price", "cost",
+    }
+    identity_hits = names & product_identity_fields
+    attribute_hits = names & product_attribute_fields
     has_product_signature = (
-        len(names & olist_product_signals) >= 2
-        or ("product_id" in names and bool(names & olist_product_signals))
-    )
+        bool(identity_hits) and bool(attribute_hits)
+    ) or len(attribute_hits) >= 3 or len(identity_hits) >= 2
     if {"supplier_id", "unit_price"} <= names or {"supplier_sku", "unit_price"} <= names:
         dataset_type = "supplier offers"
     elif names & {"quantity_on_hand", "quantity_available", "stock_quantity", "available_quantity"}:
@@ -59,7 +71,7 @@ def profile_dataset_rules(
         dataset_type = "financial transactions"
     elif names & {"email", "customer_email", "email_address", "customer_id", "customer_unique_id"}:
         dataset_type = "customer records"
-    elif has_product_signature or names & {"sku", "product_sku", "item_sku", "product_code", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category", "product_category_name"}:
+    elif has_product_signature:
         dataset_type = "product catalog"
     else:
         dataset_type = "general dataset"
@@ -76,7 +88,7 @@ def profile_dataset_rules(
         return next((by_name[name] for name in candidates if name in by_name), None)
 
     if dataset_type == "product catalog":
-        source_id_col = header("product_id", "source_product_id", "catalog_id", "item_id")
+        source_id_col = header("product_id", "source_product_id", "catalog_id", "item_id", "source_item_id")
         if source_id_col:
             source_ids = [
                 str(row.get(source_id_col)).strip().casefold()
@@ -100,7 +112,7 @@ def profile_dataset_rules(
                 "Confirm the dataset grain and source-system uniqueness rules; repeated IDs may represent variants or multiple offers rather than duplicate products.",
             )
 
-        sku_col = header("sku", "product_sku", "item_sku", "product_code")
+        sku_col = header("sku", "product_sku", "item_sku", "seller_sku", "variant_sku", "product_code", "item_code")
         if sku_col:
             missing_skus = sum(1 for row in rows if row.get(sku_col) in (None, "") or not str(row.get(sku_col)).strip())
             add_check(
@@ -125,7 +137,7 @@ def profile_dataset_rules(
         # Validate only explicit relationships whose target keys are present in
         # this same dataset. Never treat a missing external master file as proof
         # that a reference is invalid.
-        product_id_col = header("product_id", "source_product_id", "item_id")
+        product_id_col = header("product_id", "source_product_id", "item_id", "source_item_id")
         parent_col = header("parent_product_id", "parent_id")
         if product_id_col and parent_col:
             known_product_ids = {
