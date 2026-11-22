@@ -76,6 +76,30 @@ def profile_dataset_rules(
         return next((by_name[name] for name in candidates if name in by_name), None)
 
     if dataset_type == "product catalog":
+        source_id_col = header("product_id", "source_product_id", "catalog_id", "item_id")
+        if source_id_col:
+            source_ids = [
+                str(row.get(source_id_col)).strip().casefold()
+                for row in rows
+                if row.get(source_id_col) not in (None, "") and str(row.get(source_id_col)).strip()
+            ]
+            missing_source_ids = sum(
+                1 for row in rows
+                if row.get(source_id_col) in (None, "") or not str(row.get(source_id_col)).strip()
+            )
+            duplicate_source_ids = sum(count - 1 for count in Counter(source_ids).values() if count > 1)
+            add_check(
+                "MISSING_SOURCE_PRODUCT_ID", "Missing source product IDs", missing_source_ids,
+                f"{missing_source_ids} product records have no source product identifier.",
+                "Provide the source system's product ID. Do not substitute a seller SKU, MPN, or barcode.",
+                "critical",
+            )
+            add_check(
+                "DUPLICATE_SOURCE_PRODUCT_ID", "Duplicate source product IDs", duplicate_source_ids,
+                f"{duplicate_source_ids} product records repeat a source product identifier.",
+                "Confirm the dataset grain and source-system uniqueness rules; repeated IDs may represent variants or multiple offers rather than duplicate products.",
+            )
+
         sku_col = header("sku", "product_sku", "item_sku", "product_code")
         if sku_col:
             missing_skus = sum(1 for row in rows if row.get(sku_col) in (None, "") or not str(row.get(sku_col)).strip())
@@ -268,6 +292,8 @@ def profile_dataset_rules(
     rule_definitions = [
         ("MISSING_VALUES", "Missing values", "structural", "warning", None),
         ("EXACT_DUPLICATE_ROWS", "Exact duplicate rows", "structural", "warning", None),
+        ("MISSING_SOURCE_PRODUCT_ID", "Missing source product IDs", "product catalog", "critical", "product catalog"),
+        ("DUPLICATE_SOURCE_PRODUCT_ID", "Duplicate source product IDs", "product catalog", "warning", "product catalog"),
         ("MISSING_PRODUCT_SKU", "Missing product SKUs", "product catalog", "critical", "product catalog"),
         ("DUPLICATE_PRODUCT_SKU", "Duplicate product SKUs", "product catalog", "critical", "product catalog"),
         ("ORPHAN_PRODUCT_PARENT", "Product parent reference not found", "product catalog", "critical", "product catalog"),
