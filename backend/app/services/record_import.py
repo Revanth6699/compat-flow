@@ -16,6 +16,7 @@ from app.schemas import (
     SupplierOfferCreateRequest,
 )
 from app.services.ingestion_adapters import ParsedSource
+from app.services.batch_processing import DiskBackedDuplicateTracker
 
 
 RECORD_MODELS = {
@@ -139,7 +140,7 @@ def validate_parsed_records(
     valid_source_locations: list[str] = []
     valid_source_keys: list[str | None] = []
     errors: list[dict[str, Any]] = []
-    seen: dict[tuple[Any, ...], str] = {}
+    duplicate_tracker = DiskBackedDuplicateTracker()
     populated: Counter[str] = Counter()
     required_fields = [
         name for name, field in model.model_fields.items() if field.is_required()
@@ -198,22 +199,23 @@ def validate_parsed_records(
                 "identifier", values["identifier_type"], values.get("namespace", "global"),
                 str(values["value"]).casefold(),
             )
-        if duplicate_key and duplicate_key in seen:
-            if len(errors) < error_limit:
-                errors.append({
-                    "source_location": record.source_location,
-                    "source_key": record.source_key,
-                    "field": duplicate_key[0],
-                    "error_code": "DUPLICATE_IN_FILE",
-                    "message": f"Duplicate key matches {seen[duplicate_key]}.",
-                })
-            continue
         if duplicate_key:
-            seen[duplicate_key] = record.source_location
+            duplicate = duplicate_tracker.check_and_add(duplicate_key, record.source_location)
+            if duplicate.duplicate:
+                if len(errors) < error_limit:
+                    errors.append({
+                        "source_location": record.source_location,
+                        "source_key": record.source_key,
+                        "field": duplicate_key[0],
+                        "error_code": "DUPLICATE_IN_FILE",
+                        "message": f"Duplicate key matches {duplicate.first_source_location}.",
+                    })
+                continue
         valid.append(values)
         valid_source_locations.append(record.source_location)
         valid_source_keys.append(record.source_key)
 
+    duplicate_tracker.close()
     completeness = [
         {
             "field": field,
