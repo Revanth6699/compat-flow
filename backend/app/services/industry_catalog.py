@@ -149,14 +149,34 @@ def detect_industry(headers: list[str]) -> dict[str, Any]:
         profile: len(normalized & spec["signals"])
         for profile, spec in PROFILES.items()
     }
-    ranked = sorted(scores.items(), key=lambda item: item[1], reverse=True)
+    ranked = sorted(scores.items(), key=lambda item: (-item[1], item[0]))
     best, score = ranked[0]
     second = ranked[1][1] if len(ranked) > 1 else 0
-    # Do not force an industry where evidence is weak or tied.
-    if score < 2 or score == second:
-        return {"profile_id": None, "confidence": 0.0, "scores": scores, "needs_confirmation": True}
-    confidence = round(min(0.99, 0.55 + 0.10 * (score - second)), 2)
-    return {"profile_id": best, "confidence": confidence, "scores": scores, "needs_confirmation": False}
+    evidence = sorted(normalized & set().union(*(spec["signals"] for spec in PROFILES.values())))
+    # This is a deterministic heuristic, not a statistical probability. A tie or
+    # weak signal must be confirmed by the user instead of silently guessing.
+    needs_confirmation = score < 2 or score == second
+    confidence = 0.0 if needs_confirmation else round(min(0.99, 0.55 + 0.10 * (score - second)), 2)
+    top_score = score
+    candidates = [
+        {"profile_id": profile, "score": value}
+        for profile, value in ranked if value == top_score
+    ]
+    reason = (
+        "insufficient_industry_signals" if score < 2
+        else "ambiguous_tied_profiles" if score == second
+        else "strongest_unique_signal_match"
+    )
+    return {
+        "profile_id": None if needs_confirmation else best,
+        "confidence": confidence,
+        "scores": scores,
+        "needs_confirmation": needs_confirmation,
+        "decision_reason": reason,
+        "top_candidates": candidates,
+        "evidence_fields": evidence,
+        "confidence_method": "heuristic_signal_score_not_probability",
+    }
 
 
 def validate_industry_csv(content: str, profile_id: str | None = None, max_rows: int = MAX_ROWS) -> dict[str, Any]:
@@ -194,20 +214,38 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
             alias_lookup[alias] = field
     mapped: dict[str, tuple[int, float]] = {}
     ambiguous: set[str] = set()
+    ambiguous_headers: dict[str, list[str]] = {}
     unmapped: list[str] = []
     for index, header in enumerate(normalized):
         field = alias_lookup.get(header)
-        if field is None or field in ambiguous:
+        if field is None:
             unmapped.append(headers[index])
+            continue
+        if field in ambiguous:
+            unmapped.append(headers[index])
+            ambiguous_headers[field].append(headers[index])
             continue
         if field in mapped:
             previous = mapped.pop(field)[0]
             unmapped.extend([headers[previous], headers[index]])
             ambiguous.add(field)
+            ambiguous_headers[field] = [headers[previous], headers[index]]
             continue
-        # Explicit source ID is not treated as a SKU. Confidence is based on exact
-        # normalized aliases only; ambiguous generic part_number is intentionally unmapped.
+        # Exact canonical names score higher than documented aliases. These are
+        # deterministic match-strength labels, not calibrated probabilities.
         mapped[field] = (index, 0.99 if header == field else 0.95)
+    ambiguous_mappings = [
+        {"field": field, "source_headers": source_headers}
+        for field, source_headers in sorted(ambiguous_headers.items())
+    ]
+    unmapped_header_details = [
+        {
+            "source_header": headers[index],
+            "reason": "ambiguous_mapping" if alias_lookup.get(normalized[index]) in ambiguous else "unsupported_header",
+            "candidate_field": alias_lookup.get(normalized[index]),
+        }
+        for index in range(len(headers)) if headers[index] in unmapped
+    ]
 
     mappings = [
         {"field": field, "source_header": headers[index], "confidence": confidence}
@@ -222,11 +260,20 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
     valid = 0
 
     row_invalid = False
+    issue_counts_by_code: Counter[str] = Counter()
+    issue_counts_by_severity: Counter[str] = Counter()
+    rows_with_critical_issues: set[int] = set()
+    rows_with_warning_issues: set[int] = set()
 
     def add_issue(row_number: int, field: str | None, code: str, message: str, severity: str = "critical"):
         nonlocal row_invalid
+        issue_counts_by_code[code] += 1
+        issue_counts_by_severity[severity] += 1
         if severity == "critical":
             row_invalid = True
+            rows_with_critical_issues.add(row_number)
+        elif severity == "warning":
+            rows_with_warning_issues.add(row_number)
         if len(issues) < ERROR_LIMIT:
             issues.append({"row_number": row_number, "field": field, "error_code": code, "message": message, "severity": severity})
 
@@ -395,7 +442,10 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
             "completeness_pct": round(count / total * 100, 2) if total else 100.0,
         })
     relevant_columns = len(headers)
-    mapping_coverage = round(len(mapped) / relevant_columns * 100, 2) if relevant_columns else 0.0
+    mapped_column_count = sum(len(value["source_headers"]) for value in ambiguous_mappings) * 0 + len(mapped)
+    mapping_coverage = round(mapped_column_count / relevant_columns * 100, 2) if relevant_columns else 0.0
+    total_issue_count = sum(issue_counts_by_severity.values())
+    rows_with_any_issue = rows_with_critical_issues | rows_with_warning_issues
     valid_rate = round(valid / total * 100, 2) if total else 100.0
     return {
         "profile_id": selected_profile,
@@ -404,15 +454,31 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
         "total_rows": total, "valid_rows": valid, "invalid_rows": total - valid,
         "validation_pass_rate": valid_rate,
         "column_mappings": mappings, "unmapped_headers": unmapped,
+        "unmapped_header_details": unmapped_header_details,
+        "ambiguous_mappings": ambiguous_mappings,
+        "mapping_diagnostics": {
+            "source_column_count": relevant_columns,
+            "mapped_column_count": mapped_column_count,
+            "unmapped_column_count": len(unmapped),
+            "ambiguous_field_count": len(ambiguous_mappings),
+            "confidence_method": "exact_canonical_or_documented_alias_match_strength_not_probability",
+        },
         "field_metrics": metrics, "issues": issues, "preview": rows,
         "metrics": {
             "mapping_coverage_pct": mapping_coverage,
             "validation_pass_rate_pct": valid_rate,
-            "issue_count": len(issues),
-            "critical_issue_count": sum(i["severity"] == "critical" for i in issues),
-            "warning_issue_count": sum(i["severity"] == "warning" for i in issues),
+            "issue_count": total_issue_count,
+            "returned_issue_count": len(issues),
+            "issues_truncated": total_issue_count > len(issues),
+            "critical_issue_count": issue_counts_by_severity["critical"],
+            "warning_issue_count": issue_counts_by_severity["warning"],
+            "issue_counts_by_code": dict(sorted(issue_counts_by_code.items())),
+            "rows_with_critical_issues": len(rows_with_critical_issues),
+            "rows_with_warning_issues": len(rows_with_warning_issues),
+            "rows_with_any_issue": len(rows_with_any_issue),
         },
         "persisted": False,
+        "issue_details_limit": ERROR_LIMIT,
         "validation_scope": "industry_profile_mapping_and_row_level_syntax_checks; no external reference-data verification",
     }
 
