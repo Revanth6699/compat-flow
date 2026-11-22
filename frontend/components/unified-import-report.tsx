@@ -13,6 +13,7 @@ type DatasetProfile = {
   relationship_checks: { name: string; from_column: string; to_column: string; matched_records: number; average_days: number | null; minimum_days: number | null; maximum_days: number | null; negative_duration_records: number }[];
   findings: { severity: string; title: string; detail: string }[];
   domain_checks?: { code: string; title: string; issue_records: number; severity: string; detail: string; recommendation: string }[];
+  validation_rules?: { code: string; title: string; category: string; severity: string; status: "evaluated" | "not_applicable" | "not_evaluated"; records_evaluated: number; issue_records: number | null; detail: string; recommendation: string }[];
   preview: Record<string, unknown>[];
 };
 type IndustryResult = {
@@ -128,6 +129,13 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
         <summary><span>Column completeness and data types</span><small>{fieldMetrics.length} columns</small></summary>
         <h3>Column completeness and data types</h3>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead><tbody>{fieldMetrics.map((item) => <tr key={item.field}><td>{item.field}</td><td>{"inferred_type" in item ? String(item.inferred_type) : "—"}</td><td>{item.populated.toLocaleString()}</td><td>{item.missing.toLocaleString()}</td><td>{item.completeness_pct.toFixed(2)}%</td></tr>)}</tbody></table></div>
+      </details>}
+
+      {datasetResult && datasetResult.validation_rules && datasetResult.validation_rules.length > 0 && <details className="panel result-section report-detail" open>
+        <summary><span>Default validation rules</span><small>{datasetResult.validation_rules.filter(rule => rule.status === "evaluated").length} evaluated · {datasetResult.validation_rules.filter(rule => rule.status === "not_applicable").length} not applicable · {datasetResult.validation_rules.filter(rule => rule.status === "not_evaluated").length} not evaluated</small></summary>
+        <h3>Default validation rules</h3>
+        <p className="import-description">Rules are selected from the detected dataset profile. “Not applicable” means the rule belongs to another dataset type. “Not evaluated” means the rule was relevant but the required source columns were unavailable. Neither state is counted as a pass.</p>
+        <div className="table-scroll"><table className="preview-table"><thead><tr><th>Rule</th><th>Category</th><th>Status</th><th>Records evaluated</th><th>Issues</th><th>Details</th></tr></thead><tbody>{datasetResult.validation_rules.map(rule => <tr key={rule.code}><td>{rule.title}</td><td>{rule.category}</td><td>{rule.status === "evaluated" ? "Evaluated" : rule.status === "not_applicable" ? "Not applicable" : "Not evaluated"}</td><td>{rule.records_evaluated.toLocaleString()}</td><td>{rule.issue_records === null ? "—" : rule.issue_records.toLocaleString()}</td><td>{rule.detail}<br />Recommended action: {rule.recommendation}</td></tr>)}</tbody></table></div>
       </details>}
 
       {datasetResult && datasetResult.domain_checks && datasetResult.domain_checks.length > 0 && <details className="panel result-section report-detail">
