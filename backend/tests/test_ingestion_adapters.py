@@ -353,3 +353,11 @@ def test_json_keeps_equally_plausible_product_arrays_ambiguous():
     }
     with pytest.raises(IngestionParseError, match="products.*variants.*record_path"):
         parse_json(json.dumps(payload).encode())
+
+
+
+def test_json_explicit_record_path_selects_one_of_multiple_candidate_arrays():
+    payload = {"products": [{"sku": "A"}], "variants": [{"sku": "B"}]}
+    parsed = parse_json(json.dumps(payload).encode(), record_path="variants")
+    assert parsed.metadata["record_path"] == "variants"
+    assert parsed.records[0].values["sku"] == "B"
