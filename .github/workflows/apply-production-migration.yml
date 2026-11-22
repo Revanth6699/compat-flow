@@ -1,0 +1,68 @@
+name: Apply production database migration
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_verified:
+        description: "Confirm a recoverable production database backup was created and restore-tested or independently verified"
+        required: true
+        type: choice
+        options:
+          - "no"
+          - "yes"
+      confirm_production_migration:
+        description: "Type APPLY PRODUCTION MIGRATIONS to authorize upgrading production to Alembic head"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compat-flow-production-migration
+  cancel-in-progress: false
+
+jobs:
+  migrate-production:
+    if: ${{ inputs.backup_verified == 'yes' && inputs.confirm_production_migration == 'APPLY PRODUCTION MIGRATIONS' }}
+    environment: production
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify production target and apply reviewed migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::Environment secret PRODUCTION_DATABASE_URL is not configured."
+            exit 1
+          fi
+          export DATABASE_URL="$(python -c 'import os; from sqlalchemy.engine import make_url; url = make_url(os.environ["DATABASE_URL"]); print(url.set(drivername="postgresql+psycopg").render_as_string(hide_password=False))')"
+
+          echo "Expected Alembic head:"
+          python -m alembic heads
+
+          echo "Current production revision before migration:"
+          python -m alembic current
+
+          echo "Applying production migrations..."
+          python -m alembic upgrade head
+
+          echo "Production revision after migration:"
+          python -m alembic current -v
