@@ -96,6 +96,10 @@ def evaluate_custom_rules(
                 continue
 
             field_name = rule.field_name
+            try:
+                config = validate_rule_config(rule.rule_type, rule.config or {})
+            except CustomRuleError as exc:
+                raise CustomRuleError(f"Stored rule {rule.code} has invalid configuration: {exc}") from None
             if not rows or field_name not in rows[0] and not any(field_name in row for row in rows):
                 results.append({
                     "rule_id": str(rule.id), "code": rule.code, "name": rule.name,
@@ -107,7 +111,6 @@ def evaluate_custom_rules(
 
             issue_count = 0
             evaluated_count = 0
-            config = rule.config or {}
             for row, source_location in zip(rows, source_locations):
                 value = row.get(field_name)
                 missing = value is None or (isinstance(value, str) and not value.strip())
