@@ -35,16 +35,6 @@ def profile_dataset_rules(
     """Return a conservative dataset classification and applicable rule findings."""
     by_name = {_norm(header): header for header in headers}
     names = set(by_name)
-    if {"supplier_id", "unit_price"} <= names or {"supplier_sku", "unit_price"} <= names:
-        dataset_type = "supplier offers"
-    elif names & {"quantity_on_hand", "quantity_available", "stock_quantity", "available_quantity"}:
-        dataset_type = "inventory"
-    elif names & {"order_id", "order_status", "order_purchase_timestamp", "order_item_id"}:
-        dataset_type = "orders / transactions"
-    elif names & {"transaction_id", "payment_id", "invoice_id"} and names & {"amount", "total", "total_amount", "transaction_amount"}:
-        dataset_type = "financial transactions"
-    elif names & {"email", "customer_email", "email_address", "customer_id", "customer_unique_id"}:
-        dataset_type = "customer records"
     # Some real product masters use source-system product IDs and descriptive
     # attributes without exposing a seller SKU or a conventional "name" column.
     # Require multiple product-specific signals (or product_id plus one such
@@ -59,9 +49,17 @@ def profile_dataset_rules(
         len(names & olist_product_signals) >= 2
         or ("product_id" in names and bool(names & olist_product_signals))
     )
-    if has_product_signature:
-        dataset_type = "product catalog"
-    elif names & {"sku", "product_sku", "item_sku", "product_code", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category", "product_category_name"}:
+    if {"supplier_id", "unit_price"} <= names or {"supplier_sku", "unit_price"} <= names:
+        dataset_type = "supplier offers"
+    elif names & {"quantity_on_hand", "quantity_available", "stock_quantity", "available_quantity"}:
+        dataset_type = "inventory"
+    elif names & {"order_id", "order_status", "order_purchase_timestamp", "order_item_id"}:
+        dataset_type = "orders / transactions"
+    elif names & {"transaction_id", "payment_id", "invoice_id"} and names & {"amount", "total", "total_amount", "transaction_amount"}:
+        dataset_type = "financial transactions"
+    elif names & {"email", "customer_email", "email_address", "customer_id", "customer_unique_id"}:
+        dataset_type = "customer records"
+    elif has_product_signature or names & {"sku", "product_sku", "item_sku", "product_code", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category", "product_category_name"}:
         dataset_type = "product catalog"
     else:
         dataset_type = "general dataset"
