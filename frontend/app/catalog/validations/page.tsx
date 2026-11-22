@@ -43,6 +43,7 @@ export default function ValidationProfilesPage() {
   const [profileName, setProfileName] = useState("");
   const [datasetType, setDatasetType] = useState("product catalog");
   const [ruleCode, setRuleCode] = useState("");
+  const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
   const [ruleName, setRuleName] = useState("");
   const [fieldName, setFieldName] = useState("");
   const [ruleType, setRuleType] = useState("required");
@@ -100,19 +101,38 @@ export default function ValidationProfilesPage() {
       let config: Record<string, unknown>;
       try { config = JSON.parse(ruleConfig) as Record<string, unknown>; }
       catch { throw new Error("Rule configuration must be valid JSON."); }
-      await apiRequest<ValidationRule>(`/api/v1/validation/profiles/${selectedId}/rules`, {
-        method: "POST",
-        body: JSON.stringify({
-          code: ruleCode.trim().toUpperCase(), name: ruleName, field_name: fieldName,
-          rule_type: ruleType, config, severity, enabled: true,
-        }),
-        headers: { "Content-Type": "application/json" },
-      });
-      setRuleCode(""); setRuleName(""); setFieldName(""); setRuleConfig("{}");
+      if (editingRuleId) {
+        await apiRequest<ValidationRule>(`/api/v1/validation/profiles/${selectedId}/rules/${editingRuleId}`, {
+          method: "PATCH",
+          body: JSON.stringify({ name: ruleName, field_name: fieldName, config, severity }),
+          headers: { "Content-Type": "application/json" },
+        });
+      } else {
+        await apiRequest<ValidationRule>(`/api/v1/validation/profiles/${selectedId}/rules`, {
+          method: "POST",
+          body: JSON.stringify({
+            code: ruleCode.trim().toUpperCase(), name: ruleName, field_name: fieldName,
+            rule_type: ruleType, config, severity, enabled: true,
+          }),
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      setEditingRuleId(null); setRuleCode(""); setRuleName(""); setFieldName(""); setRuleConfig("{}");
       await loadRules(selectedId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create validation rule.");
     } finally { setLoading(false); }
+  }
+
+  function beginEditRule(rule: ValidationRule) {
+    setEditingRuleId(rule.id);
+    setRuleCode(rule.code);
+    setRuleName(rule.name);
+    setFieldName(rule.field_name);
+    setRuleType(rule.rule_type);
+    setRuleConfig(JSON.stringify(rule.config ?? {}, null, 2));
+    setSeverity(rule.severity);
+    setError("");
   }
 
   async function toggleRule(rule: ValidationRule) {
@@ -199,20 +219,21 @@ export default function ValidationProfilesPage() {
         </section>
 
         {selectedProfile?.is_active && <section className="panel import-panel">
-          <h2>Add a custom rule</h2>
+          <h2>{editingRuleId ? "Edit custom rule" : "Add a custom rule"}</h2>
           <p className="import-description">Use a source column name exactly as it appears in the uploaded file. Examples: required, unique, numeric minimum/maximum, allowed values, and minimum/maximum text length.</p>
           <form onSubmit={createRule} className="form-grid">
-            <label>Rule code<input value={ruleCode} onChange={(event) => setRuleCode(event.target.value)} required maxLength={80} placeholder="SKU_REQUIRED" /></label>
+            <label>Rule code<input value={ruleCode} onChange={(event) => setRuleCode(event.target.value)} required maxLength={80} placeholder="SKU_REQUIRED" disabled={Boolean(editingRuleId)} /></label>
             <label>Rule name<input value={ruleName} onChange={(event) => setRuleName(event.target.value)} required maxLength={120} /></label>
             <label>Source field<input value={fieldName} onChange={(event) => setFieldName(event.target.value)} required maxLength={120} placeholder="sku" /></label>
-            <label>Rule type<select value={ruleType} onChange={(event) => setRuleType(event.target.value)}>
+            <label>Rule type<select value={ruleType} onChange={(event) => setRuleType(event.target.value)} disabled={Boolean(editingRuleId)}>
               {RULE_TYPES.map((type) => <option key={type} value={type}>{type.replaceAll("_", " ")}</option>)}
             </select></label>
             <label>Rule configuration (JSON)<textarea value={ruleConfig} onChange={(event) => setRuleConfig(event.target.value)} rows={3} /></label>
             <label>Severity<select value={severity} onChange={(event) => setSeverity(event.target.value as typeof severity)}>
               <option value="critical">Critical</option><option value="warning">Warning</option><option value="info">Informational</option>
             </select></label>
-            <button className="button" type="submit" disabled={loading}>Add rule</button>
+            <button className="button" type="submit" disabled={loading}>{editingRuleId ? "Save rule changes" : "Add rule"}</button>
+            {editingRuleId && <button className="button button-secondary" type="button" onClick={() => { setEditingRuleId(null); setRuleCode(""); setRuleName(""); setFieldName(""); setRuleConfig("{}"); }}>Cancel edit</button>}
           </form>
           <p className="column-hint">Configuration examples: numeric minimum: {"{"}"value": 0{"}"} · allowed values: {"{"}"values": ["active", "inactive"]{"}"} · length: {"{"}"value": 10{"}"}. Required and unique use {"{}"}.</p>
         </section>}
@@ -220,7 +241,7 @@ export default function ValidationProfilesPage() {
         {selectedProfile && <section className="panel import-panel">
           <h2>Rules in {selectedProfile.name}</h2>
           {rules.length === 0 ? <p>No custom rules have been added to this profile.</p> : <div className="table-scroll"><table className="preview-table"><thead><tr><th>Rule</th><th>Field</th><th>Type</th><th>Severity</th><th>Status</th><th>Actions</th></tr></thead><tbody>
-            {rules.map((rule) => <tr key={rule.id}><td>{rule.name}<small>{rule.code}</small></td><td>{rule.field_name}</td><td>{rule.rule_type}</td><td>{rule.severity}</td><td>{rule.enabled ? "Enabled" : "Disabled — not evaluated"}</td><td><button className="button button-secondary" type="button" onClick={() => toggleRule(rule)}>{rule.enabled ? "Disable" : "Enable"}</button> <button className="button button-secondary" type="button" onClick={() => deleteRule(rule)}>Delete</button></td></tr>)}
+            {rules.map((rule) => <tr key={rule.id}><td>{rule.name}<small>{rule.code}</small></td><td>{rule.field_name}</td><td>{rule.rule_type}</td><td>{rule.severity}</td><td>{rule.enabled ? "Enabled" : "Disabled — not evaluated"}</td><td><button className="button button-secondary" type="button" onClick={() => beginEditRule(rule)}>Edit</button> <button className="button button-secondary" type="button" onClick={() => toggleRule(rule)}>{rule.enabled ? "Disable" : "Enable"}</button> <button className="button button-secondary" type="button" onClick={() => deleteRule(rule)}>Delete</button></td></tr>)}
           </tbody></table></div>}
         </section>}
 
