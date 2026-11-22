@@ -328,3 +328,36 @@ def test_csv_parser_still_enforces_explicit_system_safety_ceiling():
     payload = ("sku\n" + "".join(f"SKU-{index}\n" for index in range(MAX_RECORDS + 1))).encode()
     with pytest.raises(IngestionParseError, match="record limit"):
         parse_csv(payload)
+
+
+
+def test_json_auto_selects_nested_product_array_over_unrelated_order_array():
+    payload = {
+        "metadata": {"source": "demo"},
+        "orders": [{"order_id": "O-1", "order_status": "paid"}],
+        "catalog": {
+            "products": [
+                {"product_id": "P-1", "sku": "SKU-1", "product_name": "Widget", "price": 12.5}
+            ]
+        },
+    }
+    parsed = parse_json(json.dumps(payload).encode())
+    assert parsed.metadata["record_path"] == "catalog.products"
+    assert parsed.records[0].values["product_name"] == "Widget"
+
+
+def test_json_keeps_equally_plausible_product_arrays_ambiguous():
+    payload = {
+        "products": [{"sku": "A"}],
+        "variants": [{"sku": "B"}],
+    }
+    with pytest.raises(IngestionParseError, match="products.*variants.*record_path"):
+        parse_json(json.dumps(payload).encode())
+
+
+
+def test_json_explicit_record_path_selects_one_of_multiple_candidate_arrays():
+    payload = {"products": [{"sku": "A"}], "variants": [{"sku": "B"}]}
+    parsed = parse_json(json.dumps(payload).encode(), record_path="variants")
+    assert parsed.metadata["record_path"] == "variants"
+    assert parsed.records[0].values["sku"] == "B"

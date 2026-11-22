@@ -71,6 +71,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
   const incompleteRecords = datasetResult?.incomplete_records ?? null;
   const recordCompleteness = datasetResult?.complete_records_pct ?? null;
   const passRate = industryResult?.validation_pass_rate ?? result?.validation_pass_rate ?? (multiResult && total ? multiResult.valid_records / total * 100 : null);
+  const unmappedIndustryColumns = industryResult?.unmapped_headers.length ?? 0;
   const profileTitle = datasetResult?.dataset_type ?? industryResult?.profile_id?.replaceAll("_", " ") ?? multiResult?.record_type.replaceAll("_", " ") ?? "Product catalog";
   const mappings = industryResult?.column_mappings ?? multiResult?.mappings ?? result?.column_mappings ?? [];
   const productFieldMappings = datasetResult?.field_mappings ?? {};
@@ -86,7 +87,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
     <section className="import-results premium-report" aria-live="polite">
       <div className="results-heading">
         <div><div className="eyebrow">COMPATFLOW DATA INTELLIGENCE REPORT</div><h2>{profileTitle} overview</h2><p>{filename} · {format.toUpperCase()} · Stateless analysis</p></div>
-        <span className={invalid === null || invalid === 0 ? "result-status success" : "result-status warning"}>{invalid === null ? "Analysis complete" : invalid === 0 ? "No validation errors" : "Review required"}</span>
+        <span className={industryResult && unmappedIndustryColumns > 0 ? "result-status warning" : invalid === null || invalid === 0 ? "result-status success" : "result-status warning"}>{industryResult && unmappedIndustryColumns > 0 ? "Partial coverage" : invalid === null ? "Analysis complete" : invalid === 0 ? "No validation errors" : "Review required"}</span>
       </div>
 
       <div className="report-actions no-print">
@@ -104,7 +105,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
           <div className="panel stat-card"><span>Accepted records</span><strong className="metric-valid">{valid === null ? "—" : valid.toLocaleString()}</strong><small>{hasValidationCounts ? "Passed current validation" : "Not applicable to this result"}</small></div>
           <div className="panel stat-card"><span>Records needing review</span><strong className={invalid ? "metric-invalid" : "metric-valid"}>{invalid === null ? "—" : invalid.toLocaleString()}</strong><small>{hasValidationCounts ? "Failed current validation" : "Not applicable to this result"}</small></div>
         </>}
-        <div className="panel stat-card"><span>{completeness !== null ? "Cell completeness" : "Validation pass rate"}</span><strong>{completeness !== null ? completeness.toFixed(2) + "%" : passRate !== null ? passRate.toFixed(2) + "%" : "Unavailable"}</strong><small>{completeness !== null ? "Populated cells / total cells" : passRate !== null ? "Records passing current validation" : "No quality metric returned"}</small></div>
+        <div className="panel stat-card"><span>{completeness !== null ? "Cell completeness" : industryResult ? "Pass rate on evaluated checks" : "Validation pass rate"}</span><strong>{completeness !== null ? completeness.toFixed(2) + "%" : passRate !== null ? passRate.toFixed(2) + "%" : "Unavailable"}</strong><small>{completeness !== null ? "Populated cells / total cells" : industryResult ? `Mapping coverage ${industryResult.metrics.mapping_coverage_pct.toFixed(1)}%; ${unmappedIndustryColumns} unmapped columns were not validated` : passRate !== null ? "Records passing current validation" : "No quality metric returned"}</small></div>
       </div>
 
       <div className="panel result-section">

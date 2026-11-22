@@ -247,6 +247,51 @@ def _flatten_json_object(value: dict[str, Any]) -> dict[str, Any]:
     return flattened
 
 
+def _json_record_array_candidates(payload: Any) -> list[tuple[str, list[dict[str, Any]]]]:
+    """Find object arrays at nested object paths without descending into record arrays."""
+    candidates: list[tuple[str, list[dict[str, Any]]]] = []
+    stack: list[tuple[str, Any, int]] = [("", payload, 0)]
+    while stack:
+        prefix, current, depth = stack.pop()
+        if depth > 12 or not isinstance(current, dict):
+            continue
+        for key, value in current.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            if isinstance(value, list) and (not value or isinstance(value[0], dict)):
+                candidates.append((path, value))
+            elif isinstance(value, dict):
+                stack.append((path, value, depth + 1))
+    return candidates
+
+
+def _json_record_array_score(path: str, records: list[dict[str, Any]]) -> int:
+    """Score array evidence conservatively; ties remain an explicit user choice."""
+    identity = {
+        "product_id", "source_product_id", "sku", "seller_sku", "item_number",
+        "material_number", "barcode", "ean", "upc", "gtin", "asin",
+    }
+    product_attributes = {
+        "product_name", "name", "title", "product_title", "category",
+        "product_category", "price", "mrp", "discounted_selling_price",
+        "stock_level", "stock_levels", "available_quantity", "availablequantity",
+    }
+    order_fields = {"order_id", "order_status", "purchase_date", "order_date"}
+    sample_keys = {
+        re.sub(
+            r"[^a-z0-9]+", "_",
+            re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", str(key)).casefold(),
+        ).strip("_")
+        for record in records[:5]
+        for key in record
+    }
+    score = 3 * len(sample_keys & identity) + 2 * len(sample_keys & product_attributes)
+    score -= 3 * len(sample_keys & order_fields)
+    path_tokens = set(re.sub(r"[^a-z0-9]+", "_", path.casefold()).split("_"))
+    if path_tokens & {"product", "products", "catalog", "item", "items", "variant", "variants"}:
+        score += 1
+    return score
+
+
 def parse_json(data: bytes, *, record_path: str | None = None,
                max_records: int | None = MAX_RECORDS) -> ParsedSource:
     _check_source_size(data)
@@ -254,6 +299,7 @@ def parse_json(data: bytes, *, record_path: str | None = None,
         payload = json.loads(data.decode("utf-8-sig"))
     except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
         raise IngestionParseError("JSON must be valid UTF-8 JSON.") from None
+    selected_path = record_path
     if record_path:
         current: Any = payload
         for part in record_path.split("."):
@@ -261,13 +307,25 @@ def parse_json(data: bytes, *, record_path: str | None = None,
                 raise IngestionParseError("Configured JSON record path does not exist.")
             current = current[part]
         payload = current
-    if isinstance(payload, dict):
-        candidates = [value for value in payload.values()
-                      if isinstance(value, list) and (not value or isinstance(value[0], dict))]
+    elif isinstance(payload, dict):
+        candidates = _json_record_array_candidates(payload)
         if len(candidates) == 1:
-            payload = candidates[0]
+            selected_path, payload = candidates[0]
         elif len(candidates) > 1:
-            raise IngestionParseError("JSON contains multiple candidate record arrays; configure record_path.")
+            ranked = sorted(
+                ((_json_record_array_score(path, values), path, values) for path, values in candidates),
+                key=lambda item: (item[0], len(item[2])),
+                reverse=True,
+            )
+            best_score, best_path, best_records = ranked[0]
+            next_score = ranked[1][0]
+            if best_score > 0 and best_score >= next_score + 2:
+                selected_path, payload = best_path, best_records
+            else:
+                paths = ", ".join(path for _, path, _ in ranked[:8])
+                raise IngestionParseError(
+                    f"JSON contains multiple plausible record arrays ({paths}); choose a record_path."
+                )
         else:
             payload = [payload]
     if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
@@ -284,7 +342,7 @@ def parse_json(data: bytes, *, record_path: str | None = None,
     headers = sorted({key for item in records for key in item.values})
     if len(headers) > MAX_COLUMNS:
         raise IngestionParseError(f"Input exceeds the {MAX_COLUMNS} column limit.")
-    return ParsedSource("json", records, headers, {"record_path": record_path})
+    return ParsedSource("json", records, headers, {"record_path": selected_path})
 
 
 def _local_name(tag: str) -> str:

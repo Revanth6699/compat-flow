@@ -80,12 +80,14 @@ export default function CatalogImportPage() {
   const [multiResult, setMultiResult] = useState<MultiResult | null>(null);
   const [industryResult, setIndustryResult] = useState<IndustryResult | null>(null);
   const [error, setError] = useState("");
+  const [jsonRecordPath, setJsonRecordPath] = useState("");
+  const [jsonRecordPathOptions, setJsonRecordPathOptions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [manualMapping, setManualMapping] = useState<Record<string, string>>({});
   const canonicalFields = ["sku", "name", "manufacturer", "part_number", "category", "compatibility", "replacement_sku"];
 
   function handleFileChange(selectedFile: File | null) {
-    setFile(selectedFile); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setManualMapping({}); setError("");
+    setFile(selectedFile); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setManualMapping({}); setError(""); setJsonRecordPath(""); setJsonRecordPathOptions([]);
     if (!selectedFile) return;
     const extension = selectedFile.name.split(".").pop()?.toLowerCase();
     const allowed = demoApproved ? ["csv", "xlsx", "xls"] : ["csv", "xlsx", "xls", "json", "xml"];
@@ -103,10 +105,11 @@ export default function CatalogImportPage() {
 
   async function handleValidate() {
     if (!file || loading || !user) return;
-    setLoading(true); setError(""); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null);
+    setLoading(true); setError(""); setJsonRecordPathOptions([]); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
+      if (jsonRecordPath) formData.append("json_record_path", jsonRecordPath);
       const extension = file.name.split(".").pop()?.toLowerCase();
 
       if (demoApproved) {
@@ -114,6 +117,7 @@ export default function CatalogImportPage() {
         if (!data.profile_id) {
           const profileForm = new FormData();
           profileForm.append("file", file);
+          if (jsonRecordPath) profileForm.append("json_record_path", jsonRecordPath);
           const profile = await apiRequest<Partial<DatasetProfile>>("/api/v1/catalog/import/profile", { method: "POST", body: profileForm });
           const columns = profile.columns ?? [];
           const totalRecords = profile.total_records ?? 0;
@@ -144,6 +148,7 @@ export default function CatalogImportPage() {
       if (!data.profile_id) {
         const profileForm = new FormData();
         profileForm.append("file", file);
+        if (jsonRecordPath) profileForm.append("json_record_path", jsonRecordPath);
         const profile = await apiRequest<Partial<DatasetProfile>>("/api/v1/catalog/import/profile", { method: "POST", body: profileForm });
         const columns = profile.columns ?? [];
         const totalRecords = profile.total_records ?? 0;
@@ -168,7 +173,17 @@ export default function CatalogImportPage() {
       }
       setIndustryResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong while validating the file.");
+      const message = err instanceof Error ? err.message : "Something went wrong while validating the file.";
+      const candidateMatch = message.match(/multiple plausible record arrays \(([^)]+)\)/i);
+      if (candidateMatch) {
+        const candidates = candidateMatch[1].split(",").map((path) => path.trim()).filter(Boolean);
+        setJsonRecordPathOptions(candidates);
+        setJsonRecordPath(candidates[0] ?? "");
+        setError("CompatFlow found multiple plausible JSON record arrays. Select the array that contains the records you want to validate, then retry.");
+      } else {
+        setJsonRecordPathOptions([]);
+        setError(message);
+      }
     } finally { setLoading(false); }
   }
 
@@ -341,12 +356,21 @@ export default function CatalogImportPage() {
               {loading ? "Validating..." : "Validate file"}
             </button>
             <button className="button button-secondary" type="button" disabled={loading} onClick={() => {
-              setFile(null); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setError("");
+              setFile(null); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null); setError(""); setJsonRecordPath(""); setJsonRecordPathOptions([]);
               const input = document.getElementById("catalog-file") as HTMLInputElement | null;
               if (input) input.value = "";
             }}>Clear</button>
           </div>
           {error && <div className="import-error" role="alert">{error}</div>}
+          {jsonRecordPathOptions.length > 0 && <div className="panel result-section">
+            <label htmlFor="json-record-path">JSON record array</label>
+            <select id="json-record-path" className="form-input" value={jsonRecordPath} onChange={(event) => setJsonRecordPath(event.target.value)}>
+              {jsonRecordPathOptions.map((path) => <option key={path} value={path}>{path}</option>)}
+            </select>
+            <button className="button" type="button" onClick={handleValidate} disabled={!jsonRecordPath || loading}>
+              {loading ? "Validating..." : "Validate selected JSON array"}
+            </button>
+          </div>}
         </section>
 
         <UnifiedImportReport datasetResult={datasetResult} industryResult={industryResult} multiResult={multiResult} result={result} onDownloadCsv={downloadReport} onDownloadJson={downloadProfileJson} onPrint={printReport} />

@@ -381,3 +381,81 @@ def test_product_physical_attributes_distinguish_partial_from_all_missing():
     assert checks["INCOMPLETE_PRODUCT_PHYSICAL_ATTRIBUTES"]["issue_records"] == 1
     assert checks["MISSING_PRODUCT_PHYSICAL_ATTRIBUTES"]["issue_records"] == 1
     assert sum(item["code"] == "MISSING_PRODUCT_PHYSICAL_ATTRIBUTE" for item in result["issue_details"]) == 4
+
+
+
+def test_product_catalog_maps_stock_and_price_and_runs_inventory_checks():
+    result = profile_dataset_rules(
+        ["id", "name", "category", "stock_level", "price", "created_at"],
+        [
+            {"id": "1", "name": "Widget", "category": "tools", "stock_level": "-2", "price": "0", "created_at": "2026-01-01"},
+            {"id": "2", "name": "Gadget", "category": "tools", "stock_level": "8", "price": "12.50", "created_at": "2026-01-02"},
+        ],
+    )
+    assert result["dataset_type"] == "product catalog"
+    assert result["field_mappings"]["available_stock"] == "stock_level"
+    assert result["field_mappings"]["product_selling_price"] == "price"
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert rules["NEGATIVE_INVENTORY_QUANTITY"]["status"] == "evaluated"
+    assert rules["NEGATIVE_INVENTORY_QUANTITY"]["issue_records"] == 1
+    assert rules["NON_POSITIVE_PRODUCT_SELLING_PRICE"]["status"] == "evaluated"
+    assert rules["NON_POSITIVE_PRODUCT_SELLING_PRICE"]["issue_records"] == 1
+
+
+def test_zepto_camel_case_fields_map_without_conflating_pack_quantity_and_stock():
+    result = profile_dataset_rules(
+        ["category", "title", "quantity", "mrp", "discountPercent",
+         "availableQuantity", "discountedSellingPrice", "weightInGms", "outOfStock"],
+        [
+            {"category": "grocery", "title": "Widget", "quantity": "500 g", "mrp": "100",
+             "discountPercent": "20", "availableQuantity": "0",
+             "discountedSellingPrice": "75", "weightInGms": "500", "outOfStock": "false"},
+            {"category": "grocery", "title": "Gadget", "quantity": "1 pack", "mrp": "100",
+             "discountPercent": "20", "availableQuantity": "0",
+             "discountedSellingPrice": "80", "weightInGms": "100", "outOfStock": "true"},
+        ],
+    )
+    assert result["dataset_type"] == "product catalog"
+    mappings = result["field_mappings"]
+    assert mappings["product_list_price"] == "mrp"
+    assert mappings["product_selling_price"] == "discountedSellingPrice"
+    assert mappings["discount_percent"] == "discountPercent"
+    assert mappings["available_stock"] == "availableQuantity"
+    assert mappings["out_of_stock"] == "outOfStock"
+    assert mappings["product_weight"] == "weightInGms"
+    assert "quantity" not in mappings.values()
+    checks = {item["code"]: item for item in result["domain_checks"]}
+    assert checks["DISCOUNTED_PRICE_MISMATCH"]["issue_records"] == 1
+    assert checks["OUT_OF_STOCK_QUANTITY_CONFLICT"]["issue_records"] == 1
+
+
+def test_supply_chain_product_profile_maps_supplier_and_stock_levels():
+    result = profile_dataset_rules(
+        ["SKU", "Product type", "Price", "Stock levels", "Supplier name"],
+        [{"SKU": "S-1", "Product type": "electronics", "Price": "12.5",
+          "Stock levels": "4", "Supplier name": "Acme"}],
+    )
+    assert result["dataset_type"] == "product catalog"
+    assert result["field_mappings"]["supplier_name"] == "Supplier name"
+    assert result["field_mappings"]["available_stock"] == "Stock levels"
+    assert result["field_mappings"]["product_selling_price"] == "Price"
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert rules["NEGATIVE_INVENTORY_QUANTITY"]["status"] == "evaluated"
+
+
+
+def test_marketplace_product_listing_fields_keep_merchant_and_cluster_identity_separate():
+    result = profile_dataset_rules(
+        ["Product ID", "Product Title", "Merchant ID", "Cluster ID", "Cluster Label", "Category ID", "Category Label"],
+        [{"Product ID": "P-1", "Product Title": "Phone", "Merchant ID": "M-1",
+          "Cluster ID": "C-1", "Cluster Label": "Phone family", "Category ID": "CAT-1",
+          "Category Label": "Mobile"}],
+    )
+    assert result["dataset_type"] == "product catalog"
+    mappings = result["field_mappings"]
+    assert mappings["source_product_id"] == "Product ID"
+    assert mappings["merchant_id"] == "Merchant ID"
+    assert mappings["product_cluster_id"] == "Cluster ID"
+    assert mappings["product_cluster_label"] == "Cluster Label"
+    assert mappings["product_category_id"] == "Category ID"
+    assert mappings["product_category"] == "Category Label"
