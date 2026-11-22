@@ -39,7 +39,7 @@ from app.schemas import (
 from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
 from app.services.catalog_ingestion import persist_validated_import
-from app.services.dataset_rules import profile_dataset_rules
+from app.services.dataset_rules import missing_value_locations, profile_dataset_rules
 from app.services.custom_validation import CustomRuleError, evaluate_custom_rules, validate_rule_config
 from app.services.industry_catalog import IndustryCSVError, validate_industry_records
 from app.services.catalog_csv import (
@@ -546,13 +546,7 @@ async def profile_public_dataset(
     missing_cells = total_cells - populated_cells
     # Preserve source row and column locations for missing cells. Cap detail rows
     # to keep large reports bounded while retaining the exact aggregate count.
-    missing_value_details = []
-    for row_index, row in enumerate(rows):
-        for header in headers:
-            value = row.get(header)
-            if value is None or str(value).strip() == "":
-                if len(missing_value_details) < 1000:
-                    missing_value_details.append({"row_number": row_index + 2, "field": header})
+    missing_value_details = missing_value_locations(headers, rows, limit=1000)
     missing_value_details_truncated = missing_cells > len(missing_value_details)
     findings = []
     if missing_cells:
