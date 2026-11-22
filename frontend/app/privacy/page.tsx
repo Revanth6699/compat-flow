@@ -33,7 +33,7 @@ export default function PrivacyPage() {
           <article className="legal-content">
             <section id="operator">
               <h2>1. Who operates CompatFlow</h2>
-              <p>CompatFlow is a software service operated by <strong>Sarvasetty Revanth Kumar, an individual proprietor trading under the CompatFlow brand</strong> (referred to as “CompatFlow”, “we”, “us” or “our”). CompatFlow is not represented by this policy as a Private Limited Company.</p>
+              <p>CompatFlow is a software service operated by <strong>the individual proprietor trading under the CompatFlow brand</strong> (referred to as “CompatFlow”, “we”, “us” or “our”). CompatFlow is not represented by this policy as a Private Limited Company.</p>
               <p>Principal business address: {businessAddress}. Privacy and support contact: <a href={`mailto:${contactEmail}`}>{contactEmail}</a>. The address shown here must be completed with the proprietor’s actual business address before live commercial launch.</p>
             </section>
             <section id="information">
@@ -76,7 +76,7 @@ export default function PrivacyPage() {
               <h2>8. Your choices, privacy rights and grievances</h2>
               <p>Subject to applicable law, you may request access to information about your personal data, correction or updating of inaccurate information, erasure where permitted, or exercise other available rights. Where processing relies on consent, you may withdraw that consent; withdrawal does not affect processing already carried out lawfully. You may also request help with account deletion through your account settings or by contacting us.</p>
               <p>Send privacy requests or complaints to <a href={`mailto:${contactEmail}`}>{contactEmail}</a> with the subject “Privacy Request”. We may ask for reasonable information to verify your identity. We aim to acknowledge grievances within 48 hours and resolve them within 30 days, subject to complexity and applicable legal requirements.</p>
-              <p><strong>Grievance contact:</strong> Sarvasetty Revanth Kumar, Proprietor, CompatFlow. Email: <a href={`mailto:${contactEmail}`}>{contactEmail}</a>. Business address: {businessAddress}. The business address must be completed before live launch.</p>
+              <p><strong>Grievance contact:</strong> Proprietor, CompatFlow (name and designation to be published). Email: <a href={`mailto:${contactEmail}`}>{contactEmail}</a>. Business address: {businessAddress}. The business address must be completed before live launch.</p>
             </section>
             <section>
               <h2>9. Children, international processing and updates</h2>
