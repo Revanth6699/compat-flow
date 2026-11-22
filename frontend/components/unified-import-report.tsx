@@ -29,7 +29,7 @@ type IndustryResult = {
   ambiguous_mappings?: { field: string; source_headers: string[] }[];
   mapping_diagnostics?: { source_column_count: number; mapped_column_count: number; unmapped_column_count: number; ambiguous_field_count: number; confidence_method: string };
   field_metrics: { field: string; applicable: boolean; populated: number; missing: number; completeness_pct: number }[];
-  issues: { row_number: number; field: string | null; error_code: string; message: string; severity: string }[];
+  issues: { row_number: number; field: string | null; error_code: string; message: string; severity: string; potential_impact?: string; impact_basis?: string }[];
   preview: Record<string, unknown>[]; metrics: { mapping_coverage_pct: number; validation_pass_rate_pct: number; issue_count: number; returned_issue_count?: number; issues_truncated?: boolean; critical_issue_count: number; warning_issue_count: number; issue_counts_by_code?: Record<string, number>; rows_with_critical_issues?: number; rows_with_warning_issues?: number; rows_with_any_issue?: number };
   validation_scope: string;
 };
@@ -83,10 +83,10 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
   const mappings = industryResult?.column_mappings ?? multiResult?.mappings ?? result?.column_mappings ?? [];
   const productFieldMappings = datasetResult?.field_mappings ?? {};
   const fieldMetrics = datasetResult?.columns.map((column) => ({ field: column.name, populated: column.populated, missing: column.missing, completeness_pct: column.completeness_pct, inferred_type: column.inferred_type })) ?? industryResult?.field_metrics ?? multiResult?.field_completeness ?? result?.field_metrics ?? [];
-  const issues = datasetResult?.findings.map((finding) => ({ location: "Dataset", field: finding.title, severity: finding.severity, message: finding.detail, code: "PROFILE_FINDING" })) ??
-    industryResult?.issues.map((issue) => ({ location: `Row ${issue.row_number}`, field: issue.field ?? "Record", severity: issue.severity, message: issue.message, code: issue.error_code })) ??
-    multiResult?.errors.map((issue) => ({ location: issue.source_location, field: issue.field ?? "Record", severity: "warning", message: issue.message, code: issue.error_code })) ??
-    result?.row_errors.map((issue) => ({ location: `Row ${issue.row_number}`, field: issue.field ?? "Record", severity: issue.severity, message: issue.message, code: issue.error_code })) ?? [];
+  const issues = datasetResult?.findings.map((finding) => ({ location: "Dataset", field: finding.title, severity: finding.severity, message: finding.detail, code: "PROFILE_FINDING", potentialImpact: "Not assessed by structural profiling" })) ??
+    industryResult?.issues.map((issue) => ({ location: `Row ${issue.row_number}`, field: issue.field ?? "Record", severity: issue.severity, message: issue.message, code: issue.error_code, potentialImpact: issue.potential_impact ?? "Not assessed by this rule" })) ??
+    multiResult?.errors.map((issue) => ({ location: issue.source_location, field: issue.field ?? "Record", severity: "warning", message: issue.message, code: issue.error_code, potentialImpact: "Not assessed by this connector check" })) ??
+    result?.row_errors.map((issue) => ({ location: `Row ${issue.row_number}`, field: issue.field ?? "Record", severity: issue.severity, message: issue.message, code: issue.error_code, potentialImpact: "Not assessed by this catalog check" })) ?? [];
   const preview = datasetResult?.preview ?? industryResult?.preview ?? multiResult?.preview ?? result?.preview ?? [];
   const previewHeaders = [...new Set(preview.slice(0, 10).flatMap((row) => Object.keys(row)))].slice(0, 12);
 
@@ -182,8 +182,8 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
 
       <div className="panel result-section report-findings">
         <h3>Findings and issues</h3>
-        {issues.length === 0 ? <p>No issues were returned by the current analysis.</p> : <div className="table-scroll"><table className="preview-table"><thead><tr><th>Location</th><th>Field / finding</th><th>Severity</th><th>Code</th><th>Details</th></tr></thead><tbody>{issues.slice(0, 100).map((issue, index) => <tr key={index}><td>{issue.location}</td><td>{issue.field}</td><td>{issue.severity}</td><td>{issue.code}</td><td>{issue.message}</td></tr>)}</tbody></table></div>}
-        <p className="import-description">The report includes only checks performed by the current analysis path. Unavailable external reference checks are not inferred.</p>
+        {issues.length === 0 ? <p>No issues were returned by the current analysis.</p> : <div className="table-scroll"><table className="preview-table"><thead><tr><th>Location</th><th>Field / finding</th><th>Severity</th><th>Code</th><th>Details</th><th>Potential downstream impact</th></tr></thead><tbody>{issues.slice(0, 100).map((issue, index) => <tr key={index}><td>{issue.location}</td><td>{issue.field}</td><td>{issue.severity}</td><td>{issue.code}</td><td>{issue.message}</td><td>{issue.potentialImpact}</td></tr>)}</tbody></table></div>}
+        <p className="import-description">Potential downstream impacts are guidance, not measured financial losses or proof of destination rejection. The report includes only checks performed by the current analysis path; unavailable external reference checks are not inferred.</p>
       </div>
 
       <details className="panel result-section report-detail">
