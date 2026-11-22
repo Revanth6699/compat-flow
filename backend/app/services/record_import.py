@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+
+from app.services.batch_processing import DiskBackedDuplicateTracker, iter_batches
 from dataclasses import dataclass
 from typing import Any
 
@@ -139,13 +141,17 @@ def validate_parsed_records(
     valid_source_locations: list[str] = []
     valid_source_keys: list[str | None] = []
     errors: list[dict[str, Any]] = []
-    seen: dict[tuple[Any, ...], str] = {}
     populated: Counter[str] = Counter()
     required_fields = [
         name for name, field in model.model_fields.items() if field.is_required()
     ]
 
-    for record in parsed.records:
+    # Duplicate state lives in a temporary SQLite index, not a Python dict.
+    # This keeps exact duplicate detection bounded as batch processing is wired
+    # through the source adapters and persistence layer.
+    with DiskBackedDuplicateTracker() as duplicate_tracker:
+      for batch in iter_batches(parsed.records, batch_size=500):
+       for record in batch:
         row = {
             field: record.values.get(source)
             for field, source in mapping.items()
@@ -198,18 +204,18 @@ def validate_parsed_records(
                 "identifier", values["identifier_type"], values.get("namespace", "global"),
                 str(values["value"]).casefold(),
             )
-        if duplicate_key and duplicate_key in seen:
-            if len(errors) < error_limit:
-                errors.append({
-                    "source_location": record.source_location,
-                    "source_key": record.source_key,
-                    "field": duplicate_key[0],
-                    "error_code": "DUPLICATE_IN_FILE",
-                    "message": f"Duplicate key matches {seen[duplicate_key]}.",
-                })
-            continue
         if duplicate_key:
-            seen[duplicate_key] = record.source_location
+            match = duplicate_tracker.check_and_add(duplicate_key, record.source_location)
+            if match.duplicate:
+                if len(errors) < error_limit:
+                    errors.append({
+                        "source_location": record.source_location,
+                        "source_key": record.source_key,
+                        "field": duplicate_key[0],
+                        "error_code": "DUPLICATE_IN_FILE",
+                        "message": f"Duplicate key matches {match.first_source_location}.",
+                    })
+                continue
         valid.append(values)
         valid_source_locations.append(record.source_location)
         valid_source_keys.append(record.source_key)
