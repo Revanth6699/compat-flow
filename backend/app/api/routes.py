@@ -40,7 +40,7 @@ from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.dataset_rules import profile_dataset_rules
-from app.services.custom_validation import CustomRuleError, validate_rule_config
+from app.services.custom_validation import CustomRuleError, evaluate_custom_rules, validate_rule_config
 from app.services.industry_catalog import IndustryCSVError, validate_industry_records
 from app.services.catalog_csv import (
     CatalogCSVValidationError,
@@ -197,6 +197,65 @@ def delete_validation_rule(
     db.delete(rule)
     db.commit()
     return None
+
+@router.post("/validation/profiles/{profile_id}/evaluate")
+async def evaluate_validation_profile(
+    profile_id: UUID,
+    file: UploadFile = File(...),
+    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("custom_rules")),
+    db: Session = Depends(get_db),
+):
+    """Run one organization's enabled custom rules against an uploaded dataset."""
+    limits = resolve_import_limits(_plan, db)
+    profile = db.scalar(select(ValidationProfile).where(
+        ValidationProfile.id == profile_id,
+        ValidationProfile.organization_id == current.profile.organization_id,
+        ValidationProfile.is_active.is_(True),
+    ))
+    if profile is None:
+        await file.close()
+        raise HTTPException(status_code=404, detail="Active validation profile not found.")
+    filename = (file.filename or "").strip()
+    if not filename or len(filename) > 255:
+        await file.close()
+        raise HTTPException(status_code=400, detail="A valid filename is required.")
+    try:
+        raw = await file.read(limits["max_upload_bytes"] + 1) if limits["max_upload_bytes"] is not None else await file.read()
+    finally:
+        await file.close()
+    if limits["max_upload_bytes"] is not None and len(raw) > limits["max_upload_bytes"]:
+        raise HTTPException(status_code=413, detail="File exceeds the configured upload limit.")
+    if not raw:
+        raise HTTPException(status_code=400, detail="Uploaded dataset is empty.")
+    try:
+        parsed = parse_source(raw, filename, max_records=limits["max_records"])
+        rows = [record.values for record in parsed.records]
+        rules = list(db.scalars(
+            select(ValidationRule).where(
+                ValidationRule.profile_id == profile_id,
+                ValidationRule.organization_id == current.profile.organization_id,
+            ).order_by(ValidationRule.created_at.asc())
+        ).all())
+        result = evaluate_custom_rules(
+            rows, [record.source_location for record in parsed.records], rules
+        )
+    except IngestionParseError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    except CustomRuleError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    return {
+        "filename": filename,
+        "format": parsed.format,
+        "profile_id": str(profile.id),
+        "profile_name": profile.name,
+        "dataset_type": profile.dataset_type,
+        "total_records": len(parsed.records),
+        **result,
+        "persisted": False,
+        "validation_scope": "enabled_custom_rules_only",
+    }
+
 
 
 
