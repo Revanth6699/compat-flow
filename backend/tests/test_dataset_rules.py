@@ -129,3 +129,46 @@ def test_supplier_offer_defaults_require_currency_for_priced_offers():
     assert result["dataset_type"] == "supplier offers"
     assert rules["PRICE_WITHOUT_CURRENCY"]["issue_records"] == 1
     assert rules["INVALID_CURRENCY_FORMAT"]["issue_records"] == 1
+
+
+
+def test_product_catalog_detects_missing_and_self_parent_references():
+    result = profile_dataset_rules(
+        ["product_id", "parent_product_id", "sku", "name"],
+        [
+            {"product_id": "P1", "parent_product_id": "", "sku": "A", "name": "Parent"},
+            {"product_id": "P2", "parent_product_id": "MISSING", "sku": "B", "name": "Orphan"},
+            {"product_id": "P3", "parent_product_id": "P3", "sku": "C", "name": "Self parent"},
+        ],
+    )
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert rules["ORPHAN_PRODUCT_PARENT"]["issue_records"] == 1
+    assert rules["SELF_REFERENCING_PRODUCT"]["issue_records"] == 1
+    assert rules["ORPHAN_PRODUCT_PARENT"]["severity"] == "critical"
+
+
+def test_product_catalog_validates_replacement_sku_references_case_insensitively():
+    result = profile_dataset_rules(
+        ["sku", "replacement_sku", "name"],
+        [
+            {"sku": "OLD-1", "replacement_sku": "new-1", "name": "Old"},
+            {"sku": "NEW-1", "replacement_sku": "", "name": "New"},
+            {"sku": "SELF-1", "replacement_sku": "self-1", "name": "Self"},
+            {"sku": "BROKEN-1", "replacement_sku": "DOES-NOT-EXIST", "name": "Broken"},
+        ],
+    )
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert rules["ORPHAN_REPLACEMENT_SKU"]["issue_records"] == 1
+    assert rules["SELF_REPLACING_PRODUCT"]["issue_records"] == 1
+
+
+def test_product_relationship_checks_are_not_evaluated_without_reference_columns():
+    result = profile_dataset_rules(
+        ["sku", "name"],
+        [{"sku": "A-1", "name": "Widget"}],
+    )
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert rules["ORPHAN_PRODUCT_PARENT"]["status"] == "not_evaluated"
+    assert rules["ORPHAN_PRODUCT_PARENT"]["issue_records"] is None
+    assert rules["ORPHAN_REPLACEMENT_SKU"]["status"] == "not_evaluated"
+    assert rules["ORPHAN_REPLACEMENT_SKU"]["issue_records"] is None
