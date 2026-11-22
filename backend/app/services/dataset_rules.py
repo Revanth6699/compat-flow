@@ -221,19 +221,19 @@ def profile_dataset_rules(
             "product_name_length": ("product_name_length", "product_name_lenght", "name_length", "title_length"),
             "product_description_length": ("product_description_length", "product_description_lenght", "description_length"),
             "product_photo_quantity": ("product_photos_qty", "photos_qty", "image_count", "images_count"),
-            "product_weight": ("product_weight", "product_weight_g", "weight", "weight_g", "gross_weight", "net_weight"),
+            "product_weight": ("product_weight", "product_weight_g", "weight", "weight_g", "weightingms", "weight_in_gms", "gross_weight", "net_weight"),
             "product_length": ("product_length", "product_length_cm", "length", "length_cm"),
             "product_width": ("product_width", "product_width_cm", "width", "width_cm"),
             "product_height": ("product_height", "product_height_cm", "height", "height_cm"),
             "product_list_price": ("mrp", "list_price", "regular_price", "compare_at_price", "original_price"),
-            "product_selling_price": ("discounted_selling_price", "selling_price", "sale_price", "unit_price", "price"),
-            "discount_percent": ("discount_percent", "discountpercentage", "discount_pct"),
-            "available_stock": ("available_quantity", "available_qty", "stock_level", "stock_levels", "stock_quantity", "quantity_available", "quantity_on_hand"),
+            "product_selling_price": ("discounted_selling_price", "discountedsellingprice", "selling_price", "sale_price", "unit_price", "price"),
+            "discount_percent": ("discount_percent", "discountpercent", "discountpercentage", "discount_pct"),
+            "available_stock": ("available_quantity", "availablequantity", "available_qty", "stock_level", "stock_levels", "stock_quantity", "quantity_available", "quantity_on_hand"),
             "out_of_stock": ("out_of_stock", "outofstock", "is_out_of_stock"),
-            "supplier_name": ("supplier_name", "supplier"),
-            "merchant_id": ("merchant_id", "seller_id", "retailer_id"),
-            "product_cluster_id": ("cluster_id", "product_cluster_id"),
-            "product_cluster_label": ("cluster_label", "product_cluster_label"),
+            "supplier_name": ("supplier_name", "suppliername", "supplier"),
+            "merchant_id": ("merchant_id", "merchantid", "seller_id", "sellerid", "retailer_id"),
+            "product_cluster_id": ("cluster_id", "clusterid", "product_cluster_id"),
+            "product_cluster_label": ("cluster_label", "clusterlabel", "product_cluster_label"),
         }
         field_mappings = {
             canonical: by_name[alias]
@@ -461,7 +461,7 @@ def profile_dataset_rules(
                     continue
             add_check("DELIVERY_BEFORE_PURCHASE", "Delivery date precedes purchase date", reversed_dates, f"{reversed_dates} rows have a delivery timestamp earlier than the purchase timestamp.", "Correct the source timestamps or investigate timezone and date-mapping errors.", "critical")
     elif dataset_type == "inventory":
-        quantity_cols = [header(name) for name in ("quantity_on_hand", "quantity_available", "available_quantity", "stock_quantity", "quantity_reserved") if header(name)]
+        quantity_cols = [header(name) for name in ("quantity_on_hand", "quantity_available", "available_quantity", "availablequantity", "available_qty", "stock_quantity", "stock_level", "stock_levels", "quantity_reserved") if header(name)]
         negative = sum(1 for row in rows if any(_number(row.get(col)) is not None and _number(row.get(col)) < 0 for col in quantity_cols))
         add_check("NEGATIVE_INVENTORY_QUANTITY", "Negative inventory quantities", negative, f"{negative} records contain at least one quantity below zero.", "Verify stock movements, reservations and adjustment signs before importing.", "critical")
         on_hand, reserved, available = header("quantity_on_hand", "stock_quantity"), header("quantity_reserved"), header("quantity_available", "available_quantity")
@@ -573,8 +573,8 @@ def profile_dataset_rules(
                 "Check reservations, fulfillment rules and the source system's definition of available quantity before correcting the status.",
             )
 
-    list_price_col = header("mrp", "list_price", "regular_price", "compare_at_price", "original_price")
-    selling_price_col = header("discounted_selling_price", "selling_price", "sale_price", "unit_price", "price")
+    list_price_col = header("mrp", "list_price", "regular_price", "compare_at_price", "original_price") if dataset_type != "supplier offers" else None
+    selling_price_col = header("discounted_selling_price", "discountedsellingprice", "selling_price", "sale_price", "unit_price", "price") if dataset_type != "supplier offers" else None
     for column, code, title in (
         (list_price_col, "NON_POSITIVE_PRODUCT_LIST_PRICE", "Non-positive product list price"),
         (selling_price_col, "NON_POSITIVE_PRODUCT_SELLING_PRICE", "Non-positive product selling price"),
@@ -591,7 +591,7 @@ def profile_dataset_rules(
                 "Provide a positive numeric price. Currency is not inferred; configure the source currency separately.",
             )
 
-    discount_col = header("discount_percent", "discountpercentage", "discount_pct")
+    discount_col = header("discount_percent", "discountpercent", "discountpercentage", "discount_pct")
     if discount_col:
         invalid_discount = sum(
             1 for row in rows
@@ -679,7 +679,6 @@ def profile_dataset_rules(
         ("INVALID_CURRENCY_FORMAT", "Invalid currency code format", "supplier offers", "warning", "supplier offers"),
         ("UNRECOGNIZED_ORDER_STATUS", "Unrecognized order statuses", "orders / transactions", "warning", "orders / transactions"),
         ("DELIVERY_BEFORE_PURCHASE", "Delivery date precedes purchase date", "orders / transactions", "critical", "orders / transactions"),
-        ("NEGATIVE_INVENTORY_QUANTITY", "Negative inventory quantities", "inventory", "critical", "inventory"),
         ("INVENTORY_BALANCE_MISMATCH", "Available stock does not reconcile", "inventory", "warning", "inventory"),
         ("NON_POSITIVE_SUPPLIER_PRICE", "Non-positive supplier prices", "supplier offers", "warning", "supplier offers"),
         ("INVALID_MINIMUM_ORDER_QUANTITY", "Invalid minimum order quantities", "supplier offers", "warning", "supplier offers"),
