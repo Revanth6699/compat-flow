@@ -153,3 +153,36 @@ def test_measurements_must_be_positive_and_counts_whole_numbers():
 def test_malformed_datetime_is_not_accepted_as_valid_date():
     result = validate_industry_csv("title,effective_date\nWidget,2025-01-01Tnot-a-time\n", profile_id="d2c")
     assert any(i["error_code"] == "INVALID_DATE_VALUE" for i in result["issues"])
+
+
+def test_zepto_marketplace_fields_map_and_validate_without_conflating_quantity_and_stock():
+    result = validate_industry_csv(
+        "category,title,quantity,mrp,discountPercent,availableQuantity,"
+        "discountedSellingPrice,weightInGms,outOfStock\\n"
+        "Snacks,Chips,6,100,20,0,80,250,true\\n",
+        profile_id="ecommerce",
+    )
+    fields = mapped(result)
+    assert fields["category"] == "category"
+    assert fields["title"] == "title"
+    assert fields["quantity"] == "quantity"
+    assert fields["list_price"] == "mrp"
+    assert fields["discount_percent"] == "discountPercent"
+    assert fields["quantity_available"] == "availableQuantity"
+    assert fields["unit_price"] == "discountedSellingPrice"
+    assert fields["weight_g"] == "weightInGms"
+    assert fields["out_of_stock"] == "outOfStock"
+    assert not any(issue["error_code"] == "OUT_OF_STOCK_WITH_POSITIVE_AVAILABILITY" for issue in result["issues"])
+    assert result["valid_rows"] == 1
+
+
+def test_zepto_price_discount_and_stock_consistency_issues_are_reported():
+    result = validate_industry_csv(
+        "title,mrp,discountPercent,availableQuantity,discountedSellingPrice,outOfStock\\n"
+        "Snack,100,120,5,110,true\\n",
+        profile_id="ecommerce",
+    )
+    codes = {issue["error_code"] for issue in result["issues"]}
+    assert "DISCOUNT_PERCENT_OUT_OF_RANGE" in codes
+    assert "SELLING_PRICE_ABOVE_LIST_PRICE" in codes
+    assert "OUT_OF_STOCK_WITH_POSITIVE_AVAILABILITY" in codes

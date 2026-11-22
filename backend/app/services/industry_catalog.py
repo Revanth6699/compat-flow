@@ -53,10 +53,14 @@ ALIASES: dict[str, set[str]] = {
     "length_cm": {"product_length_cm", "length_cm"},
     "height_cm": {"product_height_cm", "height_cm"},
     "width_cm": {"product_width_cm", "width_cm"},
-    "unit_price": {"price", "unit_price", "selling_price", "wholesale_price", "unit_cost", "cost"},
+    "unit_price": {"price", "unit_price", "selling_price", "wholesale_price", "unit_cost", "cost", "discounted_selling_price"},
+    "list_price": {"mrp", "list_price", "maximum_retail_price", "regular_price"},
+    "discount_percent": {"discount_percent", "discountpercentage", "discount_pct"},
+    "out_of_stock": {"out_of_stock", "outofstock", "is_out_of_stock"},
+    "weight_g": {"weight_g", "weight_in_gms", "weightingms"},
     "currency": {"currency", "currency_code"},
     "quantity": {"quantity", "stock", "inventory_qty"},
-    "quantity_available": {"quantity_available", "available_qty"},
+    "quantity_available": {"quantity_available", "available_qty", "available_quantity", "availablequantity"},
     "quantity_on_hand": {"quantity_on_hand", "on_hand", "stock_on_hand"},
     "quantity_reserved": {"quantity_reserved", "reserved_quantity"},
     "moq": {"moq", "minimum_order_quantity"},
@@ -85,7 +89,7 @@ ALIASES: dict[str, set[str]] = {
 
 PROFILES: dict[str, dict[str, Any]] = {
     "d2c": {"required": ("title",), "signals": {"brand", "parent_product_id", "variant_id", "size", "colour", "material"}},
-    "ecommerce": {"required": ("title",), "signals": {"sku", "gtin", "category", "unit_price", "currency", "quantity"}},
+    "ecommerce": {"required": ("title",), "signals": {"sku", "gtin", "category", "unit_price", "list_price", "discount_percent", "currency", "quantity", "quantity_available", "out_of_stock"}},
     "automotive": {"required": ("manufacturer", "mpn"), "signals": {"year", "make", "vehicle_model", "engine", "submodel", "position", "compatibility", "replacement_part"}},
     "electronics": {"required": ("manufacturer", "mpn"), "signals": {"model_number", "voltage", "power_w", "frequency_hz", "capacity", "compatibility", "standard"}},
     "industrial": {"required": ("manufacturer", "mpn"), "signals": {"product_type", "material", "diameter", "pressure_rating", "temperature_range", "standard", "replacement_part"}},
@@ -93,7 +97,7 @@ PROFILES: dict[str, dict[str, Any]] = {
 }
 
 NUMERIC_NONNEGATIVE = {
-    "name_length", "description_length", "image_count", "weight_g", "length_cm",
+    "name_length", "description_length", "image_count", "weight_g", "list_price", "length_cm",
     "height_cm", "width_cm", "unit_price", "quantity", "quantity_on_hand",
     "quantity_reserved", "quantity_available", "moq", "order_multiple", "lead_time_days", "year",
     "voltage", "power_w", "frequency_hz", "capacity", "diameter", "pressure_rating",
@@ -253,6 +257,40 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
                     raise InvalidOperation
             except (InvalidOperation, ValueError):
                 add_issue(line_number, field, "INVALID_NONNEGATIVE_NUMBER", f"'{value}' is not a valid non-negative number for '{field}'.")
+        # Marketplace pricing and availability semantics: keep list price, sale price,
+        # discount and stock status distinct. A generic quantity is not available stock.
+        if row.get("discount_percent") is not None:
+            try:
+                discount = Decimal(str(row["discount_percent"]).replace(",", ""))
+                if not discount.is_finite() or discount < 0 or discount > 100:
+                    add_issue(line_number, "discount_percent", "DISCOUNT_PERCENT_OUT_OF_RANGE", "Discount percentage must be between 0 and 100.")
+            except (InvalidOperation, ValueError):
+                add_issue(line_number, "discount_percent", "INVALID_DISCOUNT_PERCENT", "Discount percentage must be numeric.")
+        if row.get("list_price") is not None and row.get("unit_price") is not None:
+            try:
+                if Decimal(str(row["unit_price"]).replace(",", "")) > Decimal(str(row["list_price"]).replace(",", "")):
+                    add_issue(line_number, "unit_price", "SELLING_PRICE_ABOVE_LIST_PRICE", "Selling price exceeds the listed/MRP price.", "warning")
+            except (InvalidOperation, ValueError):
+                pass  # Numeric validation reports malformed price values.
+        if row.get("out_of_stock") is not None:
+            status = str(row["out_of_stock"]).strip().casefold()
+            if status not in {"true", "false", "1", "0", "yes", "no", "y", "n"}:
+                add_issue(line_number, "out_of_stock", "INVALID_OUT_OF_STOCK_FLAG", "Out-of-stock flag must be a recognizable boolean value.")
+            else:
+                is_out = status in {"true", "1", "yes", "y"}
+                available = row.get("quantity_available")
+                if is_out and available is not None:
+                    try:
+                        if Decimal(str(available).replace(",", "")) > 0:
+                            add_issue(line_number, "out_of_stock", "OUT_OF_STOCK_WITH_POSITIVE_AVAILABILITY", "Out-of-stock is true while available quantity is positive.", "warning")
+                    except (InvalidOperation, ValueError):
+                        pass
+                elif not is_out and available is not None:
+                    try:
+                        if Decimal(str(available).replace(",", "")) == 0:
+                            add_issue(line_number, "out_of_stock", "IN_STOCK_WITH_ZERO_AVAILABILITY", "Out-of-stock is false while available quantity is zero.", "warning")
+                    except (InvalidOperation, ValueError):
+                        pass
         if row.get("currency") is not None and not re.fullmatch(r"[A-Za-z]{3}", str(row["currency"])):
             add_issue(line_number, "currency", "INVALID_CURRENCY_CODE", "Currency must be a three-letter ISO 4217 code.")
         elif row.get("currency") is not None:
