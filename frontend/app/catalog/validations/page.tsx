@@ -93,7 +93,7 @@ export default function ValidationProfilesPage() {
     } finally { setLoading(false); }
   }
 
-  async function createRule(event: React.FormEvent<HTMLFormElement>) {
+  async function createRule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedId) return;
     setLoading(true); setError("");
@@ -167,7 +167,7 @@ export default function ValidationProfilesPage() {
     } catch (err) { setError(err instanceof Error ? err.message : "Could not update profile."); }
   }
 
-  async function runEvaluation(event: React.FormEvent<HTMLFormElement>) {
+  async function runEvaluation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedId || !file) return;
     setLoading(true); setError(""); setEvaluation(null);
