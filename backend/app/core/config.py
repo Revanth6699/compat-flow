@@ -1,4 +1,3 @@
-
 import re
 from urllib.parse import urlsplit
 
@@ -15,6 +14,7 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
+    import_storage_bucket: str = "compatflow-imports"
     platform_admin_email: str = "sarvasettyrevanth.66@gmail.com"
     gmail_client_id: str = ""
     gmail_client_secret: str = ""
@@ -86,7 +86,6 @@ class Settings(BaseSettings):
 
         for origin in origins:
             parsed = urlsplit(origin)
-
             if (
                 parsed.scheme != "https"
                 or not parsed.hostname
@@ -105,25 +104,26 @@ class Settings(BaseSettings):
             for value in self.allowed_hosts.split(",")
             if value.strip()
         ]
-
         hostname_pattern = re.compile(
             r"^(?=.{1,253}$)"
             r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*"
             r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
         )
-
         if not hosts or "*" in hosts:
             raise ValueError(
                 "ALLOWED_HOSTS must contain explicit public API hostnames."
             )
-
         if any(not hostname_pattern.fullmatch(host) for host in hosts):
-            raise ValueError(
-                "ALLOWED_HOSTS contains an invalid hostname."
-            )
-
+            raise ValueError("ALLOWED_HOSTS contains an invalid hostname.")
         if self.app_debug:
             raise ValueError("APP_DEBUG must be false in production.")
+
+        if self.supabase_url and not self.supabase_service_role_key:
+            raise ValueError(
+                "SUPABASE_SERVICE_ROLE_KEY is required when SUPABASE_URL is configured."
+            )
+        if not self.import_storage_bucket.strip():
+            raise ValueError("IMPORT_STORAGE_BUCKET cannot be empty.")
 
         return self
 
