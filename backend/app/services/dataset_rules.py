@@ -45,7 +45,23 @@ def profile_dataset_rules(
         dataset_type = "financial transactions"
     elif names & {"email", "customer_email", "email_address", "customer_id", "customer_unique_id"}:
         dataset_type = "customer records"
-    elif names & {"sku", "product_sku", "item_sku", "product_code", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category"}:
+    # Some real product masters use source-system product IDs and descriptive
+    # attributes without exposing a seller SKU or a conventional "name" column.
+    # Require multiple product-specific signals (or product_id plus one such
+    # attribute) so a generic ID column alone cannot force product classification.
+    olist_product_signals = {
+        "product_category_name", "product_name_lenght", "product_name_length",
+        "product_description_lenght", "product_description_length",
+        "product_photos_qty", "product_weight_g", "product_length_cm",
+        "product_height_cm", "product_width_cm",
+    }
+    has_product_signature = (
+        len(names & olist_product_signals) >= 2
+        or ("product_id" in names and bool(names & olist_product_signals))
+    )
+    if has_product_signature:
+        dataset_type = "product catalog"
+    elif names & {"sku", "product_sku", "item_sku", "product_code", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category", "product_category_name"}:
         dataset_type = "product catalog"
     else:
         dataset_type = "general dataset"
