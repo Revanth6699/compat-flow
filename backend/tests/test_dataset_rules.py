@@ -204,6 +204,8 @@ def test_olist_product_master_is_classified_without_mislabeling_product_id_as_sk
     assert rules["MISSING_PRODUCT_SKU"]["status"] == "not_evaluated"
     assert rules["DUPLICATE_PRODUCT_SKU"]["status"] == "not_evaluated"
     assert rules["ORPHAN_PRODUCT_PARENT"]["status"] == "not_evaluated"
+    assert rules["MISSING_SOURCE_PRODUCT_ID"]["status"] == "evaluated"
+    assert rules["DUPLICATE_SOURCE_PRODUCT_ID"]["status"] == "evaluated"
     assert rules["MISSING_VALUES"]["status"] == "evaluated"
 
 
@@ -212,3 +214,18 @@ def test_product_id_alone_does_not_force_product_catalog_classification():
         {"product_id": "X1", "created_at": "2026-01-01"}
     ])
     assert result["dataset_type"] == "general dataset"
+
+def test_product_source_identifier_checks_do_not_treat_ids_as_skus():
+    result = profile_dataset_rules(
+        ["product_id", "product_category_name", "product_weight_g"],
+        [
+            {"product_id": "P-1", "product_category_name": "tools", "product_weight_g": "10"},
+            {"product_id": "p-1", "product_category_name": "tools", "product_weight_g": "12"},
+            {"product_id": "", "product_category_name": "tools", "product_weight_g": "8"},
+        ],
+    )
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert result["dataset_type"] == "product catalog"
+    assert rules["MISSING_SOURCE_PRODUCT_ID"]["issue_records"] == 1
+    assert rules["DUPLICATE_SOURCE_PRODUCT_ID"]["issue_records"] == 1
+    assert rules["MISSING_PRODUCT_SKU"]["status"] == "not_evaluated"
