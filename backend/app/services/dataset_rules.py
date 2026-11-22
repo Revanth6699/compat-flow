@@ -28,7 +28,10 @@ def _number(value: Any) -> float | None:
         return None
 
 
-def profile_dataset_rules(\n    headers: list[str], rows: list[dict[str, Any]],\n    *, missing_cells: int | None = None, duplicate_rows: int | None = None,\n) -> dict[str, Any]:
+def profile_dataset_rules(
+    headers: list[str], rows: list[dict[str, Any]],
+    *, missing_cells: int | None = None, duplicate_rows: int | None = None,
+) -> dict[str, Any]:
     """Return a conservative dataset classification and applicable rule findings."""
     by_name = {_norm(header): header for header in headers}
     names = set(by_name)
