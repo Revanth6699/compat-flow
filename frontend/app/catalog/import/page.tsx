@@ -28,7 +28,7 @@ type IndustryResult = {
   requires_profile_confirmation: boolean; total_rows: number; valid_rows: number; invalid_rows: number;
   validation_pass_rate: number; column_mappings: { field: string; source_header: string; confidence: number }[];
   unmapped_headers: string[]; unmapped_header_details?: { source_header: string; reason: string; candidate_field: string | null }[]; ambiguous_mappings?: { field: string; source_headers: string[] }[]; mapping_diagnostics?: { source_column_count: number; mapped_column_count: number; unmapped_column_count: number; ambiguous_field_count: number; confidence_method: string }; field_metrics: { field: string; applicable: boolean; populated: number; missing: number; completeness_pct: number }[];
-  issues: { row_number: number; field: string | null; error_code: string; message: string; severity: string }[];
+  issues: { row_number: number; field: string | null; error_code: string; message: string; severity: string; potential_impact?: string; impact_basis?: string }[];
   preview: Record<string, unknown>[]; metrics: { mapping_coverage_pct: number; validation_pass_rate_pct: number; issue_count: number; returned_issue_count?: number; issues_truncated?: boolean; critical_issue_count: number; warning_issue_count: number; issue_counts_by_code?: Record<string, number>; rows_with_critical_issues?: number; rows_with_warning_issues?: number; rows_with_any_issue?: number };
   persisted: false; validation_scope: string;
 };
@@ -279,8 +279,8 @@ export default function CatalogImportPage() {
         ...industryResult.column_mappings.map((item) => [item.field, item.source_header, item.confidence]),
         [], ["Field", "Populated", "Missing", "Completeness (%)"],
         ...industryResult.field_metrics.map((item) => [item.field, item.populated, item.missing, item.completeness_pct]),
-        [], ["Row", "Field", "Severity", "Code", "Issue"],
-        ...industryResult.issues.map((item) => [item.row_number, item.field ?? "Record", item.severity, item.error_code, item.message]),
+        [], ["Row", "Field", "Severity", "Code", "Issue", "Potential downstream impact"],
+        ...industryResult.issues.map((item) => [item.row_number, item.field ?? "Record", item.severity, item.error_code, item.message, item.potential_impact ?? "Not assessed"]),
       ];
       const csv = rows.map((row) => row.map((value) => '"' + String(value ?? "").replace(/"/g, '""') + '"').join(",")).join("\n");
       saveBlob("compatflow-industry-report.csv", csv, "text/csv;charset=utf-8");
