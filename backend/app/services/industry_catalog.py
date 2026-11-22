@@ -140,7 +140,6 @@ POTENTIAL_IMPACT_BY_CODE = {
     "INVALID_HTTP_URL": "May prevent connected systems or customers from retrieving linked product content.",
     "PRICE_CURRENCY_MISSING": "May make a price ambiguous across currencies or markets.",
     "INVALID_CURRENCY_CODE": "May cause price interpretation or market validation to fail.",
-    "PRICE_CURRENCY_MISSING": "May make a price ambiguous across currencies or markets.",
     "INVENTORY_QUANTITY_MISMATCH": "May cause available-stock values to disagree with on-hand and reserved quantities.",
     "RESERVED_EXCEEDS_ON_HAND": "May create negative available stock or an overselling risk.",
     "SELLING_PRICE_ABOVE_LIST_PRICE": "May display a discount incorrectly or fail destination pricing checks.",
