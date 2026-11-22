@@ -370,7 +370,7 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
                     except (InvalidOperation, ValueError):
                         pass
         if row.get("currency") is not None and not re.fullmatch(r"[A-Za-z]{3}", str(row["currency"])):
-            add_issue(line_number, "currency", "INVALID_CURRENCY_CODE", "Currency must be a three-letter ISO 4217 code.")
+            add_issue(line_number, "currency", "INVALID_CURRENCY_CODE", "Currency must contain three alphabetic characters; ISO 4217 registry membership is not verified.")
         elif row.get("currency") is not None:
             row["currency"] = str(row["currency"]).upper()
         if row.get("unit_price") is not None and row.get("currency") is None:
@@ -509,6 +509,7 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
         "persisted": False,
         "issue_details_limit": ERROR_LIMIT,
         "validation_scope": "industry_profile_mapping_and_row_level_syntax_checks; no external reference-data verification",
+        "currency_validation_scope": "three-letter alphabetic format only; ISO 4217 registry membership is not verified",
     }
 
 
