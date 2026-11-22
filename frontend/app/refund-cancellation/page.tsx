@@ -6,7 +6,6 @@ export const metadata: Metadata = {
 };
 
 const contactEmail = "sarvasettyrevanth.66@gmail.com";
-const operatorName = "Sarvasetty Revanth Kumar, individual proprietor trading as CompatFlow";
 const grievanceContact = "Sarvasetty Revanth Kumar, Proprietor; Phone: +91 74164 76715";
 const businessAddress = "9A-252, Kalyandurg, Anantapur, Andhra Pradesh, India - 515761";
 
