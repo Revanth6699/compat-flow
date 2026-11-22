@@ -73,3 +73,27 @@ def test_demo_notification_uses_requester_as_reply_to(monkeypatch):
     ))
     assert "New demo access request" in sent["subject"]
     assert sent["reply_to"] == "client@example.com"
+
+
+def test_contact_notification_reports_delivery_failure(monkeypatch):
+    monkeypatch.setattr(settings, "contact_notification_secret", "test-secret")
+
+    async def fail_send(*args, **kwargs):
+        raise RuntimeError("mail provider unavailable")
+
+    monkeypatch.setattr(gmail_notifications, "send_gmail_notification", fail_send)
+    client = TestClient(app)
+    response = client.post(
+        "/api/v1/notifications/contact",
+        headers={"X-Contact-Notification-Secret": "test-secret"},
+        json={
+            "name": "Test User",
+            "email": "test@example.com",
+            "organization": "Example Ltd",
+            "role": "Operations",
+            "message": "Please contact me about CompatFlow.",
+            "intent": "general",
+        },
+    )
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "email_sent": False}
