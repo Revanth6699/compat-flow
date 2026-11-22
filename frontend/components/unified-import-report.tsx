@@ -126,26 +126,26 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
 
       {Object.keys(productFieldMappings).length > 0 && mappings.length === 0 && <details className="panel result-section report-detail">
         <summary><span>Product field mapping</span><small>{Object.keys(productFieldMappings).length} canonical fields mapped</small></summary>
-        <h3>Product field mapping</h3>
+        
         <p className="import-description">CompatFlow matched source columns to canonical product attributes. These are header-based mappings, not proof that the source values satisfy your organization&apos;s business rules.</p>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical product field</th><th>Source column</th></tr></thead><tbody>{Object.entries(productFieldMappings).map(([field, source]) => <tr key={field}><td>{field.replaceAll("_", " ")}</td><td>{source}</td></tr>)}</tbody></table></div>
       </details>}
 
       {mappings.length > 0 && <details className="panel result-section report-detail">
         <summary><span>Column mapping</span><small>{mappings.length} mapped fields{((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length ? ` · ${((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length} unmapped` : ""}</small></summary>
-        <h3>Column mapping</h3>
+        
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical field</th><th>Source column</th><th>Confidence</th></tr></thead><tbody>{mappings.map((item) => <tr key={item.field}><td>{item.field.replaceAll("_", " ")}</td><td>{item.source_header}</td><td>{(item.confidence * 100).toFixed(0)}%</td></tr>)}</tbody></table></div>
         {((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length > 0 && <p className="import-description">Unmapped source columns retained: {(industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers ?? []).join(", ")}</p>}
       </details>}
 
       {fieldMetrics.length > 0 && <details className="panel result-section report-detail">
         <summary><span>Column completeness and data types</span><small>{fieldMetrics.length} columns</small></summary>
-        <h3>Column completeness and data types</h3>
+        
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead><tbody>{fieldMetrics.map((item) => <tr key={item.field}><td>{item.field}</td><td>{"inferred_type" in item ? String(item.inferred_type) : "—"}</td><td>{item.populated.toLocaleString()}</td><td>{item.missing.toLocaleString()}</td><td>{item.completeness_pct.toFixed(2)}%</td></tr>)}</tbody></table></div>
       </details>}
       {(datasetResult?.missing_value_details?.length ?? 0) > 0 && <details className="panel result-section report-detail">
         <summary><span>Missing-value locations</span><small>{datasetResult!.missing_cells.toLocaleString()} missing cells</small></summary>
-        <h3>Missing-value locations</h3>
+        
         <p className="import-description">Each entry identifies the source row and column where a value is empty. The list is capped at 1,000 locations; the aggregate missing-cell count remains exact.</p>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Source row</th><th>Source column</th></tr></thead><tbody>{datasetResult!.missing_value_details!.map((item, index) => <tr key={index}><td>{item.row_number}</td><td>{item.field}</td></tr>)}</tbody></table></div>
         {datasetResult!.missing_value_details_truncated && <p className="import-description">Showing the first 1,000 missing-value locations.</p>}
@@ -153,14 +153,14 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
 
       {datasetResult && datasetResult.validation_rules && datasetResult.validation_rules.length > 0 && <details className="panel result-section report-detail" open>
         <summary><span>Default validation rules</span><small>{datasetResult.validation_rules.filter(rule => rule.status === "evaluated").length} evaluated · {datasetResult.validation_rules.filter(rule => rule.status === "not_applicable").length} not applicable · {datasetResult.validation_rules.filter(rule => rule.status === "not_evaluated").length} not evaluated</small></summary>
-        <h3>Default validation rules</h3>
+        
         <p className="import-description">Rules are selected from the detected dataset profile. “Not applicable” means the rule belongs to another dataset type. “Not evaluated” means the rule was relevant but the required source columns were unavailable. Neither state is counted as a pass.</p>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Rule</th><th>Category</th><th>Status</th><th>Records evaluated</th><th>Issues</th><th>Details</th></tr></thead><tbody>{datasetResult.validation_rules.map(rule => <tr key={rule.code}><td>{rule.title}</td><td>{rule.category}</td><td>{rule.status === "evaluated" ? "Evaluated" : rule.status === "not_applicable" ? "Not applicable" : "Not evaluated"}</td><td>{rule.records_evaluated.toLocaleString()}</td><td>{rule.issue_records === null ? "—" : rule.issue_records.toLocaleString()}</td><td>{rule.detail}<br />Recommended action: {rule.recommendation}</td></tr>)}</tbody></table></div>
       </details>}
 
       {datasetResult?.dataset_type === "product catalog" && (datasetResult.issue_details?.length ?? 0) > 0 && <details className="panel result-section report-detail" open>
         <summary><span>Record-level product issues</span><small>{datasetResult.issue_details!.length.toLocaleString()} issue rows · {new Set(datasetResult.issue_details!.map(issue => issue.row_number)).size.toLocaleString()} affected records</small></summary>
-        <h3>Record-level product issues</h3>
+        
         <p className="import-description">Each entry identifies a source row, product identifier, source field and original value. Source row numbering includes the header row. Missing physical attributes are listed separately from non-positive or non-numeric values.</p>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Source row</th><th>Product ID</th><th>Source field</th><th>Original value</th><th>Finding</th><th>Severity</th><th>Recommended action</th></tr></thead><tbody>{datasetResult.issue_details!.slice(0, 100).map((issue, index) => <tr key={index}><td>{issue.row_number}</td><td>{issue.product_id || "—"}</td><td>{issue.field}</td><td>{issue.source_value === "" ? "— (missing)" : issue.source_value}</td><td>{issue.title}</td><td>{issue.severity}</td><td>{issue.recommendation}</td></tr>)}</tbody></table></div>
         {datasetResult.issue_details!.length > 100 && <p className="import-description">Showing the first 100 issue rows here. Download the CSV report for the complete issue list.</p>}
@@ -174,7 +174,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
 
       <details className="panel result-section report-detail">
         <summary><span>Source record preview</span><small>Up to 10 sample rows</small></summary>
-        <h3>Source record preview</h3>
+        
         <p className="import-description">Showing up to the first 10 records returned by the analysis endpoint. This is a preview, not a full-data export.</p>
         <Table headers={previewHeaders} rows={preview.slice(0, 10)} />
       </details>
