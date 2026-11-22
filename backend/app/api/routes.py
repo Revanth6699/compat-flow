@@ -399,6 +399,7 @@ async def _validate_catalog_csv(file: UploadFile, profile_id: str = "general", c
 @router.post("/catalog/import/profile")
 async def profile_public_dataset(
     file: UploadFile = File(...),
+    json_record_path: str | None = Form(None),
     _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
     db: Session = Depends(get_db),
 ):
@@ -422,7 +423,10 @@ async def profile_public_dataset(
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded dataset is empty.")
     try:
-        parsed = parse_source(raw, filename, max_records=limits["max_records"])
+        parsed = parse_source(
+            raw, filename, max_records=limits["max_records"],
+            json_record_path=json_record_path,
+        )
     except IngestionParseError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
 
@@ -591,7 +595,8 @@ async def profile_public_dataset(
 
 
 async def _validate_industry_upload(
-    file: UploadFile, profile_id: str | None, max_bytes: int | None, *, max_records: int | None = 10_000
+    file: UploadFile, profile_id: str | None, max_bytes: int | None, *,
+    max_records: int | None = 10_000, json_record_path: str | None = None,
 ):
     filename = (file.filename or "").strip()
     if not filename or len(filename) > 255:
@@ -606,7 +611,9 @@ async def _validate_industry_upload(
     if not raw:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
     try:
-        parsed = parse_source(raw, filename, max_records=max_records)
+        parsed = parse_source(
+            raw, filename, max_records=max_records, json_record_path=json_record_path
+        )
         if not parsed.records:
             raise HTTPException(status_code=422, detail="No data rows were found in the uploaded file.")
         result = validate_industry_records(
@@ -624,13 +631,15 @@ async def _validate_industry_upload(
 async def validate_industry_catalog_import(
     file: UploadFile = File(...),
     profile_id: str | None = Form(None),
+    json_record_path: str | None = Form(None),
     _plan: AuthenticatedUser = Depends(require_plan_feature("csv_validation")),
     db: Session = Depends(get_db),
 ):
     """Authenticated industry-aware validation using the active plan's upload limits."""
     limits = resolve_import_limits(_plan, db)
     return await _validate_industry_upload(
-        file, profile_id, limits["max_upload_bytes"], max_records=limits["max_records"]
+        file, profile_id, limits["max_upload_bytes"], max_records=limits["max_records"],
+        json_record_path=json_record_path,
     )
 
 
@@ -638,13 +647,15 @@ async def validate_industry_catalog_import(
 async def preview_industry_catalog_import(
     file: UploadFile = File(...),
     profile_id: str | None = Form(None),
+    json_record_path: str | None = Form(None),
     _access: AuthenticatedUser = Depends(require_demo_or_paid_access()),
     db: Session = Depends(get_db),
 ):
     """Stateless industry-aware preview using demo or active subscription limits."""
     limits = resolve_import_limits(_access, db)
     return await _validate_industry_upload(
-        file, profile_id, limits["max_upload_bytes"], max_records=limits["max_records"]
+        file, profile_id, limits["max_upload_bytes"], max_records=limits["max_records"],
+        json_record_path=json_record_path,
     )
 
 
