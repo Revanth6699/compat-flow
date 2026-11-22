@@ -1,6 +1,7 @@
 import pytest
 
 from app.services.industry_catalog import (
+    ALIASES,
     IndustryCSVError,
     detect_industry,
     validate_industry_csv,
@@ -256,3 +257,24 @@ def test_findings_include_potential_impact_without_claiming_measured_loss():
     issue = next(item for item in result["issues"] if item["error_code"] == "PRICE_CURRENCY_MISSING")
     assert "ambiguous across currencies" in issue["potential_impact"]
     assert issue["impact_basis"] == "potential_downstream_effect_not_measured"
+
+
+def test_industry_alias_registry_has_no_cross_field_collisions():
+    alias_owners = {}
+    for field, aliases in ALIASES.items():
+        for alias in aliases | {field}:
+            alias_owners.setdefault(alias, set()).add(field)
+
+    collisions = {alias: owners for alias, owners in alias_owners.items() if len(owners) > 1}
+    assert collisions == {}
+
+
+def test_generic_lead_time_is_not_silently_converted_to_days():
+    result = validate_industry_csv(
+        "supplier_sku,lead_time,lead_time_days\\nS-1,2,3\\n",
+        profile_id="wholesale",
+    )
+
+    fields = mapped(result)
+    assert fields["lead_time"] == "lead_time"
+    assert fields["lead_time_days"] == "lead_time_days"
