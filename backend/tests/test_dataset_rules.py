@@ -49,3 +49,16 @@ def test_general_dataset_does_not_claim_domain_checks():
     assert result["dataset_type"] == "general dataset"
     assert result["domain_checks"] == []
     assert result["domain_issues"] == []
+
+def test_olist_unavailable_order_status_is_recognized():
+    result = profile_dataset_rules(
+        ["order_id", "order_status"],
+        [
+            {"order_id": "O1", "order_status": "unavailable"},
+            {"order_id": "O2", "order_status": "delivered"},
+            {"order_id": "O3", "order_status": "not_a_real_status"},
+        ],
+    )
+    check = next(item for item in result["domain_checks"] if item["code"] == "UNRECOGNIZED_ORDER_STATUS")
+    assert check["issue_records"] == 1
+    assert "1 rows" in check["detail"]
