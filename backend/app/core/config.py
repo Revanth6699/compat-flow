@@ -34,6 +34,7 @@ class Settings(BaseSettings):
 
     import_storage_dir: str = "/data/imports"
     import_max_upload_bytes: int = 25 * 1024 * 1024
+    import_max_records: int = 100_000
     connector_allowed_hosts: str = ""
     sftp_known_hosts_path: str = ""
     connector_rate_limit_per_minute: int = 20
@@ -50,6 +51,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_settings(self):
+        if self.import_max_records < 1 or self.import_max_records > 100_000:
+            raise ValueError("IMPORT_MAX_RECORDS must be between 1 and 100000.")
         if self.import_max_upload_bytes <= 0:
             raise ValueError("IMPORT_MAX_UPLOAD_BYTES must be positive.")
 
