@@ -246,3 +246,13 @@ def test_industry_detection_explains_weak_and_tied_evidence():
 
     tied = detect_industry(["manufacturer", "mpn", "material", "diameter", "pressure_rating", "standard"])
     assert tied["needs_confirmation"] is False or tied["decision_reason"] == "ambiguous_tied_profiles"
+
+
+def test_findings_include_potential_impact_without_claiming_measured_loss():
+    result = validate_industry_csv(
+        "sku,title,price\\nS-1,Widget,12.50\\n",
+        profile_id="ecommerce",
+    )
+    issue = next(item for item in result["issues"] if item["error_code"] == "PRICE_CURRENCY_MISSING")
+    assert "ambiguous across currencies" in issue["potential_impact"]
+    assert issue["impact_basis"] == "potential_downstream_effect_not_measured"
