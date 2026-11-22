@@ -639,6 +639,7 @@ class ValidationRule(Base):
             ["organization_id", "profile_id"],
             ["validation_profiles.organization_id", "validation_profiles.id"],
             name="fk_validation_rules_org_profile",
+            ondelete="CASCADE",
         ),
         UniqueConstraint("profile_id", "code", name="uq_validation_rules_profile_code"),
         CheckConstraint(
