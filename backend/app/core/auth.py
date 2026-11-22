@@ -228,7 +228,7 @@ def require_demo_or_paid_access():
 def resolve_import_limits(current: AuthenticatedUser, db: Session) -> dict:
     """Resolve per-file upload limits from the authenticated account's actual access."""
     if is_platform_admin(current):
-        return {"access_type": "subscription", "max_records": 100_000, "max_upload_bytes": settings.import_max_upload_bytes}
+        return {"access_type": "subscription", "max_records": settings.import_max_records, "max_upload_bytes": settings.import_max_upload_bytes}
 
     subscription, plan = get_active_plan(current, db)
     if subscription is not None and plan is not None and any(
@@ -236,11 +236,9 @@ def resolve_import_limits(current: AuthenticatedUser, db: Session) -> dict:
         for feature in ("csv_validation", "supplier_catalogs")
     ):
         entitlements = plan.entitlements or {}
-        max_records = entitlements.get("upload_max_records")
         max_upload_bytes = entitlements.get("upload_max_bytes")
         if (
-            not isinstance(max_records, int) or isinstance(max_records, bool) or max_records < 1
-            or not isinstance(max_upload_bytes, int) or isinstance(max_upload_bytes, bool) or max_upload_bytes < 1
+            not isinstance(max_upload_bytes, int) or isinstance(max_upload_bytes, bool) or max_upload_bytes < 1
         ):
             raise HTTPException(
                 status_code=503,
@@ -249,7 +247,7 @@ def resolve_import_limits(current: AuthenticatedUser, db: Session) -> dict:
         return {
             "access_type": "subscription",
             "plan_code": plan.code,
-            "max_records": max_records,
+            "max_records": settings.import_max_records,
             "max_upload_bytes": max_upload_bytes,
         }
 
@@ -262,7 +260,7 @@ def resolve_import_limits(current: AuthenticatedUser, db: Session) -> dict:
     if approved is not None:
         return {
             "access_type": "demo",
-            "max_records": 10_000,
+            "max_records": settings.import_max_records,
             "max_upload_bytes": 5 * 1024 * 1024,
         }
     raise HTTPException(status_code=403, detail="Approved demo access or an active CSV-validation subscription is required.")

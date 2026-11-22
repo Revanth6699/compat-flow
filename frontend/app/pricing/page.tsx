@@ -20,7 +20,7 @@ const plans: Plan[] = [
     price: "Free",
     description: "Request access to evaluate the catalog validation workflow.",
     features: [
-      "CSV uploads up to 5 MB and 10,000 records",
+      "CSV uploads up to 5 MB",
       "Required-field and duplicate checks",
       "Catalog data-quality validations",
       "On-screen quality metrics",
@@ -35,7 +35,7 @@ const plans: Plan[] = [
     price: "$27",
     description: "For small teams that need repeatable validation and shareable results.",
     features: [
-      "CSV, XLS and XLSX uploads up to 10 MB and 20,000 records",
+      "CSV, XLS and XLSX uploads up to 10 MB",
       "Required-field, duplicate and catalog data-quality checks",
       "Validation metrics, issue details and recommendations",
       "Downloadable validation reports",
@@ -53,7 +53,7 @@ const plans: Plan[] = [
     features: [
       "All Starter validation capabilities",
       "JSON and XML inputs, in addition to all Starter formats",
-      "Uploads up to 20 MB and 40,000 records",
+      "Uploads up to 20 MB",
       "REST API, SFTP and SQL Server connections",
       "Multiple supplier catalog imports",
       "Up to 10 total team seats",
@@ -68,7 +68,7 @@ const plans: Plan[] = [
     description: "For operations teams coordinating catalog quality across departments.",
     features: [
       "All Growth validation and import capabilities",
-      "Uploads up to 100 MB and 100,000 records",
+      "Uploads up to 100 MB",
       "REST API, SFTP and SQL Server connections",
       "Multiple supplier catalog imports",
       "Up to 25 total team seats",
@@ -81,7 +81,7 @@ const plans: Plan[] = [
     price: "Custom",
     description: "For organizations with custom scale and integration requirements.",
     features: [
-      "Custom record and file-size limits",
+      "Custom file-size limits",
       "Custom team-seat allowance",
       "Plan configuration based on agreed requirements",
     ],
@@ -135,7 +135,7 @@ export default function PricingPage() {
         </section>
         {!user && <section className="pricing-footnote">
           <h2>Demo access</h2>
-          <p>Demo access requires approval. Approved demo accounts can upload CSV files up to 5 MB and 10,000 records and review results on screen.</p>
+          <p>Demo access requires approval. Approved demo accounts can upload CSV files up to 5 MB and review results on screen.</p>
           <p>Paid subscriptions are activated after the payment provider confirms the transaction through a verified webhook.</p>
           <Link className="pricing-text-link" href="/catalog/import">Try the public demo</Link>
         </section>}

@@ -314,3 +314,17 @@ def test_xml_feeds_the_same_industry_pipeline():
     _assert_industry_pipeline(parsed)
 
 # CI regression coverage for the format-neutral industry ingestion path.
+
+
+def test_default_csv_parser_accepts_more_than_previous_ten_thousand_record_cap():
+    payload = ("sku\n" + "".join(f"SKU-{index}\n" for index in range(10_001))).encode()
+    parsed = parse_csv(payload)
+    assert len(parsed.records) == 10_001
+
+
+def test_csv_parser_still_enforces_explicit_system_safety_ceiling():
+    from app.services.ingestion_adapters import MAX_RECORDS
+
+    payload = ("sku\n" + "".join(f"SKU-{index}\n" for index in range(MAX_RECORDS + 1))).encode()
+    with pytest.raises(IngestionParseError, match="record limit"):
+        parse_csv(payload)

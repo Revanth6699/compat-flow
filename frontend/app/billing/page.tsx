@@ -56,7 +56,7 @@ const plans = [
     price: "$27",
     description: "For small teams validating supplier product data.",
     features: [
-      "CSV, XLS and XLSX uploads up to 10 MB and 20,000 records",
+      "CSV, XLS and XLSX uploads up to 10 MB",
       "Catalog data-quality validations and issue details",
       "Downloadable validation reports",
       "Organization workspace",
@@ -71,7 +71,7 @@ const plans = [
     features: [
       "All Starter validation capabilities",
       "JSON and XML inputs, in addition to all Starter formats",
-      "Uploads up to 20 MB and 40,000 records",
+      "Uploads up to 20 MB",
       "REST API, SFTP and SQL Server connections",
       "Multiple supplier catalog imports",
       "Up to 10 total team seats",
@@ -84,7 +84,7 @@ const plans = [
     description: "For teams coordinating catalog quality across departments.",
     features: [
       "All Growth validation and import capabilities",
-      "Uploads up to 100 MB and 100,000 records",
+      "Uploads up to 100 MB",
       "REST API, SFTP and SQL Server connections",
       "Multiple supplier catalog imports",
       "Up to 25 total team seats",
