@@ -14,6 +14,7 @@ type DatasetProfile = {
   findings: { severity: string; title: string; detail: string }[];
   domain_checks?: { code: string; title: string; issue_records: number; severity: string; detail: string; recommendation: string }[];
   validation_rules?: { code: string; title: string; category: string; severity: string; status: "evaluated" | "not_applicable" | "not_evaluated"; records_evaluated: number; issue_records: number | null; detail: string; recommendation: string }[];
+  field_mappings?: Record<string, string>;
   preview: Record<string, unknown>[];
 };
 type IndustryResult = {
@@ -71,6 +72,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
   const passRate = industryResult?.validation_pass_rate ?? result?.validation_pass_rate ?? (multiResult && total ? multiResult.valid_records / total * 100 : null);
   const profileTitle = datasetResult?.dataset_type ?? industryResult?.profile_id?.replaceAll("_", " ") ?? multiResult?.record_type.replaceAll("_", " ") ?? "Product catalog";
   const mappings = industryResult?.column_mappings ?? multiResult?.mappings ?? result?.column_mappings ?? [];
+  const productFieldMappings = datasetResult?.field_mappings ?? {};
   const fieldMetrics = datasetResult?.columns.map((column) => ({ field: column.name, populated: column.populated, missing: column.missing, completeness_pct: column.completeness_pct, inferred_type: column.inferred_type })) ?? industryResult?.field_metrics ?? multiResult?.field_completeness ?? result?.field_metrics ?? [];
   const issues = datasetResult?.findings.map((finding) => ({ location: "Dataset", field: finding.title, severity: finding.severity, message: finding.detail, code: "PROFILE_FINDING" })) ??
     industryResult?.issues.map((issue) => ({ location: `Row ${issue.row_number}`, field: issue.field ?? "Record", severity: issue.severity, message: issue.message, code: issue.error_code })) ??
@@ -117,6 +119,13 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
       </div>
 
       {datasetResult && <DatasetCharts profile={datasetResult} />}
+
+      {Object.keys(productFieldMappings).length > 0 && <details className="panel result-section report-detail">
+        <summary><span>Product field mapping</span><small>{Object.keys(productFieldMappings).length} canonical fields mapped</small></summary>
+        <h3>Product field mapping</h3>
+        <p className="import-description">CompatFlow matched source columns to canonical product attributes. These are header-based mappings, not proof that the source values satisfy your organization&apos;s business rules.</p>
+        <div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical product field</th><th>Source column</th></tr></thead><tbody>{Object.entries(productFieldMappings).map(([field, source]) => <tr key={field}><td>{field.replaceAll("_", " ")}</td><td>{source}</td></tr>)}</tbody></table></div>
+      </details>}
 
       {mappings.length > 0 && <details className="panel result-section report-detail">
         <summary><span>Column mapping</span><small>{mappings.length} mapped fields{((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length ? ` · ${((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length} unmapped` : ""}</small></summary>
