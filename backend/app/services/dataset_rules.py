@@ -210,7 +210,7 @@ def profile_dataset_rules(
         # marketplace and ERP headers. These mappings are evidence-based and
         # deliberately do not invent fields absent from the source file.
         product_field_aliases = {
-            "source_product_id": ("product_id", "source_product_id", "catalog_id", "item_id", "source_item_id"),
+            "source_product_id": ("product_id", "source_product_id", "catalog_id", "item_id", "source_item_id", "item_number", "material_number", "material_code", "article_number", "part_number", "mpn", "asin", "gtin", "ean", "upc", "barcode"),
             "seller_sku": ("sku", "product_sku", "item_sku", "seller_sku", "variant_sku", "product_code", "item_code"),
             "product_name": ("product_name", "item_name", "name", "title", "product_title", "item_title"),
             "product_description": ("description", "product_description", "short_description", "long_description", "body", "body_html", "item_description", "material_description"),
