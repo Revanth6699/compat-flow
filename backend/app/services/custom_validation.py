@@ -105,7 +105,7 @@ def evaluate_custom_rules(
                     "rule_id": str(rule.id), "code": rule.code, "name": rule.name,
                     "field": field_name, "severity": rule.severity,
                     "status": "not_evaluated", "records_evaluated": 0,
-                    "issue_records": None,
+                    "records_skipped_missing": 0, "issue_records": None,
                 })
                 continue
 
