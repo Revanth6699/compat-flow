@@ -254,12 +254,16 @@ ValidationSeverity = Literal["critical", "warning", "info"]
 
 
 class ValidationProfileCreateRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     name: str = Field(min_length=1, max_length=120)
     dataset_type: str = Field(min_length=1, max_length=60)
     description: str | None = Field(default=None, max_length=500)
 
 
 class ValidationProfileUpdateRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     name: str | None = Field(default=None, min_length=1, max_length=120)
     dataset_type: str | None = Field(default=None, min_length=1, max_length=60)
     description: str | None = Field(default=None, max_length=500)
@@ -279,6 +283,8 @@ class ValidationProfileResponse(BaseModel):
 
 
 class ValidationRuleCreateRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     code: str = Field(min_length=2, max_length=80, pattern="^[A-Z][A-Z0-9_]+$")
     name: str = Field(min_length=1, max_length=120)
     field_name: str = Field(min_length=1, max_length=120)
@@ -289,6 +295,8 @@ class ValidationRuleCreateRequest(BaseModel):
 
 
 class ValidationRuleUpdateRequest(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     name: str | None = Field(default=None, min_length=1, max_length=120)
     field_name: str | None = Field(default=None, min_length=1, max_length=120)
     config: dict | None = None
