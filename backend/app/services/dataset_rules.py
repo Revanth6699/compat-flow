@@ -58,8 +58,10 @@ def profile_dataset_rules(
         "product_height", "product_length_cm", "product_width_cm",
         "product_height_cm", "product_photos_qty", "image_url", "image",
         "price", "unit_price", "regular_price", "sale_price", "compare_at_price", "cost",
-        "mrp", "discount_percent", "discounted_selling_price", "available_quantity",
-        "stock_level", "stock_levels", "out_of_stock", "supplier_name", "supplier",
+        "mrp", "discount_percent", "discountpercent", "discounted_selling_price",
+        "discountedsellingprice", "available_quantity", "availablequantity",
+        "stock_level", "stock_levels", "out_of_stock", "outofstock", "weightingms",
+        "supplier_name", "suppliername", "supplier",
         "merchant_id", "cluster_id", "cluster_label",
     }
     identity_hits = names & product_identity_fields
