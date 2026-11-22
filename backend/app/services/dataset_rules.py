@@ -14,7 +14,8 @@ from typing import Any
 
 
 def _norm(value: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", value.casefold()).strip("_")
+    separated = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value)
+    return re.sub(r"[^a-z0-9]+", "_", separated.casefold()).strip("_")
 
 
 def _number(value: Any) -> float | None:
