@@ -277,7 +277,10 @@ def _json_record_array_score(path: str, records: list[dict[str, Any]]) -> int:
     }
     order_fields = {"order_id", "order_status", "purchase_date", "order_date"}
     sample_keys = {
-        re.sub(r"[^a-z0-9]+", "_", str(key).casefold()).strip("_")
+        re.sub(
+            r"[^a-z0-9]+", "_",
+            re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", str(key)).casefold(),
+        ).strip("_")
         for record in records[:5]
         for key in record
     }
