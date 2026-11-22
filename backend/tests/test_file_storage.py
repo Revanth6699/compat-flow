@@ -58,4 +58,4 @@ def test_production_refuses_local_storage_fallback(monkeypatch):
 
     upload = UploadFile(filename="catalog.csv", file=io.BytesIO(b"sku\nA-1\n"))
     with pytest.raises(FileStorageError, match="not configured"):
-        await save_import_file(upload)
+        asyncio.run(save_import_file(upload))
