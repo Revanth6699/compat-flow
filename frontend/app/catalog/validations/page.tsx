@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { apiRequest } from "@/lib/auth-client";
 import { BrandedLoading } from "@/components/branded-loading";
@@ -76,7 +76,7 @@ export default function ValidationProfilesPage() {
     loadRules(selectedId).catch((err) => setError(err instanceof Error ? err.message : "Could not load validation rules."));
   }, [selectedId, loadRules]);
 
-  async function createProfile(event: React.FormEvent<HTMLFormElement>) {
+  async function createProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true); setError("");
     try {
