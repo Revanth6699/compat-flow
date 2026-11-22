@@ -98,3 +98,34 @@ def test_general_dataset_still_receives_structural_default_checks():
         item["status"] in {"evaluated", "not_applicable", "not_evaluated"}
         for item in result["validation_rules"]
     )
+
+
+
+def test_product_catalog_defaults_check_missing_and_duplicate_seller_skus():
+    result = profile_dataset_rules(
+        ["sku", "name"],
+        [
+            {"sku": "A-1", "name": "Widget"},
+            {"sku": "a-1", "name": "Widget duplicate"},
+            {"sku": "", "name": "Missing SKU"},
+        ],
+    )
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert result["dataset_type"] == "product catalog"
+    assert rules["MISSING_PRODUCT_SKU"]["issue_records"] == 1
+    assert rules["DUPLICATE_PRODUCT_SKU"]["issue_records"] == 1
+    assert rules["DUPLICATE_PRODUCT_SKU"]["severity"] == "critical"
+
+
+def test_supplier_offer_defaults_require_currency_for_priced_offers():
+    result = profile_dataset_rules(
+        ["supplier_sku", "unit_price", "currency"],
+        [
+            {"supplier_sku": "S1", "unit_price": "12.50", "currency": ""},
+            {"supplier_sku": "S2", "unit_price": "8.00", "currency": "US"},
+        ],
+    )
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert result["dataset_type"] == "supplier offers"
+    assert rules["PRICE_WITHOUT_CURRENCY"]["issue_records"] == 1
+    assert rules["INVALID_CURRENCY_FORMAT"]["issue_records"] == 1
