@@ -412,7 +412,7 @@ export default function CatalogImportPage() {
           </select></label>
           <button className="button" type="button" onClick={confirmIndustryProfile} disabled={loading}>{loading ? "Validating…" : "Validate with selected profile"}</button>
         </section>}
-        <UnifiedImportReport datasetResult={datasetResult} industryResult={industryResult} multiResult={multiResult} result={result} onDownloadCsv={downloadReport} onDownloadJson={downloadProfileJson} onPrint={printReport} />
+        {(!industryResult || industryResult.profile_id) && <UnifiedImportReport datasetResult={datasetResult} industryResult={industryResult} multiResult={multiResult} result={result} onDownloadCsv={downloadReport} onDownloadJson={downloadProfileJson} onPrint={printReport} />}
         {accessType !== "subscription" && <p className="import-disclaimer">Demonstration only. Do not upload confidential supplier files, personal information or production catalog data.</p>}
       </div>
     </main>
