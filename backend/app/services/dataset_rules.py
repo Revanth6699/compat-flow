@@ -524,7 +524,7 @@ def profile_dataset_rules(
     # Inventory and commercial attributes can coexist with a product master.
     # Evaluate their checks from column evidence without changing the primary profile.
     inventory_quantity_col = header(
-        "available_quantity", "available_qty", "stock_level", "stock_levels",
+        "available_quantity", "availablequantity", "available_qty", "stock_level", "stock_levels",
         "stock_quantity", "quantity_available", "quantity_on_hand",
     )
     out_of_stock_col = header("out_of_stock", "outofstock", "is_out_of_stock")
