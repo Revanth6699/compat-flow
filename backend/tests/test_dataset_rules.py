@@ -278,3 +278,66 @@ def test_generic_person_or_event_data_is_not_classified_as_product_catalog():
         [{"id": "1", "name": "Alex", "created_at": "2026-01-01"}],
     )
     assert result["dataset_type"] == "general dataset"
+
+
+def test_olist_product_master_maps_canonical_fields_and_runs_attribute_checks():
+    headers = [
+        "product_id", "product_category_name", "product_name_lenght",
+        "product_description_lenght", "product_photos_qty", "product_weight_g",
+        "product_length_cm", "product_height_cm", "product_width_cm",
+    ]
+    rows = [
+        {
+            "product_id": " P-001 ", "product_category_name": "perfumaria",
+            "product_name_lenght": "40", "product_description_lenght": "287",
+            "product_photos_qty": "1", "product_weight_g": "225",
+            "product_length_cm": "16", "product_height_cm": "10", "product_width_cm": "14",
+        },
+        {
+            "product_id": "P-002", "product_category_name": "  ",
+            "product_name_lenght": "-1", "product_description_lenght": "not-a-number",
+            "product_photos_qty": "-2", "product_weight_g": "0",
+            "product_length_cm": "0", "product_height_cm": "", "product_width_cm": "12",
+        },
+    ]
+    result = profile_dataset_rules(headers, rows)
+    rules = {item["code"]: item for item in result["validation_rules"]}
+
+    assert result["dataset_type"] == "product catalog"
+    assert result["field_mappings"]["source_product_id"] == "product_id"
+    assert result["field_mappings"]["product_category"] == "product_category_name"
+    assert result["field_mappings"]["product_name_length"] == "product_name_lenght"
+    assert rules["MALFORMED_PRODUCT_IDENTIFIER"]["issue_records"] == 1
+    assert rules["INVALID_PRODUCT_NAME_LENGTH"]["issue_records"] == 1
+    assert rules["INVALID_PRODUCT_DESCRIPTION_LENGTH"]["issue_records"] == 1
+    assert rules["INVALID_PRODUCT_PHOTO_QUANTITY"]["issue_records"] == 1
+    assert rules["NON_POSITIVE_PRODUCT_WEIGHT"]["issue_records"] == 1
+    assert rules["NON_POSITIVE_PRODUCT_LENGTH"]["issue_records"] == 1
+    assert rules["INCOMPLETE_PRODUCT_PHYSICAL_ATTRIBUTES"]["issue_records"] == 1
+
+
+def test_shopify_and_erp_aliases_map_to_canonical_product_attributes():
+    shopify = profile_dataset_rules(
+        ["Handle", "Title", "Body (HTML)", "Vendor", "Type", "Variant SKU", "Variant Price", "Variant Barcode"],
+        [{"Handle": "item-1", "Title": "Item", "Body (HTML)": "Description", "Vendor": "Acme",
+          "Type": "Tools", "Variant SKU": "SKU-1", "Variant Price": "10", "Variant Barcode": "123"}],
+    )
+    assert shopify["field_mappings"]["product_name"] == "Title"
+    assert shopify["field_mappings"]["seller_sku"] == "Variant SKU"
+    assert shopify["field_mappings"]["product_description"] == "Body (HTML)"
+
+    erp = profile_dataset_rules(
+        ["Item Number", "Material Description", "Product Group", "Gross Weight", "Length", "Width", "Height"],
+        [{"Item Number": "MAT-1", "Material Description": "Steel part", "Product Group": "Parts",
+          "Gross Weight": "1.2", "Length": "10", "Width": "5", "Height": "2"}],
+    )
+    assert erp["field_mappings"]["source_product_id"] == "Item Number"
+    assert erp["field_mappings"]["product_weight"] == "Gross Weight"
+
+
+def test_product_numeric_checks_are_not_evaluated_when_source_fields_are_absent():
+    result = profile_dataset_rules(["sku", "name"], [{"sku": "A-1", "name": "Widget"}])
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert rules["INVALID_PRODUCT_PHOTO_QUANTITY"]["status"] == "not_evaluated"
+    assert rules["NON_POSITIVE_PRODUCT_WEIGHT"]["status"] == "not_evaluated"
+    assert rules["MALFORMED_PRODUCT_CATEGORY"]["status"] == "not_evaluated"
