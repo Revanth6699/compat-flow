@@ -115,6 +115,8 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
         <div className="panel stat-card"><span>{completeness !== null ? "Cell completeness" : industryResult ? "Pass rate on evaluated checks" : "Validation pass rate"}</span><strong>{completeness !== null ? completeness.toFixed(2) + "%" : passRate !== null ? passRate.toFixed(2) + "%" : "Unavailable"}</strong><small>{completeness !== null ? "Populated cells / total cells" : industryResult ? `Mapping coverage ${industryResult.metrics.mapping_coverage_pct.toFixed(1)}%; ${unmappedIndustryColumns} unmapped columns were not validated` : passRate !== null ? "Records passing current validation" : "No quality metric returned"}</small></div>
       </div>
 
+      {industryResult?.profile_detection && <p className="import-description">{industryResult.profile_detection.decision_reason === "ambiguous_tied_profiles" ? "The automatic industry classifier found tied profiles; the selected profile was confirmed by the user." : "Industry selection used a deterministic signal-based heuristic."} Detection confidence is a heuristic score, not a probability.</p>}
+
       <div className="panel result-section">
         <div className="section-heading"><div><h3>Analysis summary</h3><p>Common report structure; metrics depend on the checks applicable to this dataset.</p></div></div>
         {datasetResult && completeRecords !== null && incompleteRecords !== null && recordCompleteness !== null ? <>
