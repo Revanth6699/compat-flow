@@ -17,7 +17,7 @@ from typing import Any
 
 from defusedxml.ElementTree import fromstring
 
-MAX_RECORDS = 10_000
+MAX_RECORDS = 100_000
 MAX_COLUMNS = 500
 MAX_CELL_CHARS = 1_000_000
 MAX_SOURCE_BYTES = 100 * 1024 * 1024
