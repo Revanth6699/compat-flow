@@ -35,6 +35,34 @@ def profile_dataset_rules(
     """Return a conservative dataset classification and applicable rule findings."""
     by_name = {_norm(header): header for header in headers}
     names = set(by_name)
+    # Detect product catalogs from combinations of common commerce, PIM,
+    # marketplace, ERP, and supplier-catalog fields. Do not depend on filenames
+    # or one vendor's export vocabulary, and do not classify on a generic ID alone.
+    product_identity_fields = {
+        "product_id", "source_product_id", "item_id", "sku", "product_sku",
+        "item_sku", "seller_sku", "variant_sku", "product_code", "item_code",
+        "item_number", "material_number", "material_code", "article_number",
+        "barcode", "ean", "upc", "gtin", "mpn", "manufacturer_part_number",
+        "part_number", "asin", "variant_id",
+    }
+    product_attribute_fields = {
+        "product_name", "item_name", "name", "title", "product_title",
+        "item_title", "description", "product_description", "short_description",
+        "long_description", "body", "body_html", "product_category", "product_category_name",
+        "category", "category_name", "product_group", "item_group", "brand",
+        "brand_name", "manufacturer", "manufacturer_name", "vendor", "product_type",
+        "product_type_name", "item_description", "material_description",
+        "product_weight", "weight", "weight_g", "product_weight_g",
+        "length", "width", "height", "product_length", "product_width",
+        "product_height", "product_length_cm", "product_width_cm",
+        "product_height_cm", "product_photos_qty", "image_url", "image",
+        "price", "unit_price", "regular_price", "sale_price", "compare_at_price", "cost",
+    }
+    identity_hits = names & product_identity_fields
+    attribute_hits = names & product_attribute_fields
+    has_product_signature = (
+        bool(identity_hits) and bool(attribute_hits)
+    ) or len(attribute_hits) >= 3 or len(identity_hits) >= 2
     if {"supplier_id", "unit_price"} <= names or {"supplier_sku", "unit_price"} <= names:
         dataset_type = "supplier offers"
     elif names & {"quantity_on_hand", "quantity_available", "stock_quantity", "available_quantity"}:
@@ -45,7 +73,7 @@ def profile_dataset_rules(
         dataset_type = "financial transactions"
     elif names & {"email", "customer_email", "email_address", "customer_id", "customer_unique_id"}:
         dataset_type = "customer records"
-    elif names & {"sku", "product_sku", "item_sku", "product_code", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category"}:
+    elif has_product_signature:
         dataset_type = "product catalog"
     else:
         dataset_type = "general dataset"
@@ -62,7 +90,31 @@ def profile_dataset_rules(
         return next((by_name[name] for name in candidates if name in by_name), None)
 
     if dataset_type == "product catalog":
-        sku_col = header("sku", "product_sku", "item_sku", "product_code")
+        source_id_col = header("product_id", "source_product_id", "catalog_id", "item_id", "source_item_id")
+        if source_id_col:
+            source_ids = [
+                str(row.get(source_id_col)).strip().casefold()
+                for row in rows
+                if row.get(source_id_col) not in (None, "") and str(row.get(source_id_col)).strip()
+            ]
+            missing_source_ids = sum(
+                1 for row in rows
+                if row.get(source_id_col) in (None, "") or not str(row.get(source_id_col)).strip()
+            )
+            duplicate_source_ids = sum(count - 1 for count in Counter(source_ids).values() if count > 1)
+            add_check(
+                "MISSING_SOURCE_PRODUCT_ID", "Missing source product IDs", missing_source_ids,
+                f"{missing_source_ids} product records have no source product identifier.",
+                "Provide the source system's product ID. Do not substitute a seller SKU, MPN, or barcode.",
+                "critical",
+            )
+            add_check(
+                "DUPLICATE_SOURCE_PRODUCT_ID", "Duplicate source product IDs", duplicate_source_ids,
+                f"{duplicate_source_ids} product records repeat a source product identifier.",
+                "Confirm the dataset grain and source-system uniqueness rules; repeated IDs may represent variants or multiple offers rather than duplicate products.",
+            )
+
+        sku_col = header("sku", "product_sku", "item_sku", "seller_sku", "variant_sku", "product_code", "item_code")
         if sku_col:
             missing_skus = sum(1 for row in rows if row.get(sku_col) in (None, "") or not str(row.get(sku_col)).strip())
             add_check(
@@ -87,7 +139,7 @@ def profile_dataset_rules(
         # Validate only explicit relationships whose target keys are present in
         # this same dataset. Never treat a missing external master file as proof
         # that a reference is invalid.
-        product_id_col = header("product_id", "source_product_id", "item_id")
+        product_id_col = header("product_id", "source_product_id", "item_id", "source_item_id")
         parent_col = header("parent_product_id", "parent_id")
         if product_id_col and parent_col:
             known_product_ids = {
@@ -254,6 +306,8 @@ def profile_dataset_rules(
     rule_definitions = [
         ("MISSING_VALUES", "Missing values", "structural", "warning", None),
         ("EXACT_DUPLICATE_ROWS", "Exact duplicate rows", "structural", "warning", None),
+        ("MISSING_SOURCE_PRODUCT_ID", "Missing source product IDs", "product catalog", "critical", "product catalog"),
+        ("DUPLICATE_SOURCE_PRODUCT_ID", "Duplicate source product IDs", "product catalog", "warning", "product catalog"),
         ("MISSING_PRODUCT_SKU", "Missing product SKUs", "product catalog", "critical", "product catalog"),
         ("DUPLICATE_PRODUCT_SKU", "Duplicate product SKUs", "product catalog", "critical", "product catalog"),
         ("ORPHAN_PRODUCT_PARENT", "Product parent reference not found", "product catalog", "critical", "product catalog"),

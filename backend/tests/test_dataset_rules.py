@@ -172,3 +172,109 @@ def test_product_relationship_checks_are_not_evaluated_without_reference_columns
     assert rules["ORPHAN_PRODUCT_PARENT"]["issue_records"] is None
     assert rules["ORPHAN_REPLACEMENT_SKU"]["status"] == "not_evaluated"
     assert rules["ORPHAN_REPLACEMENT_SKU"]["issue_records"] is None
+
+def test_olist_product_master_is_classified_without_mislabeling_product_id_as_sku():
+    headers = [
+        "product_id",
+        "product_category_name",
+        "product_name_lenght",
+        "product_description_lenght",
+        "product_photos_qty",
+        "product_weight_g",
+        "product_length_cm",
+        "product_height_cm",
+        "product_width_cm",
+    ]
+    rows = [{
+        "product_id": "P-001",
+        "product_category_name": "perfumaria",
+        "product_name_lenght": "40",
+        "product_description_lenght": "287",
+        "product_photos_qty": "1",
+        "product_weight_g": "225",
+        "product_length_cm": "16",
+        "product_height_cm": "10",
+        "product_width_cm": "14",
+    }]
+    result = profile_dataset_rules(headers, rows)
+    rules = {item["code"]: item for item in result["validation_rules"]}
+
+    assert result["dataset_type"] == "product catalog"
+    # product_id is a source identity, not proof of a seller-assigned SKU.
+    assert rules["MISSING_PRODUCT_SKU"]["status"] == "not_evaluated"
+    assert rules["DUPLICATE_PRODUCT_SKU"]["status"] == "not_evaluated"
+    assert rules["ORPHAN_PRODUCT_PARENT"]["status"] == "not_evaluated"
+    assert rules["MISSING_SOURCE_PRODUCT_ID"]["status"] == "evaluated"
+    assert rules["DUPLICATE_SOURCE_PRODUCT_ID"]["status"] == "evaluated"
+    assert rules["MISSING_VALUES"]["status"] == "evaluated"
+
+
+def test_product_id_alone_does_not_force_product_catalog_classification():
+    result = profile_dataset_rules(["product_id", "created_at"], [
+        {"product_id": "X1", "created_at": "2026-01-01"}
+    ])
+    assert result["dataset_type"] == "general dataset"
+
+def test_product_source_identifier_checks_do_not_treat_ids_as_skus():
+    result = profile_dataset_rules(
+        ["product_id", "product_category_name", "product_weight_g"],
+        [
+            {"product_id": "P-1", "product_category_name": "tools", "product_weight_g": "10"},
+            {"product_id": "p-1", "product_category_name": "tools", "product_weight_g": "12"},
+            {"product_id": "", "product_category_name": "tools", "product_weight_g": "8"},
+        ],
+    )
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert result["dataset_type"] == "product catalog"
+    assert rules["MISSING_SOURCE_PRODUCT_ID"]["issue_records"] == 1
+    assert rules["DUPLICATE_SOURCE_PRODUCT_ID"]["issue_records"] == 1
+    assert rules["MISSING_PRODUCT_SKU"]["status"] == "not_evaluated"
+
+def test_shopify_style_product_export_is_classified_from_variant_and_product_fields():
+    headers = [
+        "Handle", "Title", "Body (HTML)", "Vendor", "Type",
+        "Variant SKU", "Variant Price", "Variant Barcode",
+    ]
+    result = profile_dataset_rules(headers, [{
+        "Handle": "classic-shirt", "Title": "Classic Shirt",
+        "Body (HTML)": "Cotton shirt", "Vendor": "Acme",
+        "Type": "Apparel", "Variant SKU": "SHIRT-BLK-M",
+        "Variant Price": "29.99", "Variant Barcode": "123456789012",
+    }])
+    assert result["dataset_type"] == "product catalog"
+
+
+def test_woocommerce_style_export_is_classified_without_vendor_specific_filename():
+    headers = ["ID", "Type", "SKU", "Name", "Published", "Regular price", "Categories", "Images"]
+    result = profile_dataset_rules(headers, [{
+        "ID": "100", "Type": "simple", "SKU": "MUG-01",
+        "Name": "Coffee Mug", "Published": "1", "Regular price": "12.00",
+        "Categories": "Kitchen", "Images": "https://example.invalid/mug.jpg",
+    }])
+    assert result["dataset_type"] == "product catalog"
+
+
+def test_erp_item_master_export_is_classified_from_item_number_and_descriptors():
+    headers = ["Item Number", "Material Description", "Product Group", "Gross Weight", "UOM"]
+    result = profile_dataset_rules(headers, [{
+        "Item Number": "MAT-100", "Material Description": "Steel fastener",
+        "Product Group": "Fasteners", "Gross Weight": "0.25", "UOM": "KG",
+    }])
+    assert result["dataset_type"] == "product catalog"
+
+
+def test_supplier_offer_schema_keeps_precedence_over_product_signals():
+    result = profile_dataset_rules(
+        ["supplier_id", "supplier_sku", "product_name", "unit_price", "currency"],
+        [{"supplier_id": "SUP-1", "supplier_sku": "S-1", "product_name": "Widget",
+          "unit_price": "10", "currency": "USD"}],
+    )
+    assert result["dataset_type"] == "supplier offers"
+
+
+def test_generic_person_or_event_data_is_not_classified_as_product_catalog():
+    result = profile_dataset_rules(
+        ["id", "name", "created_at"],
+        [{"id": "1", "name": "Alex", "created_at": "2026-01-01"}],
+    )
+    assert result["dataset_type"] == "general dataset"
