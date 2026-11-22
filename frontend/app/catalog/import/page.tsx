@@ -11,7 +11,7 @@ type DatasetProfile = {
   filename: string; format: string; dataset_type: string; total_records: number; total_columns: number;
   total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number;
   complete_records: number | null; incomplete_records: number | null; complete_records_pct: number | null;
-  duplicate_rows: number; duplicate_rate_pct: number; is_product_catalog: boolean; persisted: false;
+  duplicate_rows: number; duplicate_rate_pct: number; is_product_catalog: boolean; persisted: false; field_mappings?: Record<string, string>;
   columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string; minimum: number | string | null; maximum: number | string | null; average: number | null; top_values: { value: string; count: number; pct: number }[] }[];
   categorical_distributions: { name: string; values: { value: string; count: number; pct: number }[] }[];
   date_columns: string[]; numeric_columns: string[];
@@ -190,6 +190,9 @@ export default function CatalogImportPage() {
         ["Incomplete records", datasetResult.incomplete_records],
         ["Duplicate rows", datasetResult.duplicate_rows],
         ["Duplicate rate (%)", datasetResult.duplicate_rate_pct],
+        [],
+        ["Canonical product field", "Mapped source column"],
+        ...Object.entries(datasetResult.field_mappings ?? {}).map(([field, source]) => [field, source]),
         [],
         ["Column", "Inferred type", "Populated", "Missing", "Completeness (%)", "Distinct values", "Minimum", "Maximum", "Average"],
         ...datasetResult.columns.map(c => [c.name,c.inferred_type,c.populated,c.missing,c.completeness_pct,c.distinct_values,c.minimum ?? "",c.maximum ?? "",c.average ?? ""]),
