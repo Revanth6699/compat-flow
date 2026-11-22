@@ -229,3 +229,52 @@ def test_product_source_identifier_checks_do_not_treat_ids_as_skus():
     assert rules["MISSING_SOURCE_PRODUCT_ID"]["issue_records"] == 1
     assert rules["DUPLICATE_SOURCE_PRODUCT_ID"]["issue_records"] == 1
     assert rules["MISSING_PRODUCT_SKU"]["status"] == "not_evaluated"
+
+def test_shopify_style_product_export_is_classified_from_variant_and_product_fields():
+    headers = [
+        "Handle", "Title", "Body (HTML)", "Vendor", "Type",
+        "Variant SKU", "Variant Price", "Variant Barcode",
+    ]
+    result = profile_dataset_rules(headers, [{
+        "Handle": "classic-shirt", "Title": "Classic Shirt",
+        "Body (HTML)": "Cotton shirt", "Vendor": "Acme",
+        "Type": "Apparel", "Variant SKU": "SHIRT-BLK-M",
+        "Variant Price": "29.99", "Variant Barcode": "123456789012",
+    }])
+    assert result["dataset_type"] == "product catalog"
+
+
+def test_woocommerce_style_export_is_classified_without_vendor_specific_filename():
+    headers = ["ID", "Type", "SKU", "Name", "Published", "Regular price", "Categories", "Images"]
+    result = profile_dataset_rules(headers, [{
+        "ID": "100", "Type": "simple", "SKU": "MUG-01",
+        "Name": "Coffee Mug", "Published": "1", "Regular price": "12.00",
+        "Categories": "Kitchen", "Images": "https://example.invalid/mug.jpg",
+    }])
+    assert result["dataset_type"] == "product catalog"
+
+
+def test_erp_item_master_export_is_classified_from_item_number_and_descriptors():
+    headers = ["Item Number", "Material Description", "Product Group", "Gross Weight", "UOM"]
+    result = profile_dataset_rules(headers, [{
+        "Item Number": "MAT-100", "Material Description": "Steel fastener",
+        "Product Group": "Fasteners", "Gross Weight": "0.25", "UOM": "KG",
+    }])
+    assert result["dataset_type"] == "product catalog"
+
+
+def test_supplier_offer_schema_keeps_precedence_over_product_signals():
+    result = profile_dataset_rules(
+        ["supplier_id", "supplier_sku", "product_name", "unit_price", "currency"],
+        [{"supplier_id": "SUP-1", "supplier_sku": "S-1", "product_name": "Widget",
+          "unit_price": "10", "currency": "USD"}],
+    )
+    assert result["dataset_type"] == "supplier offers"
+
+
+def test_generic_person_or_event_data_is_not_classified_as_product_catalog():
+    result = profile_dataset_rules(
+        ["id", "name", "created_at"],
+        [{"id": "1", "name": "Alex", "created_at": "2026-01-01"}],
+    )
+    assert result["dataset_type"] == "general dataset"
