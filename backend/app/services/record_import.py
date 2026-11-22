@@ -140,14 +140,16 @@ def validate_parsed_records(
     valid_source_locations: list[str] = []
     valid_source_keys: list[str | None] = []
     errors: list[dict[str, Any]] = []
-    duplicate_tracker = DiskBackedDuplicateTracker()
     populated: Counter[str] = Counter()
     required_fields = [
         name for name, field in model.model_fields.items() if field.is_required()
     ]
 
-    try:
-            for record in parsed.records:
+    # Keep the exact duplicate index on disk so its memory use does not grow
+    # with the number of records. ParsedSource itself is still materialized;
+    # streaming readers and batch persistence are a separate migration.
+    with DiskBackedDuplicateTracker() as duplicate_tracker:
+        for record in parsed.records:
             row = {
                 field: record.values.get(source)
                 for field, source in mapping.items()
@@ -186,7 +188,7 @@ def validate_parsed_records(
                         if len(errors) >= error_limit:
                             break
                 continue
-    
+
             values = parsed_model.model_dump(mode="json")
             duplicate_key: tuple[Any, ...] | None = None
             if record_type == "products":
@@ -194,14 +196,19 @@ def validate_parsed_records(
             elif record_type == "product_variants" and values.get("variant_sku"):
                 duplicate_key = ("variant_sku", str(values["variant_sku"]).casefold())
             elif record_type == "supplier_offers" and values.get("supplier_sku"):
-                duplicate_key = ("supplier_sku", str(values["supplier_id"]), str(values["supplier_sku"]).casefold())
+                duplicate_key = (
+                    "supplier_sku", str(values["supplier_id"]),
+                    str(values["supplier_sku"]).casefold(),
+                )
             elif record_type == "product_identifiers":
                 duplicate_key = (
-                    "identifier", values["identifier_type"], values.get("namespace", "global"),
-                    str(values["value"]).casefold(),
+                    "identifier", values["identifier_type"],
+                    values.get("namespace", "global"), str(values["value"]).casefold(),
                 )
             if duplicate_key:
-                duplicate = duplicate_tracker.check_and_add(duplicate_key, record.source_location)
+                duplicate = duplicate_tracker.check_and_add(
+                    duplicate_key, record.source_location
+                )
                 if duplicate.duplicate:
                     if len(errors) < error_limit:
                         errors.append({
@@ -209,22 +216,24 @@ def validate_parsed_records(
                             "source_key": record.source_key,
                             "field": duplicate_key[0],
                             "error_code": "DUPLICATE_IN_FILE",
-                            "message": f"Duplicate key matches {duplicate.first_source_location}.",
+                            "message": (
+                                "Duplicate key matches "
+                                f"{duplicate.first_source_location}."
+                            ),
                         })
                     continue
             valid.append(values)
             valid_source_locations.append(record.source_location)
             valid_source_keys.append(record.source_key)
-    
-        duplicate_tracker.close()
-    finally:
-        completeness = [
+
+    completeness = [
         {
             "field": field,
             "populated": populated[field],
             "missing": len(parsed.records) - populated[field],
-            "completeness_pct": round(populated[field] / len(parsed.records) * 100, 2)
-            if parsed.records else 100.0,
+            "completeness_pct": round(
+                populated[field] / len(parsed.records) * 100, 2
+            ) if parsed.records else 100.0,
         }
         for field in required_fields
     ]
