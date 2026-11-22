@@ -1,6 +1,7 @@
 import pytest
 
 from app.services.industry_catalog import (
+    ALIASES,
     IndustryCSVError,
     detect_industry,
     validate_industry_csv,
@@ -186,3 +187,130 @@ def test_zepto_price_discount_and_stock_consistency_issues_are_reported():
     assert "DISCOUNT_PERCENT_OUT_OF_RANGE" in codes
     assert "SELLING_PRICE_ABOVE_LIST_PRICE" in codes
     assert "OUT_OF_STOCK_WITH_POSITIVE_AVAILABILITY" in codes
+
+
+def test_industry_issue_metrics_count_all_findings_even_when_details_are_capped():
+    rows = "".join(f"S-{index},Widget,not-a-price,USD\n" for index in range(600))
+    result = validate_industry_csv(
+        "sku,title,price,currency\n" + rows,
+        profile_id="ecommerce",
+    )
+
+    assert result["metrics"]["issue_count"] == 600
+    assert result["metrics"]["critical_issue_count"] == 600
+    assert result["metrics"]["returned_issue_count"] == 500
+    assert result["metrics"]["issues_truncated"] is True
+    assert result["metrics"]["issue_counts_by_code"]["INVALID_NONNEGATIVE_NUMBER"] == 600
+    assert result["metrics"]["rows_with_critical_issues"] == 600
+    assert result["invalid_rows"] == 600
+    assert result["valid_rows"] == 0
+
+
+def test_industry_warning_only_rows_remain_valid_but_are_counted_for_review():
+    result = validate_industry_csv(
+        "title,mrp,discountedSellingPrice,currency\nWidget,10,12,USD\n",
+        profile_id="ecommerce",
+    )
+
+    assert result["valid_rows"] == 1
+    assert result["invalid_rows"] == 0
+    assert result["metrics"]["warning_issue_count"] == 1
+    assert result["metrics"]["rows_with_warning_issues"] == 1
+    assert result["metrics"]["rows_with_critical_issues"] == 0
+
+
+def test_duplicate_aliases_are_explicitly_reported_as_ambiguous_not_auto_mapped():
+    result = validate_industry_csv(
+        "sku,seller_sku,title\nS-1,S-1,Widget\n",
+        profile_id="ecommerce",
+    )
+
+    assert "sku" not in mapped(result)
+    assert "sku" in result["unmapped_headers"]
+    assert "seller_sku" in result["unmapped_headers"]
+    assert result["ambiguous_mappings"] == [{
+        "field": "sku",
+        "source_headers": ["sku", "seller_sku"],
+    }]
+    assert result["mapping_diagnostics"]["source_column_count"] == 3
+    assert result["mapping_diagnostics"]["mapped_column_count"] == 1
+    assert result["mapping_diagnostics"]["unmapped_column_count"] == 2
+    assert result["mapping_diagnostics"]["ambiguous_field_count"] == 1
+    assert {
+        item["reason"] for item in result["unmapped_header_details"]
+        if item["candidate_field"] == "sku"
+    } == {"ambiguous_mapping"}
+
+
+def test_industry_detection_explains_weak_and_tied_evidence():
+    weak = detect_industry(["id", "name"])
+    assert weak["needs_confirmation"] is True
+    assert weak["profile_id"] is None
+    assert weak["decision_reason"] == "insufficient_industry_signals"
+    assert weak["confidence_method"] == "heuristic_signal_score_not_probability"
+
+    tied = detect_industry(["unit_price", "currency", "quantity"])
+    assert tied["needs_confirmation"] is True
+    assert tied["profile_id"] is None
+    assert tied["decision_reason"] == "ambiguous_tied_profiles"
+    assert {item["profile_id"] for item in tied["top_candidates"]} == {"ecommerce", "wholesale"}
+
+
+def test_findings_include_potential_impact_without_claiming_measured_loss():
+    result = validate_industry_csv(
+        "sku,title,price\nS-1,Widget,12.50\n",
+        profile_id="ecommerce",
+    )
+    issue = next(item for item in result["issues"] if item["error_code"] == "PRICE_CURRENCY_MISSING")
+    assert "ambiguous across currencies" in issue["potential_impact"]
+    assert issue["impact_basis"] == "potential_downstream_effect_not_measured"
+
+
+def test_industry_alias_registry_has_no_cross_field_collisions():
+    alias_owners = {}
+    for field, aliases in ALIASES.items():
+        for alias in aliases | {field}:
+            alias_owners.setdefault(alias, set()).add(field)
+
+    collisions = {alias: owners for alias, owners in alias_owners.items() if len(owners) > 1}
+    assert collisions == {}
+
+
+def test_generic_lead_time_is_not_silently_converted_to_days():
+    result = validate_industry_csv(
+        "supplier_sku,lead_time,lead_time_days\nS-1,2,3\n",
+        profile_id="wholesale",
+    )
+
+    fields = mapped(result)
+    assert fields["lead_time"] == "lead_time"
+    assert fields["lead_time_days"] == "lead_time_days"
+
+
+def test_currency_validation_does_not_claim_iso_registry_membership():
+    result = validate_industry_csv(
+        "title,price,currency\nWidget,10.00,ZZZ\n",
+        profile_id="ecommerce",
+    )
+
+    assert not any(issue["error_code"] == "INVALID_CURRENCY_CODE" for issue in result["issues"])
+    assert "ISO 4217 registry membership is not verified" in result["currency_validation_scope"]
+
+
+def test_issue_and_row_totals_reconcile_when_one_row_has_multiple_severities():
+    result = validate_industry_csv(
+        "title,mrp,discountedSellingPrice,currency\n"
+        "First,10,12,\n"
+        "Second,10,12,USD\n",
+        profile_id="ecommerce",
+    )
+
+    metrics = result["metrics"]
+    assert metrics["issue_count"] == (
+        metrics["critical_issue_count"] + metrics["warning_issue_count"]
+    )
+    assert metrics["issue_count"] == sum(metrics["issue_counts_by_code"].values())
+    assert metrics["rows_with_critical_issues"] == 1
+    assert metrics["rows_with_warning_issues"] == 2
+    assert metrics["rows_with_any_issue"] == 2
+    assert result["valid_rows"] + result["invalid_rows"] == result["total_rows"] == 2
