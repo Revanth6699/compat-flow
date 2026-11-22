@@ -7,6 +7,8 @@ type DatasetProfile = {
   total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number;
   complete_records: number | null; incomplete_records: number | null; complete_records_pct: number | null;
   duplicate_rows: number; duplicate_rate_pct: number;
+  missing_value_details?: { row_number: number; field: string }[];
+  missing_value_details_truncated?: boolean;
   columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string }[];
   categorical_distributions: { name: string; values: { value: string; count: number; pct: number }[] }[];
   date_columns: string[]; numeric_columns: string[];
