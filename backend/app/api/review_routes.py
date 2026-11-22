@@ -144,6 +144,7 @@ def list_review_replies(review_id: UUID, db: Session = Depends(get_db)):
 def create_review_reply(
     review_id: UUID,
     payload: ReviewReplyCreateRequest,
+    _admin: AuthenticatedUser = Depends(require_platform_admin),
     db: Session = Depends(get_db),
 ):
     review = db.scalar(
