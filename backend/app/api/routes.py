@@ -33,7 +33,7 @@ from app.schemas import (
     InventorySnapshotResponse,
     ProductIdentifierCreateRequest,
     ProductIdentifierResponse,
-    ValidationProfileCreateRequest, ValidationProfileResponse,
+    ValidationProfileCreateRequest, ValidationProfileUpdateRequest, ValidationProfileResponse,
     ValidationRuleCreateRequest, ValidationRuleUpdateRequest, ValidationRuleResponse,
 )
 from app.services.ingestion_adapters import IngestionParseError, parse_source
@@ -78,6 +78,38 @@ def create_validation_profile(
         description=payload.description.strip() if payload.description else None,
     )
     db.add(profile)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A validation profile with this name already exists in your organization.") from None
+    db.refresh(profile)
+    return profile
+
+
+@router.patch("/validation/profiles/{profile_id}", response_model=ValidationProfileResponse)
+def update_validation_profile(
+    profile_id: UUID,
+    payload: ValidationProfileUpdateRequest,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("custom_rules")),
+    db: Session = Depends(get_db),
+):
+    profile = db.scalar(select(ValidationProfile).where(
+        ValidationProfile.id == profile_id,
+        ValidationProfile.organization_id == current.profile.organization_id,
+    ))
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Validation profile not found.")
+    changes = payload.model_dump(exclude_unset=True)
+    for key, value in changes.items():
+        if key == "name" and value is not None:
+            value = value.strip()
+        elif key == "dataset_type" and value is not None:
+            value = value.strip().casefold()
+        elif key == "description" and value is not None:
+            value = value.strip()
+        setattr(profile, key, value)
     try:
         db.commit()
     except IntegrityError:
