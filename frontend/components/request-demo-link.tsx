@@ -8,22 +8,27 @@ import { apiRequest } from "@/lib/auth-client";
 /** Shows a re-request link only when a signed-in user's previous demo request was revoked or rejected. */
 export function RequestDemoLink({ className = "" }: { className?: string }) {
   const { user } = useAuth();
-  const [eligible, setEligible] = useState(false);
+  const [eligibleUserId, setEligibleUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    setEligible(false);
     if (!user) return () => { active = false; };
+
     apiRequest<{ status?: string }>("/api/v1/demo-requests/mine")
       .then((request) => {
-        if (active) setEligible(request.status === "revoked" || request.status === "rejected");
+        if (active) {
+          setEligibleUserId(
+            request.status === "revoked" || request.status === "rejected" ? user.id : null,
+          );
+        }
       })
       .catch(() => {
-        if (active) setEligible(false);
+        if (active) setEligibleUserId(null);
       });
-    return () => { active = false; };
-  }, [user?.id]);
 
-  if (!user || !eligible) return null;
+    return () => { active = false; };
+  }, [user]);
+
+  if (!user || eligibleUserId !== user.id) return null;
   return <Link className={className} href="/contact?intent=demo">Request demo access</Link>;
 }
