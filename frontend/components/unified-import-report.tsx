@@ -92,7 +92,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
       </div>
 
       <div className="result-stats premium-kpis">
-        <div className="panel stat-card"><span>Total records</span><strong>{total.toLocaleString()}</strong><small>Rows analysed</small></div>
+        <div className="panel stat-card"><span>Total records</span><strong>{total.toLocaleString()}</strong><small>Rows in dataset</small></div>
         {datasetResult ? <>
           <div className="panel stat-card"><span>Complete records</span><strong className="metric-valid">{completeRecords === null ? "Unavailable" : completeRecords.toLocaleString()}</strong><small>{recordCompleteness === null ? "Record-level completeness not returned by API" : recordCompleteness.toFixed(2) + "% of rows fully populated"}</small></div>
           <div className="panel stat-card"><span>Incomplete records</span><strong className={incompleteRecords ? "metric-warning" : "metric-valid"}>{incompleteRecords === null ? "Unavailable" : incompleteRecords.toLocaleString()}</strong><small>{incompleteRecords === null ? "Record-level completeness not returned by API" : "At least one empty field"}</small></div>
@@ -100,7 +100,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
           <div className="panel stat-card"><span>Accepted records</span><strong className="metric-valid">{valid === null ? "—" : valid.toLocaleString()}</strong><small>{hasValidationCounts ? "Passed current validation" : "Not applicable to this result"}</small></div>
           <div className="panel stat-card"><span>Records needing review</span><strong className={invalid ? "metric-invalid" : "metric-valid"}>{invalid === null ? "—" : invalid.toLocaleString()}</strong><small>{hasValidationCounts ? "Failed current validation" : "Not applicable to this result"}</small></div>
         </>}
-        <div className="panel stat-card"><span>Quality indicator</span><strong>{completeness !== null ? completeness.toFixed(2) + "%" : passRate !== null ? passRate.toFixed(2) + "%" : "Unavailable"}</strong><small>{completeness !== null ? "Cell completeness" : passRate !== null ? "Validation pass rate" : "No quality metric returned"}</small></div>
+        <div className="panel stat-card"><span>{completeness !== null ? "Cell completeness" : "Validation pass rate"}</span><strong>{completeness !== null ? completeness.toFixed(2) + "%" : passRate !== null ? passRate.toFixed(2) + "%" : "Unavailable"}</strong><small>{completeness !== null ? "Populated cells / total cells" : passRate !== null ? "Records passing current validation" : "No quality metric returned"}</small></div>
       </div>
 
       <div className="panel result-section">
