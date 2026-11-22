@@ -492,8 +492,6 @@ async def profile_public_dataset(
             "average": round(sum(numeric) / len(numeric), 4) if numeric else None,
             "top_values": top_values,
         })
-    normalized = {re.sub(r"[^a-z0-9]+", "_", header.casefold()).strip("_") for header in headers}
-    product_headers = {"sku", "product_sku", "item_sku", "product_code", "product_name", "item_name", "manufacturer", "manufacturer_name", "part_number", "mpn", "category", "product_category"}
     domain_profile = profile_dataset_rules(
         headers, rows, missing_cells=total_cells - populated_cells,
         duplicate_rows=duplicate_rows,
