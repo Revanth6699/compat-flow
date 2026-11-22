@@ -5,6 +5,7 @@ source columns are present and never claim external/reference validation.
 """
 from __future__ import annotations
 
+import json
 import re
 from collections import Counter
 from datetime import datetime
@@ -111,4 +112,79 @@ def profile_dataset_rules(headers: list[str], rows: list[dict[str, Any]]) -> dic
             duplicate_count = sum(count - 1 for count in Counter(ids).values() if count > 1)
             add_check("DUPLICATE_CUSTOMER_IDENTIFIER", "Duplicate customer identifiers", duplicate_count, f"{duplicate_count} repeated customer identifier values were found.", "Confirm whether repeated IDs represent duplicate customer records or legitimate multiple transactions.")
 
-    return {"dataset_type": dataset_type, "domain_checks": checks, "domain_issues": issues}
+    # A stable rule catalogue is returned for every dataset, not only when a
+    # domain-specific rule happens to match. This makes applicability explicit
+    # and prevents an absent check from being mistaken for a successful check.
+    missing_cells = sum(
+        1 for row in rows for column in headers
+        if row.get(column) is None or str(row.get(column)).strip() == ""
+    )
+    row_keys = [
+        json.dumps([row.get(column) for column in headers], ensure_ascii=False,
+                   sort_keys=True, separators=(",", ":"), default=str)
+        for row in rows
+    ]
+    duplicate_rows = sum(count - 1 for count in Counter(row_keys).values() if count > 1)
+
+    evaluated = {item["code"]: item for item in checks}
+    rule_definitions = [
+        ("MISSING_VALUES", "Missing values", "structural", "warning", None),
+        ("EXACT_DUPLICATE_ROWS", "Exact duplicate rows", "structural", "warning", None),
+        ("UNRECOGNIZED_ORDER_STATUS", "Unrecognized order statuses", "orders / transactions", "warning", "orders / transactions"),
+        ("DELIVERY_BEFORE_PURCHASE", "Delivery date precedes purchase date", "orders / transactions", "critical", "orders / transactions"),
+        ("NEGATIVE_INVENTORY_QUANTITY", "Negative inventory quantities", "inventory", "critical", "inventory"),
+        ("INVENTORY_BALANCE_MISMATCH", "Available stock does not reconcile", "inventory", "warning", "inventory"),
+        ("NON_POSITIVE_SUPPLIER_PRICE", "Non-positive supplier prices", "supplier offers", "warning", "supplier offers"),
+        ("INVALID_MINIMUM_ORDER_QUANTITY", "Invalid minimum order quantities", "supplier offers", "warning", "supplier offers"),
+        ("NEGATIVE_TRANSACTION_AMOUNT", "Negative transaction amounts", "financial transactions", "warning", "financial transactions"),
+        ("INVALID_EMAIL_FORMAT", "Malformed email addresses", "customer records", "warning", "customer records"),
+        ("DUPLICATE_CUSTOMER_IDENTIFIER", "Duplicate customer identifiers", "customer records", "warning", "customer records"),
+    ]
+    validation_rules = []
+    for code, title, category, severity, required_dataset in rule_definitions:
+        if code == "MISSING_VALUES":
+            validation_rules.append({
+                "code": code, "title": title, "category": category,
+                "severity": severity, "status": "evaluated",
+                "records_evaluated": len(rows), "issue_records": missing_cells,
+                "detail": f"{missing_cells} empty cells were found across the dataset.",
+                "recommendation": "Review missing values against the fields required by your business process.",
+            })
+        elif code == "EXACT_DUPLICATE_ROWS":
+            validation_rules.append({
+                "code": code, "title": title, "category": category,
+                "severity": severity, "status": "evaluated",
+                "records_evaluated": len(rows), "issue_records": duplicate_rows,
+                "detail": f"{duplicate_rows} rows repeat an earlier exact row.",
+                "recommendation": "Confirm whether repeated rows are accidental duplicates or legitimate repeated events.",
+            })
+        elif required_dataset != dataset_type:
+            validation_rules.append({
+                "code": code, "title": title, "category": category,
+                "severity": severity, "status": "not_applicable",
+                "records_evaluated": 0, "issue_records": None,
+                "detail": f"This check applies to {required_dataset} datasets, not {dataset_type}.",
+                "recommendation": "No action required unless the dataset is reclassified.",
+            })
+        else:
+            result = evaluated.get(code)
+            if result is None:
+                validation_rules.append({
+                    "code": code, "title": title, "category": category,
+                    "severity": severity, "status": "not_evaluated",
+                    "records_evaluated": 0, "issue_records": None,
+                    "detail": "The required source columns were not available, so this check could not run.",
+                    "recommendation": "Provide the relevant source columns or review the dataset profile.",
+                })
+            else:
+                validation_rules.append({
+                    **result, "category": category, "status": "evaluated",
+                    "records_evaluated": len(rows),
+                })
+
+    return {
+        "dataset_type": dataset_type,
+        "domain_checks": checks,
+        "domain_issues": issues,
+        "validation_rules": validation_rules,
+    }
