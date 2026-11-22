@@ -240,3 +240,66 @@ class ProductIdentifierResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+
+from typing import Literal
+
+
+ValidationRuleType = Literal[
+    "required", "unique", "numeric_min", "numeric_max",
+    "allowed_values", "min_length", "max_length",
+]
+ValidationSeverity = Literal["critical", "warning", "info"]
+
+
+class ValidationProfileCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    dataset_type: str = Field(min_length=1, max_length=60)
+    description: str | None = Field(default=None, max_length=500)
+
+
+class ValidationProfileResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    dataset_type: str
+    description: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ValidationRuleCreateRequest(BaseModel):
+    code: str = Field(min_length=2, max_length=80, pattern="^[A-Z][A-Z0-9_]+$")
+    name: str = Field(min_length=1, max_length=120)
+    field_name: str = Field(min_length=1, max_length=120)
+    rule_type: ValidationRuleType
+    config: dict = Field(default_factory=dict)
+    severity: ValidationSeverity = "warning"
+    enabled: bool = True
+
+
+class ValidationRuleUpdateRequest(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    field_name: str | None = Field(default=None, min_length=1, max_length=120)
+    config: dict | None = None
+    severity: ValidationSeverity | None = None
+    enabled: bool | None = None
+
+
+class ValidationRuleResponse(BaseModel):
+    id: uuid.UUID
+    profile_id: uuid.UUID
+    code: str
+    name: str
+    field_name: str
+    rule_type: ValidationRuleType
+    config: dict
+    severity: ValidationSeverity
+    enabled: bool
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
