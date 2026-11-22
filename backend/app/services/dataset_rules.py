@@ -58,6 +58,9 @@ def profile_dataset_rules(
         "product_height", "product_length_cm", "product_width_cm",
         "product_height_cm", "product_photos_qty", "image_url", "image",
         "price", "unit_price", "regular_price", "sale_price", "compare_at_price", "cost",
+        "mrp", "discount_percent", "discounted_selling_price", "available_quantity",
+        "stock_level", "stock_levels", "out_of_stock", "supplier_name", "supplier",
+        "merchant_id", "cluster_id", "cluster_label",
     }
     identity_hits = names & product_identity_fields
     attribute_hits = names & product_attribute_fields
@@ -222,6 +225,15 @@ def profile_dataset_rules(
             "product_length": ("product_length", "product_length_cm", "length", "length_cm"),
             "product_width": ("product_width", "product_width_cm", "width", "width_cm"),
             "product_height": ("product_height", "product_height_cm", "height", "height_cm"),
+            "product_list_price": ("mrp", "list_price", "regular_price", "compare_at_price", "original_price"),
+            "product_selling_price": ("discounted_selling_price", "selling_price", "sale_price", "unit_price", "price"),
+            "discount_percent": ("discount_percent", "discountpercentage", "discount_pct"),
+            "available_stock": ("available_quantity", "available_qty", "stock_level", "stock_levels", "stock_quantity", "quantity_available", "quantity_on_hand"),
+            "out_of_stock": ("out_of_stock", "outofstock", "is_out_of_stock"),
+            "supplier_name": ("supplier_name", "supplier"),
+            "merchant_id": ("merchant_id", "seller_id", "retailer_id"),
+            "product_cluster_id": ("cluster_id", "product_cluster_id"),
+            "product_cluster_label": ("cluster_label", "product_cluster_label"),
         }
         field_mappings = {
             canonical: by_name[alias]
@@ -507,6 +519,112 @@ def profile_dataset_rules(
             duplicate_count = sum(count - 1 for count in Counter(ids).values() if count > 1)
             add_check("DUPLICATE_CUSTOMER_IDENTIFIER", "Duplicate customer identifiers", duplicate_count, f"{duplicate_count} repeated customer identifier values were found.", "Confirm whether repeated IDs represent duplicate customer records or legitimate multiple transactions.")
 
+    # Inventory and commercial attributes can coexist with a product master.
+    # Evaluate their checks from column evidence without changing the primary profile.
+    inventory_quantity_col = header(
+        "available_quantity", "available_qty", "stock_level", "stock_levels",
+        "stock_quantity", "quantity_available", "quantity_on_hand",
+    )
+    out_of_stock_col = header("out_of_stock", "outofstock", "is_out_of_stock")
+    if dataset_type != "inventory" and inventory_quantity_col:
+        invalid_stock = sum(
+            1 for row in rows
+            if row.get(inventory_quantity_col) not in (None, "")
+            and (
+                _number(row.get(inventory_quantity_col)) is None
+                or _number(row.get(inventory_quantity_col)) < 0
+            )
+        )
+        add_check(
+            "NEGATIVE_INVENTORY_QUANTITY", "Negative or invalid inventory quantities", invalid_stock,
+            f"{invalid_stock} records contain a non-numeric or negative stock quantity.",
+            "Provide a numeric non-negative stock quantity. Keep pack size and product quantity separate from available inventory.",
+            "critical",
+        )
+
+    if out_of_stock_col:
+        accepted_boolean_values = {"true", "false", "1", "0", "yes", "no", "y", "n"}
+        invalid_status = sum(
+            1 for row in rows
+            if row.get(out_of_stock_col) not in (None, "")
+            and str(row.get(out_of_stock_col)).strip().casefold() not in accepted_boolean_values
+        )
+        add_check(
+            "INVALID_OUT_OF_STOCK_STATUS", "Invalid out-of-stock status", invalid_status,
+            f"{invalid_status} records contain an out-of-stock value that is not a recognized boolean.",
+            "Use true/false, yes/no or 1/0 for the out-of-stock flag.",
+        )
+        if inventory_quantity_col:
+            conflicts = 0
+            for row in rows:
+                raw_status = row.get(out_of_stock_col)
+                stock = _number(row.get(inventory_quantity_col))
+                if raw_status in (None, "") or stock is None:
+                    continue
+                status = str(raw_status).strip().casefold()
+                is_out = status in {"true", "1", "yes", "y"}
+                is_in = status in {"false", "0", "no", "n"}
+                if (is_out and stock > 0) or (is_in and stock <= 0):
+                    conflicts += 1
+            add_check(
+                "OUT_OF_STOCK_QUANTITY_CONFLICT", "Out-of-stock status conflicts with quantity",
+                conflicts,
+                f"{conflicts} records have an out-of-stock flag inconsistent with the available quantity.",
+                "Check reservations, fulfillment rules and the source system's definition of available quantity before correcting the status.",
+            )
+
+    list_price_col = header("mrp", "list_price", "regular_price", "compare_at_price", "original_price")
+    selling_price_col = header("discounted_selling_price", "selling_price", "sale_price", "unit_price", "price")
+    for column, code, title in (
+        (list_price_col, "NON_POSITIVE_PRODUCT_LIST_PRICE", "Non-positive product list price"),
+        (selling_price_col, "NON_POSITIVE_PRODUCT_SELLING_PRICE", "Non-positive product selling price"),
+    ):
+        if column:
+            invalid = sum(
+                1 for row in rows
+                if row.get(column) not in (None, "")
+                and (_number(row.get(column)) is None or _number(row.get(column)) <= 0)
+            )
+            add_check(
+                code, title, invalid,
+                f"{invalid} non-empty values are non-numeric or not greater than zero.",
+                "Provide a positive numeric price. Currency is not inferred; configure the source currency separately.",
+            )
+
+    discount_col = header("discount_percent", "discountpercentage", "discount_pct")
+    if discount_col:
+        invalid_discount = sum(
+            1 for row in rows
+            if row.get(discount_col) not in (None, "")
+            and (
+                _number(row.get(discount_col)) is None
+                or _number(row.get(discount_col)) < 0
+                or _number(row.get(discount_col)) > 100
+            )
+        )
+        add_check(
+            "INVALID_DISCOUNT_PERCENT", "Invalid discount percentage", invalid_discount,
+            f"{invalid_discount} non-empty discount values are not numeric percentages between 0 and 100.",
+            "Use a numeric percentage from 0 through 100; confirm whether the source stores a fraction or percentage.",
+        )
+        if list_price_col and selling_price_col:
+            mismatches = 0
+            for row in rows:
+                list_price = _number(row.get(list_price_col))
+                selling_price = _number(row.get(selling_price_col))
+                discount = _number(row.get(discount_col))
+                if list_price is None or selling_price is None or discount is None:
+                    continue
+                expected = list_price * (1 - discount / 100)
+                if abs(selling_price - expected) > max(0.02, abs(expected) * 0.01):
+                    mismatches += 1
+            add_check(
+                "DISCOUNTED_PRICE_MISMATCH", "Discounted price does not match declared discount",
+                mismatches,
+                f"{mismatches} records differ from the declared percentage discount by more than rounding tolerance.",
+                "Recalculate the selling price from list price and discount, allowing for source rounding rules.",
+            )
+
     # A stable rule catalogue is returned for every dataset, not only when a
     # domain-specific rule happens to match. This makes applicability explicit
     # and prevents an absent check from being mistaken for a successful check.
@@ -550,6 +668,13 @@ def profile_dataset_rules(
         ("SELF_REFERENCING_PRODUCT", "Product references itself as parent", "product catalog", "critical", "product catalog"),
         ("ORPHAN_REPLACEMENT_SKU", "Replacement SKU not found", "product catalog", "critical", "product catalog"),
         ("SELF_REPLACING_PRODUCT", "Product replaces itself", "product catalog", "critical", "product catalog"),
+        ("NON_POSITIVE_PRODUCT_LIST_PRICE", "Non-positive product list price", "product catalog", "warning", "product catalog"),
+        ("NON_POSITIVE_PRODUCT_SELLING_PRICE", "Non-positive product selling price", "product catalog", "warning", "product catalog"),
+        ("INVALID_DISCOUNT_PERCENT", "Invalid discount percentage", "product catalog", "warning", "product catalog"),
+        ("DISCOUNTED_PRICE_MISMATCH", "Discounted price does not match declared discount", "product catalog", "warning", "product catalog"),
+        ("NEGATIVE_INVENTORY_QUANTITY", "Negative inventory quantities", "inventory", "critical", "inventory"),
+        ("INVALID_OUT_OF_STOCK_STATUS", "Invalid out-of-stock status", "inventory", "warning", "inventory"),
+        ("OUT_OF_STOCK_QUANTITY_CONFLICT", "Out-of-stock status conflicts with quantity", "inventory", "warning", "inventory"),
         ("PRICE_WITHOUT_CURRENCY", "Price missing currency", "supplier offers", "critical", "supplier offers"),
         ("INVALID_CURRENCY_FORMAT", "Invalid currency code format", "supplier offers", "warning", "supplier offers"),
         ("UNRECOGNIZED_ORDER_STATUS", "Unrecognized order statuses", "orders / transactions", "warning", "orders / transactions"),
@@ -580,6 +705,25 @@ def profile_dataset_rules(
                 "detail": f"{duplicate_rows} rows repeat an earlier exact row.",
                 "recommendation": "Confirm whether repeated rows are accidental duplicates or legitimate repeated events.",
             })
+        elif required_dataset == "inventory" and (
+            dataset_type == "inventory"
+            or inventory_quantity_col is not None
+            or out_of_stock_col is not None
+        ):
+            result = evaluated.get(code)
+            if result is None:
+                validation_rules.append({
+                    "code": code, "title": title, "category": category,
+                    "severity": severity, "status": "not_evaluated",
+                    "records_evaluated": 0, "issue_records": None,
+                    "detail": "Inventory-related columns were present, but the required fields for this check were incomplete.",
+                    "recommendation": "Provide the relevant inventory fields or configure the applicable business rule.",
+                })
+            else:
+                validation_rules.append({
+                    **result, "category": category, "status": "evaluated",
+                    "records_evaluated": len(rows),
+                })
         elif required_dataset != dataset_type:
             validation_rules.append({
                 "code": code, "title": title, "category": category,
