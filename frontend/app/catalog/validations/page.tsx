@@ -118,6 +118,7 @@ export default function ValidationProfilesPage() {
         });
       }
       setEditingRuleId(null); setRuleCode(""); setRuleName(""); setFieldName(""); setRuleConfig("{}");
+      setEvaluation(null);
       await loadRules(selectedId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create validation rule.");
@@ -133,6 +134,7 @@ export default function ValidationProfilesPage() {
     setRuleConfig(JSON.stringify(rule.config ?? {}, null, 2));
     setSeverity(rule.severity);
     setError("");
+    setEvaluation(null);
   }
 
   async function toggleRule(rule: ValidationRule) {
@@ -143,6 +145,7 @@ export default function ValidationProfilesPage() {
         body: JSON.stringify({ enabled: !rule.enabled }),
         headers: { "Content-Type": "application/json" },
       });
+      setEvaluation(null);
       await loadRules(selectedId);
     } catch (err) { setError(err instanceof Error ? err.message : "Could not update rule."); }
   }
@@ -151,6 +154,7 @@ export default function ValidationProfilesPage() {
     setError("");
     try {
       await apiRequest<void>(`/api/v1/validation/profiles/${selectedId}/rules/${rule.id}`, { method: "DELETE" });
+      setEvaluation(null);
       await loadRules(selectedId);
     } catch (err) { setError(err instanceof Error ? err.message : "Could not delete rule."); }
   }
@@ -163,6 +167,7 @@ export default function ValidationProfilesPage() {
         body: JSON.stringify({ is_active: !profile.is_active }),
         headers: { "Content-Type": "application/json" },
       });
+      setEvaluation(null);
       await loadProfiles();
     } catch (err) { setError(err instanceof Error ? err.message : "Could not update profile."); }
   }
@@ -247,10 +252,10 @@ export default function ValidationProfilesPage() {
 
         {selectedProfile?.is_active && rules.some((rule) => rule.enabled) && <section className="panel import-panel">
           <h2>Evaluate custom rules</h2>
-          <p className="import-description">This currently evaluates a newly selected upload. It does not retain the file or support revalidation without re-upload yet.</p>
+          <p className="import-description">The selected file stays in this browser tab while you edit rules, so you do not need to choose it again. Each evaluation request sends the file to the backend again; CompatFlow does not retain the uploaded file after the request.</p>
           <form onSubmit={runEvaluation} className="form-grid">
             <label>Dataset file<input type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} required /></label>
-            <button className="button" type="submit" disabled={!file || loading}>Run custom validation</button>
+            <button className="button" type="submit" disabled={!file || loading}>{evaluation ? "Re-run selected file" : "Run custom validation"}</button>
           </form>
           {evaluation && <>
             <p>{evaluation.filename} · {evaluation.total_records.toLocaleString()} records</p>
