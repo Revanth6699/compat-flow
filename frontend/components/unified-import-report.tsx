@@ -123,7 +123,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
       {Object.keys(productFieldMappings).length > 0 && <details className="panel result-section report-detail">
         <summary><span>Product field mapping</span><small>{Object.keys(productFieldMappings).length} canonical fields mapped</small></summary>
         <h3>Product field mapping</h3>
-        <p className="import-description">CompatFlow matched source columns to canonical product attributes. These are header-based mappings, not proof that the source values satisfy your organization's business rules.</p>
+        <p className="import-description">CompatFlow matched source columns to canonical product attributes. These are header-based mappings, not proof that the source values satisfy your organization&apos;s business rules.</p>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical product field</th><th>Source column</th></tr></thead><tbody>{Object.entries(productFieldMappings).map(([field, source]) => <tr key={field}><td>{field.replaceAll("_", " ")}</td><td>{source}</td></tr>)}</tbody></table></div>
       </details>}
 
