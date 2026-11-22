@@ -97,7 +97,7 @@ PROFILES: dict[str, dict[str, Any]] = {
 }
 
 NUMERIC_NONNEGATIVE = {
-    "name_length", "description_length", "image_count", "weight_g", "length_cm",
+    "name_length", "description_length", "image_count", "weight_g", "list_price", "length_cm",
     "height_cm", "width_cm", "unit_price", "quantity", "quantity_on_hand",
     "quantity_reserved", "quantity_available", "moq", "order_multiple", "lead_time_days", "year",
     "voltage", "power_w", "frequency_hz", "capacity", "diameter", "pressure_rating",
