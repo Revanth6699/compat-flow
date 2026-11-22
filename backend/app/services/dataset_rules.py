@@ -6,6 +6,7 @@ source columns are present and never claim external/reference validation.
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections import Counter
 from datetime import datetime
@@ -238,7 +239,7 @@ def profile_dataset_rules(
                 if value is None or not str(value).strip():
                     continue
                 number = _number(value)
-                if number is None or (integer and not number.is_integer()):
+                if number is None or not math.isfinite(number) or (integer and not number.is_integer()):
                     invalid += 1
                 elif minimum is not None and (number <= minimum if strict_minimum else number < minimum):
                     invalid += 1
