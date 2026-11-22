@@ -83,6 +83,76 @@ def profile_dataset_rules(
                 "Confirm whether repeated SKUs are duplicate products or legitimate variant/location records; choose the matching dataset grain.",
                 "critical",
             )
+
+        # Validate only explicit relationships whose target keys are present in
+        # this same dataset. Never treat a missing external master file as proof
+        # that a reference is invalid.
+        product_id_col = header("product_id", "source_product_id", "item_id")
+        parent_col = header("parent_product_id", "parent_id")
+        if product_id_col and parent_col:
+            known_product_ids = {
+                str(row.get(product_id_col)).strip().casefold()
+                for row in rows
+                if row.get(product_id_col) not in (None, "")
+                and str(row.get(product_id_col)).strip()
+            }
+            orphan_parents = 0
+            self_parent_references = 0
+            for row in rows:
+                product_id = row.get(product_id_col)
+                parent_id = row.get(parent_col)
+                if parent_id in (None, "") or not str(parent_id).strip():
+                    continue
+                normalized_parent = str(parent_id).strip().casefold()
+                if product_id not in (None, "") and normalized_parent == str(product_id).strip().casefold():
+                    self_parent_references += 1
+                elif normalized_parent not in known_product_ids:
+                    orphan_parents += 1
+            add_check(
+                "ORPHAN_PRODUCT_PARENT", "Product parent reference not found", orphan_parents,
+                f"{orphan_parents} product records reference a parent ID that is absent from this dataset.",
+                "Include the referenced parent product or correct the parent ID. External references are not checked by this file-level rule.",
+                "critical",
+            )
+            add_check(
+                "SELF_REFERENCING_PRODUCT", "Product references itself as parent", self_parent_references,
+                f"{self_parent_references} product records use their own product ID as the parent ID.",
+                "Correct the parent relationship; a product cannot be its own parent.",
+                "critical",
+            )
+
+        replacement_col = header("replacement_sku", "superseded_by_sku")
+        if sku_col and replacement_col:
+            known_skus = {
+                str(row.get(sku_col)).strip().casefold()
+                for row in rows
+                if row.get(sku_col) not in (None, "")
+                and str(row.get(sku_col)).strip()
+            }
+            orphan_replacements = 0
+            self_replacements = 0
+            for row in rows:
+                replacement = row.get(replacement_col)
+                sku = row.get(sku_col)
+                if replacement in (None, "") or not str(replacement).strip():
+                    continue
+                normalized_replacement = str(replacement).strip().casefold()
+                if sku not in (None, "") and normalized_replacement == str(sku).strip().casefold():
+                    self_replacements += 1
+                elif normalized_replacement not in known_skus:
+                    orphan_replacements += 1
+            add_check(
+                "ORPHAN_REPLACEMENT_SKU", "Replacement SKU not found", orphan_replacements,
+                f"{orphan_replacements} product records point to a replacement SKU that is absent from this dataset.",
+                "Include the replacement product or correct the replacement SKU. References outside this dataset are not checked.",
+                "critical",
+            )
+            add_check(
+                "SELF_REPLACING_PRODUCT", "Product replaces itself", self_replacements,
+                f"{self_replacements} product records use their own SKU as the replacement SKU.",
+                "Correct the replacement relationship; a product cannot replace itself.",
+                "critical",
+            )
     elif dataset_type == "orders / transactions":
         status_col = header("order_status", "status")
         if status_col:
@@ -186,6 +256,10 @@ def profile_dataset_rules(
         ("EXACT_DUPLICATE_ROWS", "Exact duplicate rows", "structural", "warning", None),
         ("MISSING_PRODUCT_SKU", "Missing product SKUs", "product catalog", "critical", "product catalog"),
         ("DUPLICATE_PRODUCT_SKU", "Duplicate product SKUs", "product catalog", "critical", "product catalog"),
+        ("ORPHAN_PRODUCT_PARENT", "Product parent reference not found", "product catalog", "critical", "product catalog"),
+        ("SELF_REFERENCING_PRODUCT", "Product references itself as parent", "product catalog", "critical", "product catalog"),
+        ("ORPHAN_REPLACEMENT_SKU", "Replacement SKU not found", "product catalog", "critical", "product catalog"),
+        ("SELF_REPLACING_PRODUCT", "Product replaces itself", "product catalog", "critical", "product catalog"),
         ("PRICE_WITHOUT_CURRENCY", "Price missing currency", "supplier offers", "critical", "supplier offers"),
         ("INVALID_CURRENCY_FORMAT", "Invalid currency code format", "supplier offers", "warning", "supplier offers"),
         ("UNRECOGNIZED_ORDER_STATUS", "Unrecognized order statuses", "orders / transactions", "warning", "orders / transactions"),
