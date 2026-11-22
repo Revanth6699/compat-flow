@@ -229,6 +229,8 @@ def profile_dataset_rules(
             if (alias := next((candidate for candidate in aliases if candidate in by_name), None))
         }
 
+        category_col = next((by_name[name] for name in product_field_aliases["product_category"] if name in by_name), None)
+
         # Keep source-level evidence for every product-master finding. Row numbers
         # are one-based source rows including the header row (first data row = 2).
         issue_details: list[dict[str, Any]] = []
