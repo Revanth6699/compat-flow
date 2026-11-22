@@ -232,6 +232,10 @@ def test_duplicate_aliases_are_explicitly_reported_as_ambiguous_not_auto_mapped(
         "field": "sku",
         "source_headers": ["sku", "seller_sku"],
     }]
+    assert result["mapping_diagnostics"]["source_column_count"] == 3
+    assert result["mapping_diagnostics"]["mapped_column_count"] == 1
+    assert result["mapping_diagnostics"]["unmapped_column_count"] == 2
+    assert result["mapping_diagnostics"]["ambiguous_field_count"] == 1
     assert {
         item["reason"] for item in result["unmapped_header_details"]
         if item["candidate_field"] == "sku"
@@ -291,3 +295,22 @@ def test_currency_validation_does_not_claim_iso_registry_membership():
 
     assert not any(issue["error_code"] == "INVALID_CURRENCY_CODE" for issue in result["issues"])
     assert "ISO 4217 registry membership is not verified" in result["currency_validation_scope"]
+
+
+def test_issue_and_row_totals_reconcile_when_one_row_has_multiple_severities():
+    result = validate_industry_csv(
+        "title,mrp,discountedSellingPrice,currency\n"
+        "First,10,12,\n"
+        "Second,10,12,USD\n",
+        profile_id="ecommerce",
+    )
+
+    metrics = result["metrics"]
+    assert metrics["issue_count"] == (
+        metrics["critical_issue_count"] + metrics["warning_issue_count"]
+    )
+    assert metrics["issue_count"] == sum(metrics["issue_counts_by_code"].values())
+    assert metrics["rows_with_critical_issues"] == 1
+    assert metrics["rows_with_warning_issues"] == 2
+    assert metrics["rows_with_any_issue"] == 2
+    assert result["valid_rows"] + result["invalid_rows"] == result["total_rows"] == 2
