@@ -207,7 +207,7 @@ def test_industry_issue_metrics_count_all_findings_even_when_details_are_capped(
 
 def test_industry_warning_only_rows_remain_valid_but_are_counted_for_review():
     result = validate_industry_csv(
-        "title,mrp,discountedSellingPrice\\nWidget,10,12\\n",
+        "title,mrp,discountedSellingPrice,currency\\nWidget,10,12,USD\\n",
         profile_id="ecommerce",
     )
 
