@@ -2,6 +2,7 @@ from pydantic import BaseModel, ConfigDict, Field
 import uuid
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 
 class HealthResponse(BaseModel):
@@ -241,9 +242,6 @@ class ProductIdentifierResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-
-
-from typing import Literal
 
 
 ValidationRuleType = Literal[
