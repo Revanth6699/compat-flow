@@ -41,20 +41,22 @@ def profile_dataset_rules(
     product_identity_fields = {
         "product_id", "source_product_id", "item_id", "sku", "product_sku",
         "item_sku", "seller_sku", "variant_sku", "product_code", "item_code",
+        "item_number", "material_number", "material_code", "article_number",
         "barcode", "ean", "upc", "gtin", "mpn", "manufacturer_part_number",
-        "part_number", "asin",
+        "part_number", "asin", "variant_id",
     }
     product_attribute_fields = {
         "product_name", "item_name", "name", "title", "product_title",
         "item_title", "description", "product_description", "short_description",
-        "long_description", "product_category", "product_category_name",
-        "category", "category_name", "brand", "brand_name", "manufacturer",
-        "manufacturer_name", "vendor", "product_type", "product_type_name",
+        "long_description", "body", "body_html", "product_category", "product_category_name",
+        "category", "category_name", "product_group", "item_group", "brand",
+        "brand_name", "manufacturer", "manufacturer_name", "vendor", "product_type",
+        "product_type_name", "item_description", "material_description",
         "product_weight", "weight", "weight_g", "product_weight_g",
         "length", "width", "height", "product_length", "product_width",
         "product_height", "product_length_cm", "product_width_cm",
         "product_height_cm", "product_photos_qty", "image_url", "image",
-        "price", "unit_price", "compare_at_price", "cost",
+        "price", "unit_price", "regular_price", "sale_price", "compare_at_price", "cost",
     }
     identity_hits = names & product_identity_fields
     attribute_hits = names & product_attribute_fields
