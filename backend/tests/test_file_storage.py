@@ -59,3 +59,48 @@ def test_production_refuses_local_storage_fallback(monkeypatch):
     upload = UploadFile(filename="catalog.csv", file=io.BytesIO(b"sku\nA-1\n"))
     with pytest.raises(FileStorageError, match="not configured"):
         asyncio.run(save_import_file(upload))
+
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected_suffix"),
+    [
+        ("catalog.csv", ".csv"),
+        ("catalog.xls", ".xls"),
+        ("catalog.xlsx", ".xlsx"),
+        ("catalog.json", ".json"),
+        ("catalog.xml", ".xml"),
+    ],
+)
+def test_local_storage_round_trips_supported_import_extensions(
+    tmp_path, monkeypatch, filename, expected_suffix
+):
+    monkeypatch.setattr(settings, "app_env", "development")
+    monkeypatch.setattr(settings, "supabase_url", "")
+    monkeypatch.setattr(settings, "supabase_service_role_key", "")
+    monkeypatch.setattr(settings, "import_storage_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "import_max_upload_bytes", 1024)
+
+    payload = b"test-payload"
+    upload = UploadFile(filename=filename, file=io.BytesIO(payload))
+    key = asyncio.run(save_import_file(upload))
+
+    assert key.endswith(expected_suffix)
+    stored = get_storage_path(key)
+    assert stored.read_bytes() == payload
+
+    destination = tmp_path / "worker" / f"download{expected_suffix}"
+    download_import_file(key, destination)
+    assert destination.read_bytes() == payload
+
+
+def test_local_storage_rejects_unsupported_extension(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "app_env", "development")
+    monkeypatch.setattr(settings, "import_storage_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "import_max_upload_bytes", 1024)
+
+    upload = UploadFile(filename="payload.exe", file=io.BytesIO(b"no"))
+    with pytest.raises(FileStorageError, match="Unsupported import file type"):
+        asyncio.run(save_import_file(upload))
+
+    assert list(tmp_path.iterdir()) == []
