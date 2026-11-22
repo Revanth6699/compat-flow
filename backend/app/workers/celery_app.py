@@ -1,5 +1,7 @@
 from celery import Celery
+
 from app.core.config import settings
+
 
 celery_app = Celery(
     "compatflow",
@@ -14,5 +16,10 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_acks_late=True,
+    task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
+    worker_max_tasks_per_child=100,
+    task_soft_time_limit=25 * 60,
+    task_time_limit=30 * 60,
+    broker_connection_retry_on_startup=True,
 )
