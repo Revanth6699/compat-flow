@@ -49,7 +49,7 @@ ALIASES: dict[str, set[str]] = {
     "colour": {"colour", "color", "color_name"},
     "material": {"material", "fabric", "composition"},
     "image_count": {"product_photos_qty", "image_count", "photo_count"},
-    "weight_g": {"product_weight_g", "weight_g"},
+    "weight_g": {"product_weight_g", "weight_g", "weight_in_gms", "weightingms"},
     "length_cm": {"product_length_cm", "length_cm"},
     "height_cm": {"product_height_cm", "height_cm"},
     "width_cm": {"product_width_cm", "width_cm"},
@@ -57,7 +57,6 @@ ALIASES: dict[str, set[str]] = {
     "list_price": {"mrp", "list_price", "maximum_retail_price", "regular_price"},
     "discount_percent": {"discount_percent", "discountpercentage", "discount_pct"},
     "out_of_stock": {"out_of_stock", "outofstock", "is_out_of_stock"},
-    "weight_g": {"weight_g", "weight_in_gms", "weightingms"},
     "currency": {"currency", "currency_code"},
     "quantity": {"quantity", "stock", "inventory_qty"},
     "quantity_available": {"quantity_available", "available_qty", "available_quantity", "availablequantity"},
@@ -137,7 +136,10 @@ class IndustryCSVError(ValueError):
 
 
 def normalize_header(value: str) -> str:
-    value = unicodedata.normalize("NFKC", value).strip().casefold()
+    value = unicodedata.normalize("NFKC", value).strip()
+    # Separate camel-case boundaries before case-folding so marketplace exports
+    # such as availableQuantity and discountedSellingPrice map consistently.
+    value = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", value).casefold()
     return re.sub(r"[^a-z0-9]+", "_", value).strip("_")
 
 
