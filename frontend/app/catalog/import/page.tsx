@@ -24,12 +24,12 @@ type DatasetProfile = {
   preview: Record<string, unknown>[];
 };
 type IndustryResult = {
-  filename: string; profile_id: string | null; profile_detection: { profile_id: string | null; confidence: number; scores: Record<string, number>; needs_confirmation: boolean };
+  filename: string; profile_id: string | null; profile_detection: { profile_id: string | null; confidence: number; scores: Record<string, number>; needs_confirmation: boolean; decision_reason?: string; top_candidates?: { profile_id: string; score: number }[]; evidence_fields?: string[]; confidence_method?: string };
   requires_profile_confirmation: boolean; total_rows: number; valid_rows: number; invalid_rows: number;
   validation_pass_rate: number; column_mappings: { field: string; source_header: string; confidence: number }[];
-  unmapped_headers: string[]; field_metrics: { field: string; applicable: boolean; populated: number; missing: number; completeness_pct: number }[];
+  unmapped_headers: string[]; unmapped_header_details?: { source_header: string; reason: string; candidate_field: string | null }[]; ambiguous_mappings?: { field: string; source_headers: string[] }[]; mapping_diagnostics?: { source_column_count: number; mapped_column_count: number; unmapped_column_count: number; ambiguous_field_count: number; confidence_method: string }; field_metrics: { field: string; applicable: boolean; populated: number; missing: number; completeness_pct: number }[];
   issues: { row_number: number; field: string | null; error_code: string; message: string; severity: string }[];
-  preview: Record<string, unknown>[]; metrics: { mapping_coverage_pct: number; validation_pass_rate_pct: number; issue_count: number; critical_issue_count: number; warning_issue_count: number };
+  preview: Record<string, unknown>[]; metrics: { mapping_coverage_pct: number; validation_pass_rate_pct: number; issue_count: number; returned_issue_count?: number; issues_truncated?: boolean; critical_issue_count: number; warning_issue_count: number; issue_counts_by_code?: Record<string, number>; rows_with_critical_issues?: number; rows_with_warning_issues?: number; rows_with_any_issue?: number };
   persisted: false; validation_scope: string;
 };
 type PreviewRow = {
@@ -80,6 +80,7 @@ export default function CatalogImportPage() {
   const [datasetResult, setDatasetResult] = useState<DatasetProfile | null>(null);
   const [multiResult, setMultiResult] = useState<MultiResult | null>(null);
   const [industryResult, setIndustryResult] = useState<IndustryResult | null>(null);
+  const [selectedIndustryProfile, setSelectedIndustryProfile] = useState("ecommerce");
   const [error, setError] = useState("");
   const [jsonRecordPath, setJsonRecordPath] = useState("");
   const [jsonRecordPathOptions, setJsonRecordPathOptions] = useState<string[]>([]);
@@ -115,6 +116,11 @@ export default function CatalogImportPage() {
 
       if (demoApproved) {
         const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/preview-industry", { method: "POST", body: formData });
+        if (!data.profile_id && data.profile_detection.decision_reason === "ambiguous_tied_profiles") {
+          setIndustryResult(data);
+          setSelectedIndustryProfile(data.profile_detection.top_candidates?.[0]?.profile_id ?? "ecommerce");
+          return;
+        }
         if (!data.profile_id) {
           const profileForm = new FormData();
           profileForm.append("file", file);
@@ -146,6 +152,11 @@ export default function CatalogImportPage() {
       }
 
       const data = await apiRequest<IndustryResult>("/api/v1/catalog/import/validate-industry", { method: "POST", body: formData });
+      if (!data.profile_id && data.profile_detection.decision_reason === "ambiguous_tied_profiles") {
+        setIndustryResult(data);
+        setSelectedIndustryProfile(data.profile_detection.top_candidates?.[0]?.profile_id ?? "ecommerce");
+        return;
+      }
       if (!data.profile_id) {
         const profileForm = new FormData();
         profileForm.append("file", file);
@@ -185,6 +196,24 @@ export default function CatalogImportPage() {
         setJsonRecordPathOptions([]);
         setError(message);
       }
+    } finally { setLoading(false); }
+  }
+
+  async function confirmIndustryProfile() {
+    if (!file || !user || loading || !selectedIndustryProfile) return;
+    setLoading(true); setError("");
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      body.append("profile_id", selectedIndustryProfile);
+      if (jsonRecordPath) body.append("json_record_path", jsonRecordPath);
+      const endpoint = demoApproved
+        ? "/api/v1/catalog/import/preview-industry"
+        : "/api/v1/catalog/import/validate-industry";
+      const data = await apiRequest<IndustryResult>(endpoint, { method: "POST", body });
+      setIndustryResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not validate the selected industry profile.");
     } finally { setLoading(false); }
   }
 
@@ -374,6 +403,15 @@ export default function CatalogImportPage() {
           </div>}
         </section>
 
+        {industryResult && !industryResult.profile_id && industryResult.profile_detection.decision_reason === "ambiguous_tied_profiles" && <section className="panel import-panel">
+          <h2>Confirm the dataset industry</h2>
+          <p className="import-description">The source columns match more than one industry profile. CompatFlow will not guess. Select the profile that describes this dataset, then run its validation rules.</p>
+          <p className="import-description">Matching signals: {industryResult.profile_detection.evidence_fields?.join(", ") || "No decisive signals"}</p>
+          <label>Industry profile<select value={selectedIndustryProfile} onChange={(event) => setSelectedIndustryProfile(event.target.value)}>
+            {["d2c", "ecommerce", "automotive", "electronics", "industrial", "wholesale"].map((profile) => <option key={profile} value={profile}>{profile.replaceAll("_", " ")}</option>)}
+          </select></label>
+          <button className="button" type="button" onClick={confirmIndustryProfile} disabled={loading}>{loading ? "Validating…" : "Validate with selected profile"}</button>
+        </section>}
         <UnifiedImportReport datasetResult={datasetResult} industryResult={industryResult} multiResult={multiResult} result={result} onDownloadCsv={downloadReport} onDownloadJson={downloadProfileJson} onPrint={printReport} />
         {accessType !== "subscription" && <p className="import-disclaimer">Demonstration only. Do not upload confidential supplier files, personal information or production catalog data.</p>}
       </div>
