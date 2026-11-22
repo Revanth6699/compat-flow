@@ -599,3 +599,68 @@ class ConnectorRateLimit(Base):
     )
     window_start: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=False)
     request_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+
+
+class ValidationProfile(Base):
+    """Organization-owned, reusable set of dataset validation rules."""
+
+    __tablename__ = "validation_profiles"
+    __table_args__ = (
+        UniqueConstraint("organization_id", "id", name="uq_validation_profiles_org_id"),
+        UniqueConstraint("organization_id", "name", name="uq_validation_profiles_org_name"),
+        ForeignKeyConstraint(
+            ["organization_id", "created_by_user_id"],
+            ["users.organization_id", "users.id"],
+            name="fk_validation_profiles_org_creator",
+        ),
+        Index("ix_validation_profiles_org_dataset", "organization_id", "dataset_type"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    dataset_type: Mapped[str] = mapped_column(String(60), nullable=False)
+    description: Mapped[str | None] = mapped_column(String(500))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ValidationRule(Base):
+    """A safe declarative rule attached to an organization-owned profile."""
+
+    __tablename__ = "validation_rules"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["organization_id", "profile_id"],
+            ["validation_profiles.organization_id", "validation_profiles.id"],
+            name="fk_validation_rules_org_profile",
+        ),
+        UniqueConstraint("profile_id", "code", name="uq_validation_rules_profile_code"),
+        CheckConstraint(
+            "rule_type IN ('required', 'unique', 'numeric_min', 'numeric_max', "
+            "'allowed_values', 'min_length', 'max_length')",
+            name="ck_validation_rules_type",
+        ),
+        CheckConstraint("severity IN ('critical', 'warning', 'info')", name="ck_validation_rules_severity"),
+        Index("ix_validation_rules_org_profile_enabled", "organization_id", "profile_id", "enabled"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
+    )
+    profile_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    code: Mapped[str] = mapped_column(String(80), nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    field_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    rule_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict, server_default="{}")
+    severity: Mapped[str] = mapped_column(String(16), nullable=False, default="warning", server_default="warning")
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
