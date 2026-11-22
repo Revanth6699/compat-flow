@@ -57,24 +57,39 @@ export default function ValidationProfilesPage() {
   const loadProfiles = useCallback(async () => {
     const data = await apiRequest<ValidationProfile[]>("/api/v1/validation/profiles");
     setProfiles(data);
-    if (!selectedId && data.length) setSelectedId(data[0].id);
-  }, [selectedId]);
+    setSelectedId((current) => current || data[0]?.id || "");
+  }, []);
 
   const loadRules = useCallback(async (profileId: string) => {
-    if (!profileId) { setRules([]); return; }
     const data = await apiRequest<ValidationRule[]>(`/api/v1/validation/profiles/${profileId}/rules`);
     setRules(data);
   }, []);
 
   useEffect(() => {
     if (!user) return;
-    loadProfiles().catch((err) => setError(err instanceof Error ? err.message : "Could not load validation profiles."));
-  }, [user, loadProfiles]);
+    let active = true;
+    apiRequest<ValidationProfile[]>("/api/v1/validation/profiles")
+      .then((data) => {
+        if (!active) return;
+        setProfiles(data);
+        setSelectedId((current) => current || data[0]?.id || "");
+      })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : "Could not load validation profiles.");
+      });
+    return () => { active = false; };
+  }, [user]);
 
   useEffect(() => {
-    if (!selectedId) { setRules([]); return; }
-    loadRules(selectedId).catch((err) => setError(err instanceof Error ? err.message : "Could not load validation rules."));
-  }, [selectedId, loadRules]);
+    if (!selectedId) return;
+    let active = true;
+    apiRequest<ValidationRule[]>(`/api/v1/validation/profiles/${selectedId}/rules`)
+      .then((data) => { if (active) setRules(data); })
+      .catch((err) => {
+        if (active) setError(err instanceof Error ? err.message : "Could not load validation rules.");
+      });
+    return () => { active = false; };
+  }, [selectedId]);
 
   async function createProfile(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -240,7 +255,7 @@ export default function ValidationProfilesPage() {
             <button className="button" type="submit" disabled={loading}>{editingRuleId ? "Save rule changes" : "Add rule"}</button>
             {editingRuleId && <button className="button button-secondary" type="button" onClick={() => { setEditingRuleId(null); setRuleCode(""); setRuleName(""); setFieldName(""); setRuleConfig("{}"); }}>Cancel edit</button>}
           </form>
-          <p className="column-hint">Configuration examples: numeric minimum: {"{"}"value": 0{"}"} · allowed values: {"{"}"values": ["active", "inactive"]{"}"} · length: {"{"}"value": 10{"}"}. Required and unique use {"{}"}.</p>
+          <p className="column-hint">Configuration examples: <code>{'{"value": 0}'}</code> for numeric minimum, <code>{'{"values": ["active", "inactive"]}'}</code> for allowed values, and <code>{'{"value": 10}'}</code> for length. Required and unique use an empty object.</p>
         </section>}
 
         {selectedProfile && <section className="panel import-panel">
