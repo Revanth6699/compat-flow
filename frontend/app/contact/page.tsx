@@ -7,6 +7,10 @@ function ContactForm() {
  const requestedPlan=(searchParams.get("plan")||"").toLowerCase();
  const isPricing=searchParams.get("intent")==="pricing";
  const planLabel=["starter","growth","business","enterprise"].includes(requestedPlan)?requestedPlan.charAt(0).toUpperCase()+requestedPlan.slice(1):"CompatFlow";
+ const contactEmail="sarvasettyrevanth.66@gmail.com";
+ const operatorName="Sarvasetty Revanth Kumar";
+ const operatorAddress="9A-252, Kalyandurg, Anantapur, Andhra Pradesh, India - 515761";
+ const grievancePhone="+91 74164 76715";
  const [status,setStatus]=useState<"idle"|"sending"|"success"|"warning"|"error">("idle");
  const [message,setMessage]=useState("");
  const [form,setForm]=useState({name:"",email:"",organization:"",role:"",message:isPricing?`I am interested in the ${planLabel} plan. My team needs...`:"",website:""});
@@ -38,7 +42,7 @@ function ContactForm() {
      </div>
      <div className="contact-submit-row"><button className="button" type="submit" disabled={status==="sending"}>{status==="sending"?"Submitting...":isDemo?"Submit demo request":"Send message"}</button><span className={`contact-status ${status}`} role="status">{message}</span></div>
     </form>
-    <aside className="contact-aside"><h2>{isDemo?"What happens next?":isPricing?"Plan enquiry":"Talk to CompatFlow"}</h2><p>{isDemo?"We review each request individually. If approved, an invitation will be sent to the email address you provided. Submitting this form does not grant demo access.":isPricing?`Your enquiry is submitted to CompatFlow for review. No email application is needed.`:"Share the context of your supplier catalog workflow and the question you are trying to solve. We will review your message and respond by email."}</p><a href={`mailto:${process.env.NEXT_PUBLIC_CONTACT_EMAIL||"sarvasettyrevanth.66@gmail.com"}`}>Email CompatFlow</a></aside>
+    <aside className="contact-aside"><h2>{isDemo?"What happens next?":isPricing?"Plan enquiry":"Talk to CompatFlow"}</h2><p>{isDemo?"We review each request individually. If approved, an invitation will be sent to the email address you provided. Submitting this form does not grant demo access.":isPricing?`Your enquiry is submitted to CompatFlow for review. No email application is needed.`:"Share the context of your supplier catalog workflow and the question you are trying to solve. We will review your message and respond by email."}</p><div className="contact-business-details"><h3>Business and support details</h3><p><strong>Operator:</strong> {operatorName}, individual proprietor trading as CompatFlow</p><p><strong>Business address:</strong> {operatorAddress}</p><p><strong>Email:</strong> <a href={`mailto:${contactEmail}`}>{contactEmail}</a></p><p><strong>Phone / grievance contact:</strong> <a href="tel:+917416476715">{grievancePhone}</a></p></div></aside>
    </div>
   </div>
  </main>;
