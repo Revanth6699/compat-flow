@@ -84,8 +84,6 @@ def evaluate_custom_rules(
 
     results: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
-    unique_rules = [rule for rule in rules if rule.enabled and rule.rule_type == "unique"]
-
     with DiskBackedDuplicateTracker() as tracker:
         for rule in rules:
             if not rule.enabled:
@@ -139,10 +137,13 @@ def evaluate_custom_rules(
                     except (InvalidOperation, ValueError):
                         code, message = "INVALID_NUMBER", f"{field_name} must contain a numeric value."
                     else:
-                        threshold = Decimal(str(config["value"]))
-                        if rule.rule_type == "numeric_min" and number < threshold:
+                        if not number.is_finite():
+                            code, message = "INVALID_NUMBER", f"{field_name} must contain a finite numeric value."
+                            number = None
+                        threshold = Decimal(str(config["value"])) if number is not None else None
+                        if number is not None and rule.rule_type == "numeric_min" and number < threshold:
                             code, message = "BELOW_MINIMUM", f"{field_name} is below the configured minimum of {threshold}."
-                        elif rule.rule_type == "numeric_max" and number > threshold:
+                        elif number is not None and rule.rule_type == "numeric_max" and number > threshold:
                             code, message = "ABOVE_MAXIMUM", f"{field_name} exceeds the configured maximum of {threshold}."
                 elif rule.rule_type == "allowed_values":
                     evaluated_count += 1
