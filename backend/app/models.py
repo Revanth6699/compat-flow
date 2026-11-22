@@ -609,11 +609,6 @@ class ValidationProfile(Base):
     __table_args__ = (
         UniqueConstraint("organization_id", "id", name="uq_validation_profiles_org_id"),
         UniqueConstraint("organization_id", "name", name="uq_validation_profiles_org_name"),
-        ForeignKeyConstraint(
-            ["organization_id", "created_by_user_id"],
-            ["users.organization_id", "users.id"],
-            name="fk_validation_profiles_org_creator",
-        ),
         Index("ix_validation_profiles_org_dataset", "organization_id", "dataset_type"),
     )
 
@@ -621,7 +616,7 @@ class ValidationProfile(Base):
     organization_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
     )
-    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(\n        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")\n    )
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     dataset_type: Mapped[str] = mapped_column(String(60), nullable=False)
     description: Mapped[str | None] = mapped_column(String(500))
