@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
+import { RequestDemoLink } from "@/components/request-demo-link";
 
 const capabilities = [
   {
@@ -47,6 +48,7 @@ export default function HomePage() {
             <div className="home-hero-actions">
               {user ? <Link className="button" href="/workspace">Open workspace</Link> : <Link className="button" href="/contact?intent=demo">Request demo access</Link>}
               {user ? <Link className="button button-secondary" href="/catalog/import">Validate catalog</Link> : <Link className="button button-secondary" href="/pricing">Explore plans</Link>}
+              {user && <RequestDemoLink className="button button-secondary" /> }
             </div>
             <p className="home-hero-note">{user ? "You are signed in. Open your workspace to manage your organization and catalog operations." : "Request demo access. Demo access is reviewed and granted individually."}</p>
           </div>
