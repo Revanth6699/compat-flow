@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
-import { apiRequest, getCurrentProfile, updatePassword } from "@/lib/auth-client";
+import { apiRequest, getCurrentProfile } from "@/lib/auth-client";
 import { BrandedLoading, LoadingMetricCards, LoadingSkeleton } from "@/components/branded-loading";
 
 type Overview = {
@@ -37,11 +37,6 @@ export default function PlatformAdminPage() {
   const [reviews, setReviews] = useState<AdminReview[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordMessage, setPasswordMessage] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [passwordBusy, setPasswordBusy] = useState(false);
 
   const load = useCallback(async () => {
     const [summary, items, reviewItems] = await Promise.all([
@@ -81,23 +76,6 @@ export default function PlatformAdminPage() {
       });
     return () => { active = false; };
   }, [user]);
-
-  async function changeOwnerPassword(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setPasswordMessage("");
-    setPasswordError("");
-    if (newPassword.length < 10) { setPasswordError("Use a password with at least 10 characters."); return; }
-    if (newPassword !== confirmPassword) { setPasswordError("The passwords do not match."); return; }
-    setPasswordBusy(true);
-    try {
-      await updatePassword(newPassword);
-      setNewPassword("");
-      setConfirmPassword("");
-      setPasswordMessage("Your owner-account password has been updated.");
-    } catch (cause) {
-      setPasswordError(cause instanceof Error ? cause.message : "Could not update your password.");
-    } finally { setPasswordBusy(false); }
-  }
 
   async function moderateReview(id: string, decision: "publish" | "hide" | "delete") {
     setBusy(id); setError("");
@@ -189,22 +167,6 @@ export default function PlatformAdminPage() {
           </section>
 
           <div style={{ display: "grid", gap: 18 }}>
-            <section className="panel" aria-label="Owner account security" style={{ padding: 22, borderRadius: 11, borderColor: "#E2E8F0", boxShadow: "0 2px 8px rgba(15,23,42,.025)" }}>
-              <div className="eyebrow">ACCOUNT SECURITY</div>
-              <h2 style={{ margin: "7px 0 5px", color: "#1E293B", fontSize: 18 }}>Owner account</h2>
-              <p style={{ margin: "0 0 17px", color: "#64748B", fontSize: 12, overflowWrap: "anywhere" }}>sarvasettyrevanth.66@gmail.com</p>
-              <form className="auth-form" onSubmit={changeOwnerPassword}>
-                <label htmlFor="owner-new-password">New password</label>
-                <input id="owner-new-password" type="password" autoComplete="new-password" minLength={10} required value={newPassword} onChange={event => setNewPassword(event.target.value)} />
-                <label htmlFor="owner-confirm-password">Confirm new password</label>
-                <input id="owner-confirm-password" type="password" autoComplete="new-password" minLength={10} required value={confirmPassword} onChange={event => setConfirmPassword(event.target.value)} />
-                {passwordError && <p className="auth-error" role="alert">{passwordError}</p>}
-                {passwordMessage && <p className="auth-success" role="status">{passwordMessage}</p>}
-                <button className="button" style={{ width: "100%" }} disabled={passwordBusy}>{passwordBusy ? "Updating…" : "Update password"}</button>
-              </form>
-              <p style={{ margin: "13px 0 0", fontSize: 12 }}><Link href="/forgot-password">Reset password by email</Link></p>
-            </section>
-
             <section className="panel" aria-label="Platform operations" style={{ padding: 22, borderRadius: 11, borderColor: "#E2E8F0", boxShadow: "0 2px 8px rgba(15,23,42,.025)" }}>
               <div className="eyebrow">PLATFORM OPERATIONS</div>
               <h2 style={{ margin: "7px 0 14px", color: "#1E293B", fontSize: 18 }}>Service modules</h2>
