@@ -72,7 +72,12 @@ def profile_dataset_rules(
     ) or len(attribute_hits) >= 3 or len(identity_hits) >= 2
     if {"supplier_id", "unit_price"} <= names or {"supplier_sku", "unit_price"} <= names:
         dataset_type = "supplier offers"
-    elif names & {"quantity_on_hand", "quantity_available", "stock_quantity", "available_quantity"}:
+    elif (
+        names & {
+            "quantity_on_hand", "quantity_available", "stock_quantity", "available_quantity",
+            "stock_level", "stock_levels", "available_qty", "out_of_stock",
+        }
+    ) and not has_product_signature:
         dataset_type = "inventory"
     elif names & {"order_id", "order_status", "order_purchase_timestamp", "order_item_id"}:
         dataset_type = "orders / transactions"
