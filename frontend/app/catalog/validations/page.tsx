@@ -26,7 +26,7 @@ type ValidationRule = {
 type EvaluationResult = {
   filename: string;
   total_records: number;
-  rules: { code: string; name: string; status: string; records_evaluated: number; issue_records: number | null }[];
+  rules: { code: string; name: string; status: string; records_evaluated: number; records_skipped_missing?: number; issue_records: number | null }[];
   errors: { source_location: string; field: string; error_code: string; message: string; severity: string }[];
 };
 
