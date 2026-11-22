@@ -27,11 +27,7 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.ForeignKeyConstraint(["organization_id"], ["organizations.id"], ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(
-            ["organization_id", "created_by_user_id"],
-            ["users.organization_id", "users.id"],
-            name="fk_validation_profiles_org_creator",
-        ),
+        sa.ForeignKeyConstraint(["created_by_user_id"], ["users.id"], ondelete="SET NULL"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("organization_id", "id", name="uq_validation_profiles_org_id"),
         sa.UniqueConstraint("organization_id", "name", name="uq_validation_profiles_org_name"),
