@@ -6,6 +6,7 @@ source columns are present and never claim external/reference validation.
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections import Counter
 from datetime import datetime
@@ -205,6 +206,136 @@ def profile_dataset_rules(
                 "Correct the replacement relationship; a product cannot replace itself.",
                 "critical",
             )
+        # Canonical product attributes are mapped from common commerce, PIM,
+        # marketplace and ERP headers. These mappings are evidence-based and
+        # deliberately do not invent fields absent from the source file.
+        product_field_aliases = {
+            "source_product_id": ("product_id", "source_product_id", "catalog_id", "item_id", "source_item_id"),
+            "seller_sku": ("sku", "product_sku", "item_sku", "seller_sku", "variant_sku", "product_code", "item_code"),
+            "product_name": ("product_name", "item_name", "name", "title", "product_title", "item_title"),
+            "product_description": ("description", "product_description", "short_description", "long_description", "body", "body_html", "item_description", "material_description"),
+            "product_category": ("product_category", "product_category_name", "category", "category_name", "categories", "product_group", "item_group"),
+            "product_name_length": ("product_name_length", "product_name_lenght", "name_length", "title_length"),
+            "product_description_length": ("product_description_length", "product_description_lenght", "description_length"),
+            "product_photo_quantity": ("product_photos_qty", "photos_qty", "image_count", "images_count"),
+            "product_weight": ("product_weight", "product_weight_g", "weight", "weight_g", "gross_weight", "net_weight"),
+            "product_length": ("product_length", "product_length_cm", "length", "length_cm"),
+            "product_width": ("product_width", "product_width_cm", "width", "width_cm"),
+            "product_height": ("product_height", "product_height_cm", "height", "height_cm"),
+        }
+        field_mappings = {
+            canonical: by_name[alias]
+            for canonical, aliases in product_field_aliases.items()
+            if (alias := next((candidate for candidate in aliases if candidate in by_name), None))
+        }
+
+        def non_empty_values(column: str) -> list[Any]:
+            return [row.get(column) for row in rows if row.get(column) is not None and str(row.get(column)).strip()]
+
+        def invalid_numeric_count(column: str, *, integer: bool = False, minimum: float | None = None, strict_minimum: bool = False) -> int:
+            invalid = 0
+            for row in rows:
+                value = row.get(column)
+                if value is None or not str(value).strip():
+                    continue
+                number = _number(value)
+                if number is None or not math.isfinite(number) or (integer and not number.is_integer()):
+                    invalid += 1
+                elif minimum is not None and (number <= minimum if strict_minimum else number < minimum):
+                    invalid += 1
+            return invalid
+
+        # Identifier syntax checks are intentionally conservative: no universal
+        # SKU/GTIN/MPN format is assumed. We only flag control characters and
+        # leading/trailing whitespace, not vendor-specific identifier patterns.
+        identifier_col = source_id_col or sku_col
+        if identifier_col:
+            malformed_ids = sum(
+                1 for value in non_empty_values(identifier_col)
+                if str(value) != str(value).strip()
+                or any(ord(char) < 32 or ord(char) == 127 for char in str(value))
+            )
+            add_check(
+                "MALFORMED_PRODUCT_IDENTIFIER", "Malformed product identifiers", malformed_ids,
+                f"{malformed_ids} product identifiers contain leading/trailing whitespace or control characters.",
+                "Trim identifier whitespace and remove control characters without changing the source system's identifier semantics.",
+                "critical",
+            )
+
+        category_col = next((by_name[name] for name in product_field_aliases["product_category"] if name in by_name), None)
+        if category_col:
+            malformed_categories = sum(
+                1 for value in non_empty_values(category_col)
+                if str(value) != str(value).strip()
+                or any(ord(char) < 32 or ord(char) == 127 for char in str(value))
+            )
+            add_check(
+                "MALFORMED_PRODUCT_CATEGORY", "Malformed product category values", malformed_categories,
+                f"{malformed_categories} non-empty category values contain leading/trailing whitespace or control characters.",
+                "Normalize category text and remove control characters. CompatFlow does not assume a universal category taxonomy.",
+            )
+
+        for canonical, title, severity in (
+            ("product_name_length", "Invalid product name lengths", "warning"),
+            ("product_description_length", "Invalid product description lengths", "warning"),
+        ):
+            column = field_mappings.get(canonical)
+            if column:
+                invalid = invalid_numeric_count(column, integer=True, minimum=0)
+                add_check(
+                    f"INVALID_{canonical.upper()}",
+                    title,
+                    invalid,
+                    f"{invalid} values are not non-negative whole numbers.",
+                    "Use non-negative integer character counts; verify whether the source field measures characters, bytes or another unit.",
+                    severity,
+                )
+
+        photo_col = field_mappings.get("product_photo_quantity")
+        if photo_col:
+            invalid = invalid_numeric_count(photo_col, integer=True, minimum=0)
+            add_check(
+                "INVALID_PRODUCT_PHOTO_QUANTITY", "Invalid product photo quantities", invalid,
+                f"{invalid} photo-count values are not non-negative whole numbers.",
+                "Use a non-negative whole number for the number of product images.",
+            )
+
+        weight_col = field_mappings.get("product_weight")
+        if weight_col:
+            invalid = invalid_numeric_count(weight_col, minimum=0, strict_minimum=True)
+            add_check(
+                "NON_POSITIVE_PRODUCT_WEIGHT", "Non-positive product weights", invalid,
+                f"{invalid} non-empty product weight values are not greater than zero or are not numeric.",
+                "Provide a positive numeric weight and retain the source unit (for example grams or kilograms).",
+            )
+
+        dimension_columns = {
+            key: field_mappings.get(f"product_{key}")
+            for key in ("length", "width", "height")
+        }
+        for dimension, column in dimension_columns.items():
+            if column:
+                invalid = invalid_numeric_count(column, minimum=0, strict_minimum=True)
+                add_check(
+                    f"NON_POSITIVE_PRODUCT_{dimension.upper()}",
+                    f"Non-positive product {dimension} values",
+                    invalid,
+                    f"{invalid} non-empty product {dimension} values are not greater than zero or are not numeric.",
+                    "Provide a positive numeric dimension and retain its source unit.",
+                )
+
+        physical_columns = [column for column in (weight_col, *dimension_columns.values()) if column]
+        if len(physical_columns) >= 2:
+            partial_physical_data = sum(
+                1 for row in rows
+                if any(row.get(column) not in (None, "") and str(row.get(column)).strip() for column in physical_columns)
+                and any(row.get(column) in (None, "") or not str(row.get(column)).strip() for column in physical_columns)
+            )
+            add_check(
+                "INCOMPLETE_PRODUCT_PHYSICAL_ATTRIBUTES", "Incomplete product physical attributes", partial_physical_data,
+                f"{partial_physical_data} products have some physical attributes populated while other available physical-attribute columns are empty.",
+                "Complete the physical attributes required by your shipping, storage or product-compliance process. Missing fields are not assumed universally mandatory.",
+            )
     elif dataset_type == "orders / transactions":
         status_col = header("order_status", "status")
         if status_col:
@@ -308,6 +439,16 @@ def profile_dataset_rules(
         ("EXACT_DUPLICATE_ROWS", "Exact duplicate rows", "structural", "warning", None),
         ("MISSING_SOURCE_PRODUCT_ID", "Missing source product IDs", "product catalog", "critical", "product catalog"),
         ("DUPLICATE_SOURCE_PRODUCT_ID", "Duplicate source product IDs", "product catalog", "warning", "product catalog"),
+        ("MALFORMED_PRODUCT_IDENTIFIER", "Malformed product identifiers", "product catalog", "critical", "product catalog"),
+        ("MALFORMED_PRODUCT_CATEGORY", "Malformed product category values", "product catalog", "warning", "product catalog"),
+        ("INVALID_PRODUCT_NAME_LENGTH", "Invalid product name lengths", "product catalog", "warning", "product catalog"),
+        ("INVALID_PRODUCT_DESCRIPTION_LENGTH", "Invalid product description lengths", "product catalog", "warning", "product catalog"),
+        ("INVALID_PRODUCT_PHOTO_QUANTITY", "Invalid product photo quantities", "product catalog", "warning", "product catalog"),
+        ("NON_POSITIVE_PRODUCT_WEIGHT", "Non-positive product weights", "product catalog", "warning", "product catalog"),
+        ("NON_POSITIVE_PRODUCT_LENGTH", "Non-positive product length values", "product catalog", "warning", "product catalog"),
+        ("NON_POSITIVE_PRODUCT_WIDTH", "Non-positive product width values", "product catalog", "warning", "product catalog"),
+        ("NON_POSITIVE_PRODUCT_HEIGHT", "Non-positive product height values", "product catalog", "warning", "product catalog"),
+        ("INCOMPLETE_PRODUCT_PHYSICAL_ATTRIBUTES", "Incomplete product physical attributes", "product catalog", "warning", "product catalog"),
         ("MISSING_PRODUCT_SKU", "Missing product SKUs", "product catalog", "critical", "product catalog"),
         ("DUPLICATE_PRODUCT_SKU", "Duplicate product SKUs", "product catalog", "critical", "product catalog"),
         ("ORPHAN_PRODUCT_PARENT", "Product parent reference not found", "product catalog", "critical", "product catalog"),
@@ -370,6 +511,7 @@ def profile_dataset_rules(
 
     return {
         "dataset_type": dataset_type,
+        "field_mappings": field_mappings if dataset_type == "product catalog" else {},
         "domain_checks": checks,
         "domain_issues": issues,
         "validation_rules": validation_rules,
