@@ -415,7 +415,6 @@ def profile_dataset_rules(
                 if all(row.get(column) in (None, "") or not str(row.get(column)).strip() for column in physical_columns)
             )
             for index, row in enumerate(rows):
-                populated = any(row.get(column) not in (None, "") and str(row.get(column)).strip() for column in physical_columns)
                 for column in physical_columns:
                     value = row.get(column)
                     if value in (None, "") or not str(value).strip():
