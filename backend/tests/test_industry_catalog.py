@@ -285,7 +285,7 @@ def test_generic_lead_time_is_not_silently_converted_to_days():
 
 def test_currency_validation_does_not_claim_iso_registry_membership():
     result = validate_industry_csv(
-        "title,price,currency\\nWidget,10.00,ZZZ\\n",
+        "title,price,currency\nWidget,10.00,ZZZ\n",
         profile_id="ecommerce",
     )
 
