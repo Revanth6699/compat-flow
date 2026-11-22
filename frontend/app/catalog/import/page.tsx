@@ -12,6 +12,7 @@ type DatasetProfile = {
   total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number;
   complete_records: number | null; incomplete_records: number | null; complete_records_pct: number | null;
   duplicate_rows: number; duplicate_rate_pct: number; is_product_catalog: boolean; persisted: false; field_mappings?: Record<string, string>;
+  missing_value_details?: { row_number: number; field: string }[]; missing_value_details_truncated?: boolean;
   issue_details?: { row_number: number; product_id: string; field: string; source_value: string; code: string; title: string; severity: string; recommendation: string }[];
   columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string; minimum: number | string | null; maximum: number | string | null; average: number | null; top_values: { value: string; count: number; pct: number }[] }[];
   categorical_distributions: { name: string; values: { value: string; count: number; pct: number }[] }[];

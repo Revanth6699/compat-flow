@@ -1,4 +1,4 @@
-from app.services.dataset_rules import profile_dataset_rules
+from app.services.dataset_rules import missing_value_locations, profile_dataset_rules
 
 
 def test_inventory_profile_reports_negative_and_unreconciled_quantities():
@@ -459,3 +459,21 @@ def test_marketplace_product_listing_fields_keep_merchant_and_cluster_identity_s
     assert mappings["product_cluster_label"] == "Cluster Label"
     assert mappings["product_category_id"] == "Category ID"
     assert mappings["product_category"] == "Category Label"
+
+
+def test_missing_value_locations_preserve_source_rows_and_cap_details():
+    headers = ["sku", "price"]
+    rows = [
+        {"sku": "A", "price": ""},
+        {"sku": None, "price": "10"},
+        {"sku": "C", "price": "  "},
+    ]
+    assert missing_value_locations(headers, rows) == [
+        {"row_number": 2, "field": "price"},
+        {"row_number": 3, "field": "sku"},
+        {"row_number": 4, "field": "price"},
+    ]
+    assert missing_value_locations(headers, rows, limit=2) == [
+        {"row_number": 2, "field": "price"},
+        {"row_number": 3, "field": "sku"},
+    ]

@@ -30,6 +30,21 @@ def _number(value: Any) -> float | None:
         return None
 
 
+def missing_value_locations(
+    headers: list[str], rows: list[dict[str, Any]], *, limit: int = 1000,
+) -> list[dict[str, Any]]:
+    """Return bounded source-row/column locations for empty cells."""
+    details: list[dict[str, Any]] = []
+    for row_index, row in enumerate(rows):
+        for header in headers:
+            value = row.get(header)
+            if value is None or str(value).strip() == "":
+                if len(details) >= limit:
+                    return details
+                details.append({"row_number": row_index + 2, "field": header})
+    return details
+
+
 def profile_dataset_rules(
     headers: list[str], rows: list[dict[str, Any]],
     *, missing_cells: int | None = None, duplicate_rows: int | None = None,

@@ -7,6 +7,8 @@ type DatasetProfile = {
   total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number;
   complete_records: number | null; incomplete_records: number | null; complete_records_pct: number | null;
   duplicate_rows: number; duplicate_rate_pct: number;
+  missing_value_details?: { row_number: number; field: string }[];
+  missing_value_details_truncated?: boolean;
   columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string }[];
   categorical_distributions: { name: string; values: { value: string; count: number; pct: number }[] }[];
   date_columns: string[]; numeric_columns: string[];
@@ -122,7 +124,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
 
       {datasetResult && <DatasetCharts profile={datasetResult} />}
 
-      {Object.keys(productFieldMappings).length > 0 && <details className="panel result-section report-detail">
+      {Object.keys(productFieldMappings).length > 0 && mappings.length === 0 && <details className="panel result-section report-detail">
         <summary><span>Product field mapping</span><small>{Object.keys(productFieldMappings).length} canonical fields mapped</small></summary>
         <h3>Product field mapping</h3>
         <p className="import-description">CompatFlow matched source columns to canonical product attributes. These are header-based mappings, not proof that the source values satisfy your organization&apos;s business rules.</p>
@@ -141,6 +143,13 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
         <h3>Column completeness and data types</h3>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Field</th><th>Type</th><th>Populated</th><th>Missing</th><th>Completeness</th></tr></thead><tbody>{fieldMetrics.map((item) => <tr key={item.field}><td>{item.field}</td><td>{"inferred_type" in item ? String(item.inferred_type) : "—"}</td><td>{item.populated.toLocaleString()}</td><td>{item.missing.toLocaleString()}</td><td>{item.completeness_pct.toFixed(2)}%</td></tr>)}</tbody></table></div>
       </details>}
+      {(datasetResult?.missing_value_details?.length ?? 0) > 0 && <details className="panel result-section report-detail">
+        <summary><span>Missing-value locations</span><small>{datasetResult!.missing_cells.toLocaleString()} missing cells</small></summary>
+        <h3>Missing-value locations</h3>
+        <p className="import-description">Each entry identifies the source row and column where a value is empty. The list is capped at 1,000 locations; the aggregate missing-cell count remains exact.</p>
+        <div className="table-scroll"><table className="preview-table"><thead><tr><th>Source row</th><th>Source column</th></tr></thead><tbody>{datasetResult!.missing_value_details!.map((item, index) => <tr key={index}><td>{item.row_number}</td><td>{item.field}</td></tr>)}</tbody></table></div>
+        {datasetResult!.missing_value_details_truncated && <p className="import-description">Showing the first 1,000 missing-value locations.</p>}
+      </details>}
 
       {datasetResult && datasetResult.validation_rules && datasetResult.validation_rules.length > 0 && <details className="panel result-section report-detail" open>
         <summary><span>Default validation rules</span><small>{datasetResult.validation_rules.filter(rule => rule.status === "evaluated").length} evaluated · {datasetResult.validation_rules.filter(rule => rule.status === "not_applicable").length} not applicable · {datasetResult.validation_rules.filter(rule => rule.status === "not_evaluated").length} not evaluated</small></summary>
@@ -157,13 +166,6 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
         {datasetResult.issue_details!.length > 100 && <p className="import-description">Showing the first 100 issue rows here. Download the CSV report for the complete issue list.</p>}
       </details>}
 
-      {datasetResult && datasetResult.domain_checks && datasetResult.domain_checks.length > 0 && <details className="panel result-section report-detail">
-        <summary><span>Dataset-specific validation checks</span><small>{datasetResult.domain_checks.length} checks</small></summary>
-        <h3>Dataset-specific validation checks</h3>
-        <p className="import-description">These rules were selected from the detected dataset type and available columns. A zero issue count means the check ran and did not flag a record; it does not certify external or business-specific correctness.</p>
-        <div className="table-scroll"><table className="preview-table"><thead><tr><th>Check</th><th>Severity</th><th>Records flagged</th><th>Finding</th><th>Recommended action</th></tr></thead><tbody>{datasetResult.domain_checks.map((check) => <tr key={check.code}><td>{check.title}</td><td>{check.severity}</td><td>{check.issue_records.toLocaleString()}</td><td>{check.detail}</td><td>{check.recommendation}</td></tr>)}</tbody></table></div>
-      </details>}
-
       <div className="panel result-section report-findings">
         <h3>Findings and issues</h3>
         {issues.length === 0 ? <p>No issues were returned by the current analysis.</p> : <div className="table-scroll"><table className="preview-table"><thead><tr><th>Location</th><th>Field / finding</th><th>Severity</th><th>Code</th><th>Details</th></tr></thead><tbody>{issues.slice(0, 100).map((issue, index) => <tr key={index}><td>{issue.location}</td><td>{issue.field}</td><td>{issue.severity}</td><td>{issue.code}</td><td>{issue.message}</td></tr>)}</tbody></table></div>}
@@ -176,7 +178,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
         <p className="import-description">Showing up to the first 10 records returned by the analysis endpoint. This is a preview, not a full-data export.</p>
         <Table headers={previewHeaders} rows={preview.slice(0, 10)} />
       </details>
-      {industryResult && <p className="import-disclaimer">External vehicle fitment, certification, taxonomy and compatibility reference checks are not included unless explicitly provided by the active validation rules.</p>}
+      {industryResult && (industryResult.profile_id === "automotive" || industryResult.column_mappings.some((mapping) => mapping.field === "compatibility")) && <p className="import-disclaimer">External vehicle/equipment fitment and compatibility references are not checked unless explicitly provided by active validation rules.</p>}
       {result && <p className="import-disclaimer">The score is a transparent rule-based heuristic, not a statistical accuracy measurement. It reflects only the current product-catalog validation rules.</p>}
     </section>
   );
