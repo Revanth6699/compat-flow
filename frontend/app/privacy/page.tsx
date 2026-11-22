@@ -1,22 +1,90 @@
 import type { Metadata } from "next";
-export const metadata: Metadata = { title: "Privacy Policy", description: "How CompatFlow processes account, organization, contact request and demonstration data." };
-const operatorName = process.env.NEXT_PUBLIC_OPERATOR_NAME || "CompatFlow";
-const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "Contact email not configured";
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description: "How CompatFlow collects, uses, stores and protects personal information.",
+};
+
+const contactEmail = process.env.NEXT_PUBLIC_CONTACT_EMAIL || "sarvasettyrevanth.66@gmail.com";
+const businessAddress = process.env.NEXT_PUBLIC_OPERATOR_ADDRESS || "Business address pending publication";
+
 export default function PrivacyPage() {
- return <main id="main" className="legal-page"><div className="container legal-container">
-  <header className="legal-hero"><span className="eyebrow">LEGAL / PRIVACY</span><h1>Privacy Policy</h1><p>This policy explains how the CompatFlow website, account system and current demonstrations process information.</p><span className="legal-updated">Last updated: 13 November 2026</span></header>
-  <div className="legal-layout"><aside className="legal-aside"><span>ON THIS PAGE</span><a href="#operator">Who operates CompatFlow</a><a href="#information">Information processed</a><a href="#purpose">How information is used</a><a href="#authentication">Accounts and authentication</a><a href="#cookies">Local storage</a><a href="#providers">Service providers</a><a href="#retention">Retention and security</a><a href="#rights">Your choices and contact</a></aside>
-   <article className="legal-content">
-    <section id="operator"><h2>1. Who operates CompatFlow</h2><p>CompatFlow is an early-stage product operated by {operatorName}. Privacy questions and requests can be sent to {contactEmail}. Replace the operator and contact placeholders with the responsible legal entity and monitored privacy contact before opening registration to the public.</p></section>
-    <section id="information"><h2>2. Information processed</h2><p>Depending on how you use the service, information may include:</p><p><strong>Account information:</strong> email address, authentication identifiers, password credentials managed by Supabase Auth, email-confirmation status and profile information such as the display name you choose to provide.</p><p><strong>Organization and access information:</strong> organization membership, assigned role, account status, invitation records, invitation acceptance and related administrative actions.</p><p><strong>Enquiries:</strong> the name, email address, organization, role, message, request type and submission time that you provide through contact or demo-request forms.</p><p><strong>Demonstration data:</strong> CSV file contents submitted to the public validator for processing and its validation output. The current validator is intended to process the uploaded file in memory and not persist it as a catalog record.</p><p><strong>Technical information:</strong> hosting, API, database and security providers may process IP address, browser/device details, timestamps, request metadata and service logs as part of operating and protecting the service.</p></section>
-    <section id="purpose"><h2>3. How information is used</h2><p>We use information to create and authenticate accounts, confirm email addresses, recover accounts, maintain user profiles, link users to organizations, enforce role-based access, issue and validate invitations, respond to enquiries, provide the demonstration and protect the service. We do not sell personal information.</p><div className="legal-callout">Do not submit passwords, payment-card information, confidential supplier files, personal information about other people or production catalog data through public forms or the CSV demo.</div></section>
-    <section id="authentication"><h2>4. Accounts and authentication</h2><p>Account registration, email confirmation, sign-in and password recovery are handled through Supabase Auth. CompatFlow receives authentication tokens to establish a signed-in session and verify requests to its API. The current frontend stores the refresh token in browser session storage and uses browser local storage temporarily for the PKCE email-link verification value. Sign out clears the locally stored session and requests server-side sign-out.</p><p>Creating an authentication account does not by itself create an organization or grant workspace access. Organization membership and role information are managed separately by CompatFlow. Invitation links should be treated as confidential access credentials.</p></section>
-    <section id="cookies"><h2>5. Cookies and browser storage</h2><p>The website stores the cookie-consent preference in browser local storage. The current custom authentication client stores a refresh token in session storage and a temporary PKCE verifier in local storage to complete email confirmation and password-recovery links. These values support authentication and are not advertising identifiers. Browser settings can clear local and session storage, but doing so may sign you out or invalidate an in-progress verification flow.</p></section>
-    <section id="providers"><h2>6. Service providers and sharing</h2><p>CompatFlow relies on third-party infrastructure to host the website and API, provide authentication and store application data. These providers process information as needed to provide their services and under their own terms. Information may also be disclosed where required by law, to protect users or the service, or as part of a business transfer where legally permitted. Organization administrators may be able to view account details and workspace activity needed to administer their organization.</p></section>
-    <section id="retention"><h2>7. Retention and security</h2><p>Account, organization, invitation and enquiry records are retained for as long as needed to operate the service, administer access, respond to requests, resolve disputes and meet legal obligations. Authentication records are subject to the configured Supabase project retention and deletion processes. CSV contents are intended not to be persisted by the public validator, although request metadata and technical logs may be retained by infrastructure providers under their own policies. Reasonable technical and organizational safeguards are used, but no internet service can guarantee absolute security.</p></section>
-    <section id="rights"><h2>8. Your choices and privacy requests</h2><p>Depending on the law that applies to you, you may be able to request access to, correction of or deletion of your personal information, or exercise other applicable rights. Contact {contactEmail}. We may need to verify your identity and may retain certain information where required or permitted by law. You can update your display name and password in <a href="/settings">Profile settings</a>; account email changes and organization membership changes may require administrator assistance.</p></section>
-    <section><h2>9. International processing and policy changes</h2><p>Our service providers may process information in countries other than the country where you are located. Where required, appropriate safeguards should be used for international transfers. This policy may be updated as product functionality, providers or data practices change. The latest version will be published on this page.</p></section>
-   </article>
-  </div>
- </div></main>;
+  return (
+    <main id="main" className="legal-page">
+      <div className="container legal-container">
+        <header className="legal-hero">
+          <span className="eyebrow">LEGAL / PRIVACY</span>
+          <h1>Privacy Policy</h1>
+          <p>This policy explains how CompatFlow handles personal information when you visit the website, create an account, request a demonstration or use a paid workspace.</p>
+          <span className="legal-updated">Effective date: 22 November 2026</span>
+        </header>
+        <div className="legal-layout">
+          <aside className="legal-aside">
+            <span>ON THIS PAGE</span>
+            <a href="#operator">Operator and contact</a>
+            <a href="#information">Information we collect</a>
+            <a href="#use">How we use information</a>
+            <a href="#payments">Subscriptions and payments</a>
+            <a href="#storage">Cookies and browser storage</a>
+            <a href="#sharing">Service providers and sharing</a>
+            <a href="#retention">Retention and security</a>
+            <a href="#rights">Your rights and grievances</a>
+          </aside>
+          <article className="legal-content">
+            <section id="operator">
+              <h2>1. Who operates CompatFlow</h2>
+              <p>CompatFlow is a software service operated by <strong>Sarvasetty Revanth Kumar, an individual proprietor trading under the CompatFlow brand</strong> (referred to as “CompatFlow”, “we”, “us” or “our”). CompatFlow is not represented by this policy as a Private Limited Company.</p>
+              <p>Principal business address: {businessAddress}. Privacy and support contact: <a href={`mailto:${contactEmail}`}>{contactEmail}</a>. The address shown here must be completed with the proprietor’s actual business address before live commercial launch.</p>
+            </section>
+            <section id="information">
+              <h2>2. Information we collect</h2>
+              <p>Information depends on the features you use and may include:</p>
+              <ul>
+                <li><strong>Account and profile data:</strong> name, email address, authentication identifiers, password credentials handled by our authentication provider, profile details and account preferences.</li>
+                <li><strong>Organization and access data:</strong> organization name, membership, role, invitations, account status and administrative activity.</li>
+                <li><strong>Catalog and usage data:</strong> files and records you submit, connector configuration, validation results, issue details, reports, import history and related usage events.</li>
+                <li><strong>Enquiry data:</strong> name, email, organization, role, message, request type and submission timestamp from contact and demonstration forms.</li>
+                <li><strong>Payment and subscription references:</strong> plan, subscription status, billing period, transaction identifiers, invoice or receipt references and payment event details. Payment credentials are handled by the payment provider; we do not ask you to send card numbers or security codes to CompatFlow.</li>
+                <li><strong>Technical and security data:</strong> IP address, browser and device information, timestamps, diagnostic logs and request metadata generated by the website, API and infrastructure providers.</li>
+              </ul>
+            </section>
+            <section id="use">
+              <h2>3. How we use information</h2>
+              <p>We use information to create and secure accounts; authenticate users; manage organizations, roles and invitations; provide catalog validation, imports, reports and integrations; administer subscriptions; process support and demonstration requests; send service and billing communications; prevent fraud and misuse; troubleshoot failures; maintain records; and comply with legal obligations.</p>
+              <p>We do not sell personal information. We do not use uploaded catalog information to advertise third-party products. You are responsible for ensuring that you have the right to upload and process information supplied to CompatFlow, including information relating to other people.</p>
+            </section>
+            <section id="payments">
+              <h2>4. Subscriptions and payments</h2>
+              <p>When paid subscriptions are available, payments and recurring billing are processed through Razorpay or another payment method expressly identified at checkout. The payment provider may collect and process payment credentials, verification data and transaction information under its own privacy terms. CompatFlow receives payment and subscription references needed to activate access, reconcile billing, handle support requests and maintain financial records.</p>
+              <p>We do not store full payment-card numbers, CVV values, UPI PINs or internet-banking passwords. Do not send these details to us through email, contact forms or support messages.</p>
+            </section>
+            <section id="storage">
+              <h2>5. Cookies and browser storage</h2>
+              <p>CompatFlow currently uses browser storage for essential functions, including remembering your privacy-banner choice and maintaining authentication and email-verification flows. The current website does not intentionally load advertising or analytics cookies. Authentication tokens and temporary verification values may be stored in browser local or session storage. Clearing browser storage may sign you out or interrupt an active verification flow.</p>
+            </section>
+            <section id="sharing">
+              <h2>6. Service providers and other disclosures</h2>
+              <p>We use service providers to host and deliver the website and API, authenticate users, store application data, process payments and deliver operational email. These may include Vercel, Render, Supabase, Razorpay and Google email services, depending on the feature and environment. They process information as needed to provide their services and under their applicable terms and safeguards.</p>
+              <p>We may disclose information where required by law, to respond to lawful requests, protect users or the service, investigate suspected misuse, or complete a lawful business transfer. Organization administrators can access member and workspace information needed to administer their organization. We do not make customer workspace information public by default.</p>
+            </section>
+            <section id="retention">
+              <h2>7. Retention and security</h2>
+              <p>We retain information for as long as reasonably necessary to provide the service, maintain account and subscription records, support organizations, resolve disputes, prevent fraud and meet applicable legal and accounting requirements. Retention periods may differ for authentication records, uploaded catalog data, reports, enquiries, payment records and technical logs. Deleting an account does not require us to erase records that must be retained by law or are necessary to establish, exercise or defend legal claims.</p>
+              <p>We use reasonable technical and organizational safeguards appropriate to the service. No online service or transmission method can be guaranteed completely secure. You should use strong, unique passwords, restrict team access and avoid uploading information you are not authorized to share.</p>
+            </section>
+            <section id="rights">
+              <h2>8. Your choices, privacy rights and grievances</h2>
+              <p>Subject to applicable law, you may request access to information about your personal data, correction or updating of inaccurate information, erasure where permitted, or exercise other available rights. Where processing relies on consent, you may withdraw that consent; withdrawal does not affect processing already carried out lawfully. You may also request help with account deletion through your account settings or by contacting us.</p>
+              <p>Send privacy requests or complaints to <a href={`mailto:${contactEmail}`}>{contactEmail}</a> with the subject “Privacy Request”. We may ask for reasonable information to verify your identity. We aim to acknowledge grievances within 48 hours and resolve them within 30 days, subject to complexity and applicable legal requirements.</p>
+              <p><strong>Grievance contact:</strong> Sarvasetty Revanth Kumar, Proprietor, CompatFlow. Email: <a href={`mailto:${contactEmail}`}>{contactEmail}</a>. Business address: {businessAddress}. The business address must be completed before live launch.</p>
+            </section>
+            <section>
+              <h2>9. Children, international processing and updates</h2>
+              <p>CompatFlow is a business software service and is not directed to children. Do not create an account or submit a child’s personal information. Our service providers may process information in locations outside your state or country, subject to applicable law and safeguards. We may update this policy as the product, legal requirements or service providers change. The effective date above identifies the current version.</p>
+            </section>
+          </article>
+        </div>
+      </div>
+    </main>
+  );
 }
