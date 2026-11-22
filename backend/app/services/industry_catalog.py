@@ -65,7 +65,7 @@ ALIASES: dict[str, set[str]] = {
     "moq": {"moq", "minimum_order_quantity"},
     "order_multiple": {"order_multiple", "order_increment"},
     "unit_of_measure": {"unit_of_measure", "uom", "unit"},
-    "lead_time_days": {"lead_time_days", "lead_time"},
+    "lead_time_days": {"lead_time_days"},
     "year": {"year", "vehicle_year", "model_year"},
     "make": {"make", "vehicle_make"},
     "vehicle_model": {"vehicle_model", "car_model"},
@@ -92,7 +92,7 @@ PROFILES: dict[str, dict[str, Any]] = {
     "automotive": {"required": ("manufacturer", "mpn"), "signals": {"year", "make", "vehicle_model", "engine", "submodel", "position", "compatibility", "replacement_part"}},
     "electronics": {"required": ("manufacturer", "mpn"), "signals": {"model_number", "voltage", "power_w", "frequency_hz", "capacity", "compatibility", "standard"}},
     "industrial": {"required": ("manufacturer", "mpn"), "signals": {"product_type", "material", "diameter", "pressure_rating", "temperature_range", "standard", "replacement_part"}},
-    "wholesale": {"required": ("supplier_sku",), "signals": {"supplier_id", "buyer_sku", "unit_price", "currency", "quantity", "moq", "order_multiple", "unit_of_measure", "lead_time_days", "pack_size"}},
+    "wholesale": {"required": ("supplier_sku",), "signals": {"supplier_id", "buyer_sku", "unit_price", "currency", "quantity", "moq", "order_multiple", "unit_of_measure", "lead_time_days", "lead_time", "pack_size"}},
 }
 
 NUMERIC_NONNEGATIVE = {
