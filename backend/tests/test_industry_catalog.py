@@ -158,8 +158,8 @@ def test_malformed_datetime_is_not_accepted_as_valid_date():
 def test_zepto_marketplace_fields_map_and_validate_without_conflating_quantity_and_stock():
     result = validate_industry_csv(
         "category,title,quantity,mrp,discountPercent,availableQuantity,"
-        "discountedSellingPrice,weightInGms,outOfStock\\n"
-        "Snacks,Chips,6,100,20,0,80,250,true\\n",
+        "discountedSellingPrice,weightInGms,outOfStock\n"
+        "Snacks,Chips,6,100,20,0,80,250,true\n",
         profile_id="ecommerce",
     )
     fields = mapped(result)
@@ -178,8 +178,8 @@ def test_zepto_marketplace_fields_map_and_validate_without_conflating_quantity_a
 
 def test_zepto_price_discount_and_stock_consistency_issues_are_reported():
     result = validate_industry_csv(
-        "title,mrp,discountPercent,availableQuantity,discountedSellingPrice,outOfStock\\n"
-        "Snack,100,120,5,110,true\\n",
+        "title,mrp,discountPercent,availableQuantity,discountedSellingPrice,outOfStock\n"
+        "Snack,100,120,5,110,true\n",
         profile_id="ecommerce",
     )
     codes = {issue["error_code"] for issue in result["issues"]}
