@@ -158,8 +158,8 @@ def test_malformed_datetime_is_not_accepted_as_valid_date():
 def test_zepto_marketplace_fields_map_and_validate_without_conflating_quantity_and_stock():
     result = validate_industry_csv(
         "category,title,quantity,mrp,discountPercent,availableQuantity,"
-        "discountedSellingPrice,weightInGms,outOfStock\n"
-        "Snacks,Chips,6,100,20,0,80,250,true\n",
+        "discountedSellingPrice,weightInGms,outOfStock,currency\n"
+        "Snacks,Chips,6,100,20,0,80,250,true,INR\n",
         profile_id="ecommerce",
     )
     fields = mapped(result)
