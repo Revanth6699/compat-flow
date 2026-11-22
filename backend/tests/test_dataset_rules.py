@@ -341,3 +341,43 @@ def test_product_numeric_checks_are_not_evaluated_when_source_fields_are_absent(
     assert rules["INVALID_PRODUCT_PHOTO_QUANTITY"]["status"] == "not_evaluated"
     assert rules["NON_POSITIVE_PRODUCT_WEIGHT"]["status"] == "not_evaluated"
     assert rules["MALFORMED_PRODUCT_CATEGORY"]["status"] == "not_evaluated"
+
+
+def test_product_issue_details_include_source_row_identifier_field_and_original_value():
+    result = profile_dataset_rules(
+        ["product_id", "product_category_name", "product_weight_g", "product_length_cm"],
+        [
+            {"product_id": "P-001", "product_category_name": "tools", "product_weight_g": "10", "product_length_cm": "5"},
+            {"product_id": "P-002", "product_category_name": "tools", "product_weight_g": "0", "product_length_cm": ""},
+        ],
+    )
+    weight_issue = next(item for item in result["issue_details"] if item["code"] == "NON_POSITIVE_PRODUCT_WEIGHT")
+    assert weight_issue == {
+        "row_number": 3,
+        "product_id": "P-002",
+        "field": "product_weight_g",
+        "source_value": "0",
+        "code": "NON_POSITIVE_PRODUCT_WEIGHT",
+        "title": "Non-positive product weight",
+        "severity": "warning",
+        "recommendation": "Provide a positive numeric value and retain the source unit.",
+    }
+    missing_dimension = next(item for item in result["issue_details"] if item["code"] == "MISSING_PRODUCT_PHYSICAL_ATTRIBUTE")
+    assert missing_dimension["row_number"] == 3
+    assert missing_dimension["product_id"] == "P-002"
+    assert missing_dimension["field"] == "product_length_cm"
+    assert missing_dimension["source_value"] == ""
+
+
+def test_product_physical_attributes_distinguish_partial_from_all_missing():
+    result = profile_dataset_rules(
+        ["product_id", "product_category_name", "product_weight_g", "product_length_cm", "product_width_cm"],
+        [
+            {"product_id": "P-001", "product_category_name": "tools", "product_weight_g": "10", "product_length_cm": "", "product_width_cm": "4"},
+            {"product_id": "P-002", "product_category_name": "tools", "product_weight_g": "", "product_length_cm": "", "product_width_cm": ""},
+        ],
+    )
+    checks = {item["code"]: item for item in result["domain_checks"]}
+    assert checks["INCOMPLETE_PRODUCT_PHYSICAL_ATTRIBUTES"]["issue_records"] == 1
+    assert checks["MISSING_PRODUCT_PHYSICAL_ATTRIBUTES"]["issue_records"] == 1
+    assert sum(item["code"] == "MISSING_PRODUCT_PHYSICAL_ATTRIBUTE" for item in result["issue_details"]) == 4

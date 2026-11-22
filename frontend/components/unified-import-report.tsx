@@ -15,6 +15,7 @@ type DatasetProfile = {
   domain_checks?: { code: string; title: string; issue_records: number; severity: string; detail: string; recommendation: string }[];
   validation_rules?: { code: string; title: string; category: string; severity: string; status: "evaluated" | "not_applicable" | "not_evaluated"; records_evaluated: number; issue_records: number | null; detail: string; recommendation: string }[];
   field_mappings?: Record<string, string>;
+  issue_details?: { row_number: number; product_id: string; field: string; source_value: string; code: string; title: string; severity: string; recommendation: string }[];
   preview: Record<string, unknown>[];
 };
 type IndustryResult = {
@@ -145,6 +146,14 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
         <h3>Default validation rules</h3>
         <p className="import-description">Rules are selected from the detected dataset profile. “Not applicable” means the rule belongs to another dataset type. “Not evaluated” means the rule was relevant but the required source columns were unavailable. Neither state is counted as a pass.</p>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Rule</th><th>Category</th><th>Status</th><th>Records evaluated</th><th>Issues</th><th>Details</th></tr></thead><tbody>{datasetResult.validation_rules.map(rule => <tr key={rule.code}><td>{rule.title}</td><td>{rule.category}</td><td>{rule.status === "evaluated" ? "Evaluated" : rule.status === "not_applicable" ? "Not applicable" : "Not evaluated"}</td><td>{rule.records_evaluated.toLocaleString()}</td><td>{rule.issue_records === null ? "—" : rule.issue_records.toLocaleString()}</td><td>{rule.detail}<br />Recommended action: {rule.recommendation}</td></tr>)}</tbody></table></div>
+      </details>}
+
+      {datasetResult?.dataset_type === "product catalog" && (datasetResult.issue_details?.length ?? 0) > 0 && <details className="panel result-section report-detail" open>
+        <summary><span>Record-level product issues</span><small>{datasetResult.issue_details!.length.toLocaleString()} issue rows · {new Set(datasetResult.issue_details!.map(issue => issue.row_number)).size.toLocaleString()} affected records</small></summary>
+        <h3>Record-level product issues</h3>
+        <p className="import-description">Each entry identifies a source row, product identifier, source field and original value. Source row numbering includes the header row. Missing physical attributes are listed separately from non-positive or non-numeric values.</p>
+        <div className="table-scroll"><table className="preview-table"><thead><tr><th>Source row</th><th>Product ID</th><th>Source field</th><th>Original value</th><th>Finding</th><th>Severity</th><th>Recommended action</th></tr></thead><tbody>{datasetResult.issue_details!.slice(0, 100).map((issue, index) => <tr key={index}><td>{issue.row_number}</td><td>{issue.product_id || "—"}</td><td>{issue.field}</td><td>{issue.source_value === "" ? "— (missing)" : issue.source_value}</td><td>{issue.title}</td><td>{issue.severity}</td><td>{issue.recommendation}</td></tr>)}</tbody></table></div>
+        {datasetResult.issue_details!.length > 100 && <p className="import-description">Showing the first 100 issue rows here. Download the CSV report for the complete issue list.</p>}
       </details>}
 
       {datasetResult && datasetResult.domain_checks && datasetResult.domain_checks.length > 0 && <details className="panel result-section report-detail">

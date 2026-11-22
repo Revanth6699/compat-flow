@@ -229,6 +229,85 @@ def profile_dataset_rules(
             if (alias := next((candidate for candidate in aliases if candidate in by_name), None))
         }
 
+        category_col = next((by_name[name] for name in product_field_aliases["product_category"] if name in by_name), None)
+
+        # Keep source-level evidence for every product-master finding. Row numbers
+        # are one-based source rows including the header row (first data row = 2).
+        issue_details: list[dict[str, Any]] = []
+        product_id_field = field_mappings.get("source_product_id") or source_id_col or sku_col
+
+        def add_product_issue(
+            row_index: int, code: str, title: str, column: str, value: Any,
+            recommendation: str, severity: str = "warning",
+        ) -> None:
+            row = rows[row_index]
+            issue_details.append({
+                "row_number": row_index + 2,
+                "product_id": str(row.get(product_id_field) or "").strip() if product_id_field else "",
+                "field": column,
+                "source_value": "" if value is None else str(value),
+                "code": code,
+                "title": title,
+                "severity": severity,
+                "recommendation": recommendation,
+            })
+
+        def invalid_number(value: Any, *, integer: bool = False, minimum: float | None = None, strict_minimum: bool = False) -> bool:
+            number = _number(value)
+            return (
+                number is None or not math.isfinite(number)
+                or (integer and not number.is_integer())
+                or (minimum is not None and (number <= minimum if strict_minimum else number < minimum))
+            )
+
+        identifier_col_for_issues = field_mappings.get("source_product_id") or sku_col
+        if identifier_col_for_issues:
+            for index, row in enumerate(rows):
+                value = row.get(identifier_col_for_issues)
+                if value is not None and str(value).strip() and (
+                    str(value) != str(value).strip()
+                    or any(ord(char) < 32 or ord(char) == 127 for char in str(value))
+                ):
+                    add_product_issue(index, "MALFORMED_PRODUCT_IDENTIFIER", "Malformed product identifier", identifier_col_for_issues, value,
+                        "Trim identifier whitespace and remove control characters without changing identifier semantics.", "critical")
+
+        if category_col:
+            for index, row in enumerate(rows):
+                value = row.get(category_col)
+                if value is not None and str(value).strip() and (
+                    str(value) != str(value).strip()
+                    or any(ord(char) < 32 or ord(char) == 127 for char in str(value))
+                ):
+                    add_product_issue(index, "MALFORMED_PRODUCT_CATEGORY", "Malformed product category", category_col, value,
+                        "Normalize category text and remove control characters.")
+
+        for canonical, code, title in (
+            ("product_name_length", "INVALID_PRODUCT_NAME_LENGTH", "Invalid product name length"),
+            ("product_description_length", "INVALID_PRODUCT_DESCRIPTION_LENGTH", "Invalid product description length"),
+            ("product_photo_quantity", "INVALID_PRODUCT_PHOTO_QUANTITY", "Invalid product photo quantity"),
+        ):
+            column = field_mappings.get(canonical)
+            if column:
+                for index, row in enumerate(rows):
+                    value = row.get(column)
+                    if value is not None and str(value).strip() and invalid_number(value, integer=True, minimum=0):
+                        add_product_issue(index, code, title, column, value,
+                            "Use a non-negative whole number; verify the source unit or measurement definition.")
+
+        for canonical, code, title in (
+            ("product_weight", "NON_POSITIVE_PRODUCT_WEIGHT", "Non-positive product weight"),
+            ("product_length", "NON_POSITIVE_PRODUCT_LENGTH", "Non-positive product length"),
+            ("product_width", "NON_POSITIVE_PRODUCT_WIDTH", "Non-positive product width"),
+            ("product_height", "NON_POSITIVE_PRODUCT_HEIGHT", "Non-positive product height"),
+        ):
+            column = field_mappings.get(canonical)
+            if column:
+                for index, row in enumerate(rows):
+                    value = row.get(column)
+                    if value is not None and str(value).strip() and invalid_number(value, minimum=0, strict_minimum=True):
+                        add_product_issue(index, code, title, column, value,
+                            "Provide a positive numeric value and retain the source unit.")
+
         def non_empty_values(column: str) -> list[Any]:
             return [row.get(column) for row in rows if row.get(column) is not None and str(row.get(column)).strip()]
 
@@ -330,6 +409,21 @@ def profile_dataset_rules(
                 1 for row in rows
                 if any(row.get(column) not in (None, "") and str(row.get(column)).strip() for column in physical_columns)
                 and any(row.get(column) in (None, "") or not str(row.get(column)).strip() for column in physical_columns)
+            )
+            missing_all_physical = sum(
+                1 for row in rows
+                if all(row.get(column) in (None, "") or not str(row.get(column)).strip() for column in physical_columns)
+            )
+            for index, row in enumerate(rows):
+                for column in physical_columns:
+                    value = row.get(column)
+                    if value in (None, "") or not str(value).strip():
+                        add_product_issue(index, "MISSING_PRODUCT_PHYSICAL_ATTRIBUTE", "Missing physical attribute", column, value,
+                            "Populate this physical attribute if it is required by your shipping, storage or compliance process.")
+            add_check(
+                "MISSING_PRODUCT_PHYSICAL_ATTRIBUTES", "Products missing all physical attributes", missing_all_physical,
+                f"{missing_all_physical} products have no values in any available physical-attribute column.",
+                "Provide physical measurements where required by your business process. Missing data is not assumed universally mandatory.",
             )
             add_check(
                 "INCOMPLETE_PRODUCT_PHYSICAL_ATTRIBUTES", "Incomplete product physical attributes", partial_physical_data,
@@ -449,6 +543,7 @@ def profile_dataset_rules(
         ("NON_POSITIVE_PRODUCT_WIDTH", "Non-positive product width values", "product catalog", "warning", "product catalog"),
         ("NON_POSITIVE_PRODUCT_HEIGHT", "Non-positive product height values", "product catalog", "warning", "product catalog"),
         ("INCOMPLETE_PRODUCT_PHYSICAL_ATTRIBUTES", "Incomplete product physical attributes", "product catalog", "warning", "product catalog"),
+        ("MISSING_PRODUCT_PHYSICAL_ATTRIBUTES", "Products missing all physical attributes", "product catalog", "warning", "product catalog"),
         ("MISSING_PRODUCT_SKU", "Missing product SKUs", "product catalog", "critical", "product catalog"),
         ("DUPLICATE_PRODUCT_SKU", "Duplicate product SKUs", "product catalog", "critical", "product catalog"),
         ("ORPHAN_PRODUCT_PARENT", "Product parent reference not found", "product catalog", "critical", "product catalog"),
@@ -512,6 +607,7 @@ def profile_dataset_rules(
     return {
         "dataset_type": dataset_type,
         "field_mappings": field_mappings if dataset_type == "product catalog" else {},
+        "issue_details": issue_details if dataset_type == "product catalog" else [],
         "domain_checks": checks,
         "domain_issues": issues,
         "validation_rules": validation_rules,

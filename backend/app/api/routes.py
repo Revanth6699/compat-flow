@@ -567,6 +567,7 @@ async def profile_public_dataset(
         "relationship_checks": relationship_checks,
         "domain_checks": domain_profile["domain_checks"],
         "field_mappings": domain_profile["field_mappings"],
+        "issue_details": domain_profile["issue_details"],
         "validation_rules": domain_profile["validation_rules"],
         "findings": findings,
         "preview": rows[:10],
