@@ -186,3 +186,63 @@ def test_zepto_price_discount_and_stock_consistency_issues_are_reported():
     assert "DISCOUNT_PERCENT_OUT_OF_RANGE" in codes
     assert "SELLING_PRICE_ABOVE_LIST_PRICE" in codes
     assert "OUT_OF_STOCK_WITH_POSITIVE_AVAILABILITY" in codes
+
+
+def test_industry_issue_metrics_count_all_findings_even_when_details_are_capped():
+    rows = "".join(f"S-{index},Widget,not-a-price,USD\\n" for index in range(600))
+    result = validate_industry_csv(
+        "sku,title,price,currency\\n" + rows,
+        profile_id="ecommerce",
+    )
+
+    assert result["metrics"]["issue_count"] == 600
+    assert result["metrics"]["critical_issue_count"] == 600
+    assert result["metrics"]["returned_issue_count"] == 500
+    assert result["metrics"]["issues_truncated"] is True
+    assert result["metrics"]["issue_counts_by_code"]["INVALID_NONNEGATIVE_NUMBER"] == 600
+    assert result["metrics"]["rows_with_critical_issues"] == 600
+    assert result["invalid_rows"] == 600
+    assert result["valid_rows"] == 0
+
+
+def test_industry_warning_only_rows_remain_valid_but_are_counted_for_review():
+    result = validate_industry_csv(
+        "title,mrp,discountedSellingPrice\\nWidget,10,12\\n",
+        profile_id="ecommerce",
+    )
+
+    assert result["valid_rows"] == 1
+    assert result["invalid_rows"] == 0
+    assert result["metrics"]["warning_issue_count"] == 1
+    assert result["metrics"]["rows_with_warning_issues"] == 1
+    assert result["metrics"]["rows_with_critical_issues"] == 0
+
+
+def test_duplicate_aliases_are_explicitly_reported_as_ambiguous_not_auto_mapped():
+    result = validate_industry_csv(
+        "sku,seller_sku,title\\nS-1,S-1,Widget\\n",
+        profile_id="ecommerce",
+    )
+
+    assert "sku" not in mapped(result)
+    assert "sku" in result["unmapped_headers"]
+    assert "seller_sku" in result["unmapped_headers"]
+    assert result["ambiguous_mappings"] == [{
+        "field": "sku",
+        "source_headers": ["sku", "seller_sku"],
+    }]
+    assert {
+        item["reason"] for item in result["unmapped_header_details"]
+        if item["candidate_field"] == "sku"
+    } == {"ambiguous_mapping"}
+
+
+def test_industry_detection_explains_weak_and_tied_evidence():
+    weak = detect_industry(["id", "name"])
+    assert weak["needs_confirmation"] is True
+    assert weak["profile_id"] is None
+    assert weak["decision_reason"] == "insufficient_industry_signals"
+    assert weak["confidence_method"] == "heuristic_signal_score_not_probability"
+
+    tied = detect_industry(["manufacturer", "mpn", "material", "diameter", "pressure_rating", "standard"])
+    assert tied["needs_confirmation"] is False or tied["decision_reason"] == "ambiguous_tied_profiles"
