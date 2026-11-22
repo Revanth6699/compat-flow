@@ -1,4 +1,3 @@
-import mimetypes
 import re
 import shutil
 import uuid
@@ -16,7 +15,7 @@ SUPPORTED_IMPORT_EXTENSIONS = {
 }
 STORAGE_KEY_PATTERN = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
-    r"\\.(?:csv|xls|xlsx|json|xml)$"
+    r"\.(?:csv|xls|xlsx|json|xml)$"
 )
 
 
