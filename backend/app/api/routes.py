@@ -447,6 +447,15 @@ async def profile_public_dataset(
         values = [row.get(header) for row in rows]
         present = [value for value in values if value is not None and str(value).strip() != ""]
         populated_cells += len(present)
+        normalized_header = re.sub(r"[^a-z0-9]+", "_", header.casefold()).strip("_")
+        identifier_field = (
+            normalized_header == "id"
+            or normalized_header.endswith("_id")
+            or normalized_header in {"sku", "barcode", "ean", "upc", "gtin", "mpn", "asin"}
+            or normalized_header.endswith("_sku")
+            or normalized_header.endswith("_barcode")
+            or normalized_header.endswith("_code")
+        )
         numeric = []
         for value in present:
             try:
@@ -464,6 +473,8 @@ async def profile_public_dataset(
                     break
         if not present:
             inferred = "empty"
+        elif identifier_field:
+            inferred = "identifier"
         elif numeric and len(numeric) == len(present):
             inferred = "numeric"
             numeric_columns.append(header)
