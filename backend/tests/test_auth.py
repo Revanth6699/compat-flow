@@ -144,3 +144,11 @@ def test_approved_demo_has_no_separate_record_quota(monkeypatch):
     assert limits["max_records"] == settings.import_max_records
     assert limits["max_upload_bytes"] == 5 * 1024 * 1024
 
+
+
+def test_review_reply_creation_requires_platform_admin():
+    response = client.post(
+        "/api/v1/reviews/00000000-0000-0000-0000-000000000001/replies",
+        json={"display_name": "CompatFlow", "comment": "Thank you for sharing your feedback."},
+    )
+    assert response.status_code == 401
