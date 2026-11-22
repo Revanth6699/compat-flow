@@ -309,6 +309,7 @@ export default function CatalogImportPage() {
           <h1>{demoApproved ? "Explore your approved demo" : "Validate your catalog data"}</h1>
           <p>{demoApproved ? "Use the limited, stateless demo workflow. Access is checked by the backend on every upload." : "Validate product data using the file formats and limits available to your organization. Review field completeness, duplicates and actionable issues."}</p>
           {user && <p className="import-description"><a href="/catalog/sources">Connect a REST API, SFTP server or SQL Server source →</a></p>}
+          {user && <p className="import-description"><a href="/catalog/validations">Manage reusable validation profiles and custom rules →</a></p>}
         </div>
 
         <section className="panel import-panel">
