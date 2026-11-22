@@ -91,7 +91,7 @@ def evaluate_custom_rules(
                     "rule_id": str(rule.id), "code": rule.code, "name": rule.name,
                     "field": rule.field_name, "severity": rule.severity,
                     "status": "not_evaluated", "records_evaluated": 0,
-                    "issue_records": None,
+                    "records_skipped_missing": 0, "issue_records": None,
                 })
                 continue
 
@@ -111,6 +111,7 @@ def evaluate_custom_rules(
 
             issue_count = 0
             evaluated_count = 0
+            skipped_missing_count = 0
             for row, source_location in zip(rows, source_locations):
                 value = row.get(field_name)
                 missing = value is None or (isinstance(value, str) and not value.strip())
@@ -122,6 +123,7 @@ def evaluate_custom_rules(
                     if missing:
                         code, message = "REQUIRED_VALUE_MISSING", f"{field_name} is required."
                 elif missing:
+                    skipped_missing_count += 1
                     continue
                 elif rule.rule_type == "unique":
                     evaluated_count += 1
@@ -176,6 +178,7 @@ def evaluate_custom_rules(
                 "rule_id": str(rule.id), "code": rule.code, "name": rule.name,
                 "field": field_name, "severity": rule.severity,
                 "status": "evaluated", "records_evaluated": evaluated_count,
+                "records_skipped_missing": skipped_missing_count,
                 "issue_records": issue_count,
             })
 
