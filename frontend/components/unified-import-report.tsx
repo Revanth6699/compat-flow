@@ -22,10 +22,15 @@ type DatasetProfile = {
 };
 type IndustryResult = {
   filename: string; profile_id: string | null; total_rows: number; valid_rows: number; invalid_rows: number;
+  profile_detection?: { confidence: number; decision_reason?: string; evidence_fields?: string[]; confidence_method?: string };
   validation_pass_rate: number; column_mappings: { field: string; source_header: string; confidence: number }[];
-  unmapped_headers: string[]; field_metrics: { field: string; applicable: boolean; populated: number; missing: number; completeness_pct: number }[];
+  unmapped_headers: string[];
+  unmapped_header_details?: { source_header: string; reason: string; candidate_field: string | null }[];
+  ambiguous_mappings?: { field: string; source_headers: string[] }[];
+  mapping_diagnostics?: { source_column_count: number; mapped_column_count: number; unmapped_column_count: number; ambiguous_field_count: number; confidence_method: string };
+  field_metrics: { field: string; applicable: boolean; populated: number; missing: number; completeness_pct: number }[];
   issues: { row_number: number; field: string | null; error_code: string; message: string; severity: string }[];
-  preview: Record<string, unknown>[]; metrics: { mapping_coverage_pct: number; validation_pass_rate_pct: number; issue_count: number; critical_issue_count: number; warning_issue_count: number };
+  preview: Record<string, unknown>[]; metrics: { mapping_coverage_pct: number; validation_pass_rate_pct: number; issue_count: number; returned_issue_count?: number; issues_truncated?: boolean; critical_issue_count: number; warning_issue_count: number; issue_counts_by_code?: Record<string, number>; rows_with_critical_issues?: number; rows_with_warning_issues?: number; rows_with_any_issue?: number };
   validation_scope: string;
 };
 type MultiResult = {
@@ -135,7 +140,10 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
         <summary><span>Column mapping</span><small>{mappings.length} mapped fields{((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length ? ` · ${((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length} unmapped` : ""}</small></summary>
         
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical field</th><th>Source column</th><th>Confidence</th></tr></thead><tbody>{mappings.map((item) => <tr key={item.field}><td>{item.field.replaceAll("_", " ")}</td><td>{item.source_header}</td><td>{(item.confidence * 100).toFixed(0)}%</td></tr>)}</tbody></table></div>
-        {((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length > 0 && <p className="import-description">Unmapped source columns retained: {(industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers ?? []).join(", ")}</p>}
+        {industryResult && <p className="import-description">Mapping confidence is a deterministic header-match strength indicator, not a probability that the mapped values are semantically correct. Mapping coverage is mapped source columns divided by all source columns.</p>}
+        {industryResult?.ambiguous_mappings?.length ? <div className="table-scroll"><table className="preview-table"><thead><tr><th>Canonical field</th><th>Conflicting source columns</th><th>Decision</th></tr></thead><tbody>{industryResult.ambiguous_mappings.map((item) => <tr key={item.field}><td>{item.field}</td><td>{item.source_headers.join(", ")}</td><td>Not auto-mapped — choose one source column before relying on this field</td></tr>)}</tbody></table></div> : null}
+        {industryResult?.unmapped_header_details?.filter((item) => item.reason === "unsupported_header").length ? <p className="import-description">Unsupported/unrecognized source columns retained but not validated: {industryResult.unmapped_header_details.filter((item) => item.reason === "unsupported_header").map((item) => item.source_header).join(", ")}</p> : null}
+                {((industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers) ?? []).length > 0 && <p className="import-description">Unmapped source columns retained: {(industryResult?.unmapped_headers ?? multiResult?.unmapped_headers ?? result?.unmapped_headers ?? []).join(", ")}</p>}
       </details>}
 
       {fieldMetrics.length > 0 && <details className="panel result-section report-detail">
@@ -165,6 +173,12 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Source row</th><th>Product ID</th><th>Source field</th><th>Original value</th><th>Finding</th><th>Severity</th><th>Recommended action</th></tr></thead><tbody>{datasetResult.issue_details!.slice(0, 100).map((issue, index) => <tr key={index}><td>{issue.row_number}</td><td>{issue.product_id || "—"}</td><td>{issue.field}</td><td>{issue.source_value === "" ? "— (missing)" : issue.source_value}</td><td>{issue.title}</td><td>{issue.severity}</td><td>{issue.recommendation}</td></tr>)}</tbody></table></div>
         {datasetResult.issue_details!.length > 100 && <p className="import-description">Showing the first 100 issue rows here. Download the CSV report for the complete issue list.</p>}
       </details>}
+
+      {industryResult && <div className="panel result-section">
+        <h3>Validation issue totals</h3>
+        <p><strong>{industryResult.metrics.issue_count.toLocaleString()}</strong> total findings across <strong>{(industryResult.metrics.rows_with_any_issue ?? 0).toLocaleString()}</strong> affected rows: {industryResult.metrics.critical_issue_count.toLocaleString()} critical and {industryResult.metrics.warning_issue_count.toLocaleString()} warnings.</p>
+        {industryResult.metrics.issues_truncated && <p className="import-description">The API returned the first {(industryResult.metrics.returned_issue_count ?? industryResult.issues.length).toLocaleString()} issue details. Aggregate counts include all findings; download the JSON report for the complete aggregate breakdown.</p>}
+      </div>}
 
       <div className="panel result-section report-findings">
         <h3>Findings and issues</h3>
