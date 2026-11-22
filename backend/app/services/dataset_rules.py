@@ -61,7 +61,29 @@ def profile_dataset_rules(
     def header(*candidates: str) -> str | None:
         return next((by_name[name] for name in candidates if name in by_name), None)
 
-    if dataset_type == "orders / transactions":
+    if dataset_type == "product catalog":
+        sku_col = header("sku", "product_sku", "item_sku", "product_code")
+        if sku_col:
+            missing_skus = sum(1 for row in rows if row.get(sku_col) in (None, "") or not str(row.get(sku_col)).strip())
+            add_check(
+                "MISSING_PRODUCT_SKU", "Missing product SKUs", missing_skus,
+                f"{missing_skus} product records have no seller SKU.",
+                "Provide the seller-assigned SKU or use a different source profile when the source identifier is not a seller SKU.",
+                "critical",
+            )
+            sku_values = [
+                str(row.get(sku_col)).strip().casefold()
+                for row in rows
+                if row.get(sku_col) not in (None, "") and str(row.get(sku_col)).strip()
+            ]
+            duplicate_skus = sum(count - 1 for count in Counter(sku_values).values() if count > 1)
+            add_check(
+                "DUPLICATE_PRODUCT_SKU", "Duplicate product SKUs", duplicate_skus,
+                f"{duplicate_skus} product records repeat a seller SKU.",
+                "Confirm whether repeated SKUs are duplicate products or legitimate variant/location records; choose the matching dataset grain.",
+                "critical",
+            )
+    elif dataset_type == "orders / transactions":
         status_col = header("order_status", "status")
         if status_col:
             allowed = {"created", "pending", "approved", "processing", "shipped", "delivered", "cancelled", "canceled", "returned", "refunded", "completed", "paid", "invoiced", "unavailable", "sent"}
@@ -99,6 +121,29 @@ def profile_dataset_rules(
         if moq_col:
             invalid = sum(1 for row in rows if _number(row.get(moq_col)) is not None and _number(row.get(moq_col)) <= 0)
             add_check("INVALID_MINIMUM_ORDER_QUANTITY", "Invalid minimum order quantities", invalid, f"{invalid} offers have a minimum order quantity of zero or less.", "Set a positive MOQ or explicitly define how non-positive values should be handled.")
+        currency_col = header("currency", "currency_code")
+        if price_col and currency_col:
+            missing_currency = sum(
+                1 for row in rows
+                if row.get(price_col) not in (None, "")
+                and row.get(currency_col) in (None, "")
+            )
+            add_check(
+                "PRICE_WITHOUT_CURRENCY", "Price missing currency", missing_currency,
+                f"{missing_currency} priced offers do not specify a currency.",
+                "Provide the ISO 4217 currency code; do not infer currency from locale or supplier location.",
+                "critical",
+            )
+            invalid_currency = sum(
+                1 for row in rows
+                if row.get(currency_col) not in (None, "")
+                and not re.fullmatch(r"[A-Z]{3}", str(row[currency_col]).strip().upper())
+            )
+            add_check(
+                "INVALID_CURRENCY_FORMAT", "Invalid currency code format", invalid_currency,
+                f"{invalid_currency} offers contain a currency value that is not a three-letter code.",
+                "Normalize currency values to ISO 4217 codes and verify the code is supported.",
+            )
     elif dataset_type == "financial transactions":
         amount_col = header("amount", "total", "total_amount", "transaction_amount")
         if amount_col:
@@ -139,6 +184,10 @@ def profile_dataset_rules(
     rule_definitions = [
         ("MISSING_VALUES", "Missing values", "structural", "warning", None),
         ("EXACT_DUPLICATE_ROWS", "Exact duplicate rows", "structural", "warning", None),
+        ("MISSING_PRODUCT_SKU", "Missing product SKUs", "product catalog", "critical", "product catalog"),
+        ("DUPLICATE_PRODUCT_SKU", "Duplicate product SKUs", "product catalog", "critical", "product catalog"),
+        ("PRICE_WITHOUT_CURRENCY", "Price missing currency", "supplier offers", "critical", "supplier offers"),
+        ("INVALID_CURRENCY_FORMAT", "Invalid currency code format", "supplier offers", "warning", "supplier offers"),
         ("UNRECOGNIZED_ORDER_STATUS", "Unrecognized order statuses", "orders / transactions", "warning", "orders / transactions"),
         ("DELIVERY_BEFORE_PURCHASE", "Delivery date precedes purchase date", "orders / transactions", "critical", "orders / transactions"),
         ("NEGATIVE_INVENTORY_QUANTITY", "Negative inventory quantities", "inventory", "critical", "inventory"),
