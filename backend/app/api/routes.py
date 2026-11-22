@@ -12,7 +12,7 @@ from uuid import UUID
 
 from app.core.auth import AuthenticatedUser, resolve_import_limits, require_demo_or_paid_access, require_permission, require_plan_feature
 from app.core.database import get_db
-from app.models import InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer
+from app.models import InventorySnapshot, Product, ProductIdentifier, ProductVariant, Supplier, SupplierOffer, ValidationProfile, ValidationRule
 from app.core.config import settings
 from app.schemas import (
     HealthResponse,
@@ -37,7 +37,7 @@ from app.schemas import (
 from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
 from app.services.catalog_ingestion import persist_validated_import
-from app.services.dataset_rules import profile_dataset_rules
+from app.services.dataset_rules import profile_dataset_rules\nfrom app.services.custom_validation import CustomRuleError, validate_rule_config
 from app.services.industry_catalog import IndustryCSVError, validate_industry_records
 from app.services.catalog_csv import (
     CatalogCSVValidationError,
@@ -46,6 +46,156 @@ from app.services.catalog_csv import (
 )
 
 router = APIRouter()
+
+@router.get("/validation/profiles", response_model=list[ValidationProfileResponse])
+def list_validation_profiles(
+    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("custom_rules")),
+    db: Session = Depends(get_db),
+):
+    return list(db.scalars(
+        select(ValidationProfile)
+        .where(ValidationProfile.organization_id == current.profile.organization_id)
+        .order_by(ValidationProfile.name.asc())
+    ).all())
+
+
+@router.post("/validation/profiles", response_model=ValidationProfileResponse, status_code=201)
+def create_validation_profile(
+    payload: ValidationProfileCreateRequest,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("custom_rules")),
+    db: Session = Depends(get_db),
+):
+    profile = ValidationProfile(
+        organization_id=current.profile.organization_id,
+        created_by_user_id=current.profile.id,
+        name=payload.name.strip(),
+        dataset_type=payload.dataset_type.strip().casefold(),
+        description=payload.description.strip() if payload.description else None,
+    )
+    db.add(profile)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A validation profile with this name already exists in your organization.") from None
+    db.refresh(profile)
+    return profile
+
+
+@router.get("/validation/profiles/{profile_id}/rules", response_model=list[ValidationRuleResponse])
+def list_validation_profile_rules(
+    profile_id: UUID,
+    current: AuthenticatedUser = Depends(require_permission("catalog:read")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("custom_rules")),
+    db: Session = Depends(get_db),
+):
+    profile = db.scalar(select(ValidationProfile.id).where(
+        ValidationProfile.id == profile_id,
+        ValidationProfile.organization_id == current.profile.organization_id,
+    ))
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Validation profile not found.")
+    return list(db.scalars(
+        select(ValidationRule)
+        .where(
+            ValidationRule.profile_id == profile_id,
+            ValidationRule.organization_id == current.profile.organization_id,
+        )
+        .order_by(ValidationRule.created_at.asc())
+    ).all())
+
+
+@router.post("/validation/profiles/{profile_id}/rules", response_model=ValidationRuleResponse, status_code=201)
+def create_validation_rule(
+    profile_id: UUID,
+    payload: ValidationRuleCreateRequest,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("custom_rules")),
+    db: Session = Depends(get_db),
+):
+    profile = db.scalar(select(ValidationProfile.id).where(
+        ValidationProfile.id == profile_id,
+        ValidationProfile.organization_id == current.profile.organization_id,
+        ValidationProfile.is_active.is_(True),
+    ))
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Active validation profile not found.")
+    try:
+        config = validate_rule_config(payload.rule_type, payload.config)
+    except CustomRuleError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    rule = ValidationRule(
+        organization_id=current.profile.organization_id,
+        profile_id=profile_id,
+        code=payload.code,
+        name=payload.name.strip(),
+        field_name=payload.field_name.strip(),
+        rule_type=payload.rule_type,
+        config=config,
+        severity=payload.severity,
+        enabled=payload.enabled,
+    )
+    db.add(rule)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="A rule with this code already exists in the selected profile.") from None
+    db.refresh(rule)
+    return rule
+
+
+@router.patch("/validation/profiles/{profile_id}/rules/{rule_id}", response_model=ValidationRuleResponse)
+def update_validation_rule(
+    profile_id: UUID,
+    rule_id: UUID,
+    payload: ValidationRuleUpdateRequest,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("custom_rules")),
+    db: Session = Depends(get_db),
+):
+    rule = db.scalar(select(ValidationRule).where(
+        ValidationRule.id == rule_id,
+        ValidationRule.profile_id == profile_id,
+        ValidationRule.organization_id == current.profile.organization_id,
+    ))
+    if rule is None:
+        raise HTTPException(status_code=404, detail="Validation rule not found.")
+    changes = payload.model_dump(exclude_unset=True)
+    if "config" in changes:
+        try:
+            changes["config"] = validate_rule_config(rule.rule_type, changes["config"])
+        except CustomRuleError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from None
+    for key, value in changes.items():
+        setattr(rule, key, value.strip() if key in {"name", "field_name"} and value is not None else value)
+    db.commit()
+    db.refresh(rule)
+    return rule
+
+
+@router.delete("/validation/profiles/{profile_id}/rules/{rule_id}", status_code=204)
+def delete_validation_rule(
+    profile_id: UUID,
+    rule_id: UUID,
+    current: AuthenticatedUser = Depends(require_permission("catalog:write")),
+    _plan: AuthenticatedUser = Depends(require_plan_feature("custom_rules")),
+    db: Session = Depends(get_db),
+):
+    rule = db.scalar(select(ValidationRule).where(
+        ValidationRule.id == rule_id,
+        ValidationRule.profile_id == profile_id,
+        ValidationRule.organization_id == current.profile.organization_id,
+    ))
+    if rule is None:
+        raise HTTPException(status_code=404, detail="Validation rule not found.")
+    db.delete(rule)
+    db.commit()
+    return None
+
+
 
 
 @router.get("/health", response_model=HealthResponse)
