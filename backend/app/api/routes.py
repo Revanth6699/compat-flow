@@ -317,6 +317,7 @@ async def profile_public_dataset(
         "numeric_columns": numeric_columns,
         "relationship_checks": relationship_checks,
         "domain_checks": domain_profile["domain_checks"],
+        "validation_rules": domain_profile["validation_rules"],
         "findings": findings,
         "preview": rows[:10],
         "is_product_catalog": bool(normalized & product_headers),
