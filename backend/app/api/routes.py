@@ -544,6 +544,16 @@ async def profile_public_dataset(
 
     completeness = round((populated_cells / total_cells * 100) if total_cells else 0, 2)
     missing_cells = total_cells - populated_cells
+    # Preserve source row and column locations for missing cells. Cap detail rows
+    # to keep large reports bounded while retaining the exact aggregate count.
+    missing_value_details = []
+    for row_index, row in enumerate(rows):
+        for header in headers:
+            value = row.get(header)
+            if value is None or str(value).strip() == "":
+                if len(missing_value_details) < 1000:
+                    missing_value_details.append({"row_number": row_index + 2, "field": header})
+    missing_value_details_truncated = missing_cells > len(missing_value_details)
     findings = []
     if missing_cells:
         findings.append({"severity": "warning", "title": "Missing values detected", "detail": f"{missing_cells:,} cells are empty ({round(missing_cells / total_cells * 100, 2) if total_cells else 0}% of the dataset)."})
@@ -570,6 +580,8 @@ async def profile_public_dataset(
         "total_cells": total_cells,
         "populated_cells": populated_cells,
         "missing_cells": missing_cells,
+        "missing_value_details": missing_value_details,
+        "missing_value_details_truncated": missing_value_details_truncated,
         "completeness_pct": completeness,
         "complete_records": complete_records,
         "incomplete_records": total - complete_records,
