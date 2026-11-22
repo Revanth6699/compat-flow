@@ -62,3 +62,39 @@ def test_olist_unavailable_order_status_is_recognized():
     check = next(item for item in result["domain_checks"] if item["code"] == "UNRECOGNIZED_ORDER_STATUS")
     assert check["issue_records"] == 1
     assert "1 rows" in check["detail"]
+
+
+
+def test_validation_catalog_shows_evaluated_and_not_applicable_rules_for_every_dataset():
+    result = profile_dataset_rules(
+        ["order_id", "order_status"],
+        [{"order_id": "O1", "order_status": "unavailable"}],
+    )
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert rules["MISSING_VALUES"]["status"] == "evaluated"
+    assert rules["EXACT_DUPLICATE_ROWS"]["status"] == "evaluated"
+    assert rules["UNRECOGNIZED_ORDER_STATUS"]["status"] == "evaluated"
+    assert rules["NEGATIVE_INVENTORY_QUANTITY"]["status"] == "not_applicable"
+    assert rules["NEGATIVE_INVENTORY_QUANTITY"]["issue_records"] is None
+
+
+def test_validation_catalog_marks_missing_required_columns_not_evaluated():
+    result = profile_dataset_rules(
+        ["quantity_on_hand"],
+        [{"quantity_on_hand": "10"}],
+    )
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert rules["NEGATIVE_INVENTORY_QUANTITY"]["status"] == "evaluated"
+    assert rules["INVENTORY_BALANCE_MISMATCH"]["status"] == "not_evaluated"
+    assert rules["INVENTORY_BALANCE_MISMATCH"]["issue_records"] is None
+
+
+def test_general_dataset_still_receives_structural_default_checks():
+    result = profile_dataset_rules(["field_a"], [{"field_a": ""}, {"field_a": "x"}])
+    rules = {item["code"]: item for item in result["validation_rules"]}
+    assert rules["MISSING_VALUES"]["issue_records"] == 1
+    assert rules["EXACT_DUPLICATE_ROWS"]["issue_records"] == 0
+    assert all(
+        item["status"] in {"evaluated", "not_applicable", "not_evaluated"}
+        for item in result["validation_rules"]
+    )
