@@ -109,3 +109,36 @@ def test_custom_numeric_rule_rejects_nan_source_value_as_invalid():
     )
     assert result["rules"][0]["issue_records"] == 1
     assert result["errors"][0]["error_code"] == "INVALID_NUMBER"
+
+
+def test_custom_rules_report_missing_values_separately_from_evaluated_records():
+    result = evaluate_custom_rules(
+        [
+            {"price": "10.00"},
+            {"price": ""},
+            {"price": None},
+            {"price": "not-a-number"},
+        ],
+        ["row:2", "row:3", "row:4", "row:5"],
+        [make_rule("r1", "PRICE_MIN", "price", "numeric_min", {"value": 1})],
+    )
+
+    rule = result["rules"][0]
+    assert rule["status"] == "evaluated"
+    assert rule["records_evaluated"] == 2
+    assert rule["records_skipped_missing"] == 2
+    assert rule["issue_records"] == 1
+    assert len(result["errors"]) == 1
+
+
+def test_required_custom_rule_evaluates_missing_values_instead_of_skipping_them():
+    result = evaluate_custom_rules(
+        [{"sku": ""}, {"sku": None}, {"sku": "A-1"}],
+        ["row:2", "row:3", "row:4"],
+        [make_rule("r1", "SKU_REQUIRED", "sku", "required")],
+    )
+
+    rule = result["rules"][0]
+    assert rule["records_evaluated"] == 3
+    assert rule["records_skipped_missing"] == 0
+    assert rule["issue_records"] == 2
