@@ -149,7 +149,7 @@ export default function UnifiedImportReport({ datasetResult, industryResult, mul
         <p className="import-description">Each entry identifies the source row and column where a value is empty. The list is capped at 1,000 locations; the aggregate missing-cell count remains exact.</p>
         <div className="table-scroll"><table className="preview-table"><thead><tr><th>Source row</th><th>Source column</th></tr></thead><tbody>{datasetResult!.missing_value_details!.map((item, index) => <tr key={index}><td>{item.row_number}</td><td>{item.field}</td></tr>)}</tbody></table></div>
         {datasetResult!.missing_value_details_truncated && <p className="import-description">Showing the first 1,000 missing-value locations.</p>}
-      </details>
+      </details>}
 
       {datasetResult && datasetResult.validation_rules && datasetResult.validation_rules.length > 0 && <details className="panel result-section report-detail" open>
         <summary><span>Default validation rules</span><small>{datasetResult.validation_rules.filter(rule => rule.status === "evaluated").length} evaluated · {datasetResult.validation_rules.filter(rule => rule.status === "not_applicable").length} not applicable · {datasetResult.validation_rules.filter(rule => rule.status === "not_evaluated").length} not evaluated</small></summary>
