@@ -1,0 +1,52 @@
+name: Reliability regression benchmark
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/app/services/dataset_rules.py"
+      - "backend/app/services/catalog_csv.py"
+      - "backend/app/services/ingestion_adapters.py"
+      - "backend/app/services/industry_catalog.py"
+      - "backend/app/api/**"
+      - "backend/tests/**"
+      - ".github/workflows/reliability-regression.yml"
+  push:
+    branches: [main]
+    paths:
+      - "backend/app/services/dataset_rules.py"
+      - "backend/app/services/catalog_csv.py"
+      - "backend/app/services/ingestion_adapters.py"
+      - "backend/app/services/industry_catalog.py"
+      - "backend/app/api/**"
+      - "backend/tests/**"
+      - ".github/workflows/reliability-regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    name: Deterministic profiling, mapping, and ingestion regression
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Install backend test dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Run reviewed dataset benchmark
+        run: python -m pytest -q tests/test_reliability_benchmark.py
+      - name: Run dataset rule and mapping regression suites
+        run: python -m pytest -q tests/test_dataset_rules.py tests/test_column_mapping_benchmark.py tests/test_catalog_csv.py
+      - name: Run supported-format and malformed-input regression suites
+        run: python -m pytest -q tests/test_input_format_matrix.py tests/test_ingestion_adapters.py
+      - name: Run API access and upload failure regression suite
+        run: python -m pytest -q tests/test_api.py
