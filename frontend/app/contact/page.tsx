@@ -7,7 +7,7 @@ function ContactForm() {
  const requestedPlan=(searchParams.get("plan")||"").toLowerCase();
  const isPricing=searchParams.get("intent")==="pricing";
  const planLabel=["starter","growth","business","enterprise"].includes(requestedPlan)?requestedPlan.charAt(0).toUpperCase()+requestedPlan.slice(1):"CompatFlow";
- const [status,setStatus]=useState<"idle"|"sending"|"success"|"error">("idle");
+ const [status,setStatus]=useState<"idle"|"sending"|"success"|"warning"|"error">("idle");
  const [message,setMessage]=useState("");
  const [form,setForm]=useState({name:"",email:"",organization:"",role:"",message:isPricing?`I am interested in the ${planLabel} plan. My team needs...`:"",website:""});
  function update(field:keyof typeof form,value:string){setForm(current=>({...current,[field]:value}));}
@@ -17,7 +17,9 @@ function ContactForm() {
    const response=await fetch("/api/contact",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...form,intent:isDemo?"demo":"general"})});
    const data=await response.json();
    if(!response.ok)throw new Error(data.error||"We could not submit your message. Please try again.");
-   setStatus("success");setMessage(isDemo?"Your demo request has been received. Access is not automatic; requests are reviewed before invitations are sent.":"Your message has been received. We will review it and get back to you.");
+   if(data.notification_sent===false){setStatus("warning");setMessage("Your submission was saved, but the email notification could not be delivered. The team may not receive an immediate email alert.");}
+   else if(data.notification_sent===null){setStatus("warning");setMessage("Your request was saved, but its email notification status could not be confirmed.");}
+   else{setStatus("success");setMessage(isDemo?"Your demo request has been received. Access is not automatic; requests are reviewed before invitations are sent.":"Your message has been received. We will review it and get back to you.");}
    setForm({name:"",email:"",organization:"",role:"",message:"",website:""});
   }catch(error){setStatus("error");setMessage(error instanceof Error?error.message:"Something went wrong. Please try again.");}
  }

@@ -29,7 +29,7 @@ export async function POST(request:Request){
     console.error("CompatFlow demo request was saved in the backend but its Supabase mirror failed:",mirrored.status,await mirrored.text().catch(()=>""));
     return NextResponse.json({error:"Your demo request was received, but its tracking record is still syncing. Please retry in a moment; your request will not be duplicated."},{status:503});
    }
-   return NextResponse.json({ok:true});
+   return NextResponse.json({ok:true,notification_sent:saved.notification_sent??null});
   }
   const response=await fetch(supabaseUrl.replace(/\/$/,"")+"/rest/v1/contact_requests",{
    method:"POST",headers:{apikey:serviceKey,Authorization:"Bearer "+serviceKey,"Content-Type":"application/json",Prefer:"return=minimal"},
@@ -38,6 +38,7 @@ export async function POST(request:Request){
   if(!response.ok)return NextResponse.json({error:"We could not save your message. Please try again later."},{status:502});
   const apiBase=process.env.NEXT_PUBLIC_API_BASE_URL;
   const notificationSecret=process.env.CONTACT_NOTIFICATION_SECRET;
+  let notificationSent=false;
   if(apiBase?.startsWith("https://")&&notificationSecret){
    try{
     const notification=await fetch(apiBase.replace(/\/$/,"")+"/api/v1/notifications/contact",{
@@ -49,7 +50,8 @@ export async function POST(request:Request){
      console.error("CompatFlow contact email notification endpoint failed:",notification.status);
     }else{
      const result=await notification.json().catch(()=>null);
-     if(result?.email_sent!==true){
+     notificationSent=result?.email_sent===true;
+     if(!notificationSent){
       console.error("CompatFlow contact email notification was not delivered:",result);
      }
     }
@@ -57,7 +59,7 @@ export async function POST(request:Request){
   }else{
    console.error("CompatFlow contact email notification is not configured.");
   }
-  return NextResponse.json({ok:true});
+  return NextResponse.json({ok:true,notification_sent:notificationSent});
  }catch(error){
   console.error("CompatFlow contact form submission failed:",error);
   return NextResponse.json({error:"Invalid request. Please check the form and try again."},{status:400});

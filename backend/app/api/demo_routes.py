@@ -4,7 +4,7 @@ from uuid import UUID, uuid4
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -44,6 +44,9 @@ class DemoRequestResponse(BaseModel):
     message: str
     status: str
     created_at: datetime
+    notification_sent: bool | None = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 def require_platform_admin(current: AuthenticatedUser = Depends(get_current_user)) -> AuthenticatedUser:
@@ -144,14 +147,18 @@ async def submit_demo_request(payload: DemoRequestPayload, db: Session = Depends
     db.add(request)
     db.commit()
     db.refresh(request)
+    notification_sent = False
     try:
         await notify_demo_request(
             name=request.name, email=request.email, organization=request.organization,
             role=request.role, message=request.message,
         )
+        notification_sent = True
     except Exception:
         logger.exception("Demo request was saved, but its email notification failed.")
-    return request
+    return DemoRequestResponse.model_validate(request).model_copy(
+        update={"notification_sent": notification_sent}
+    )
 
 
 @router.get("/demo-access")
