@@ -62,3 +62,117 @@ def validate_rule_config(rule_type: str, config: dict[str, Any] | None) -> dict[
         return {"value": value}
 
     raise CustomRuleError("Unsupported custom validation rule type.")
+
+
+
+def evaluate_custom_rules(
+    rows: list[dict[str, Any]],
+    source_locations: list[str],
+    rules: list[Any],
+    *,
+    error_limit: int = 500,
+) -> dict[str, Any]:
+    """Evaluate enabled declarative rules without executing customer-supplied code."""
+    from decimal import Decimal, InvalidOperation
+
+    from app.services.batch_processing import DiskBackedDuplicateTracker
+
+    if len(rows) != len(source_locations):
+        raise CustomRuleError("Source locations must match the number of records.")
+    if not 1 <= error_limit <= 10_000:
+        raise CustomRuleError("Custom rule error limit is outside the supported range.")
+
+    results: list[dict[str, Any]] = []
+    errors: list[dict[str, Any]] = []
+    unique_rules = [rule for rule in rules if rule.enabled and rule.rule_type == "unique"]
+
+    with DiskBackedDuplicateTracker() as tracker:
+        for rule in rules:
+            if not rule.enabled:
+                results.append({
+                    "rule_id": str(rule.id), "code": rule.code, "name": rule.name,
+                    "field": rule.field_name, "severity": rule.severity,
+                    "status": "not_evaluated", "records_evaluated": 0,
+                    "issue_records": None,
+                })
+                continue
+
+            field_name = rule.field_name
+            if not rows or field_name not in rows[0] and not any(field_name in row for row in rows):
+                results.append({
+                    "rule_id": str(rule.id), "code": rule.code, "name": rule.name,
+                    "field": field_name, "severity": rule.severity,
+                    "status": "not_evaluated", "records_evaluated": 0,
+                    "issue_records": None,
+                })
+                continue
+
+            issue_count = 0
+            evaluated_count = 0
+            config = rule.config or {}
+            for row, source_location in zip(rows, source_locations):
+                value = row.get(field_name)
+                missing = value is None or (isinstance(value, str) and not value.strip())
+                code = None
+                message = None
+
+                if rule.rule_type == "required":
+                    evaluated_count += 1
+                    if missing:
+                        code, message = "REQUIRED_VALUE_MISSING", f"{field_name} is required."
+                elif missing:
+                    continue
+                elif rule.rule_type == "unique":
+                    evaluated_count += 1
+                    duplicate = tracker.check_and_add(
+                        (rule.code, str(value).strip().casefold()), source_location
+                    )
+                    if duplicate.duplicate:
+                        code, message = "DUPLICATE_VALUE", (
+                            f"{field_name} duplicates the value first seen at "
+                            f"{duplicate.first_source_location}."
+                        )
+                elif rule.rule_type in {"numeric_min", "numeric_max"}:
+                    evaluated_count += 1
+                    try:
+                        number = Decimal(str(value).strip())
+                    except (InvalidOperation, ValueError):
+                        code, message = "INVALID_NUMBER", f"{field_name} must contain a numeric value."
+                    else:
+                        threshold = Decimal(str(config["value"]))
+                        if rule.rule_type == "numeric_min" and number < threshold:
+                            code, message = "BELOW_MINIMUM", f"{field_name} is below the configured minimum of {threshold}."
+                        elif rule.rule_type == "numeric_max" and number > threshold:
+                            code, message = "ABOVE_MAXIMUM", f"{field_name} exceeds the configured maximum of {threshold}."
+                elif rule.rule_type == "allowed_values":
+                    evaluated_count += 1
+                    allowed = {item.casefold() for item in config["values"]}
+                    if str(value).strip().casefold() not in allowed:
+                        code, message = "VALUE_NOT_ALLOWED", f"{field_name} is not in the configured allowed values."
+                elif rule.rule_type == "min_length":
+                    evaluated_count += 1
+                    if len(str(value)) < config["value"]:
+                        code, message = "VALUE_TOO_SHORT", f"{field_name} is shorter than {config['value']} characters."
+                elif rule.rule_type == "max_length":
+                    evaluated_count += 1
+                    if len(str(value)) > config["value"]:
+                        code, message = "VALUE_TOO_LONG", f"{field_name} exceeds {config['value']} characters."
+
+                if code:
+                    issue_count += 1
+                    if len(errors) < error_limit:
+                        errors.append({
+                            "rule_id": str(rule.id), "rule_code": rule.code,
+                            "source_location": source_location, "field": field_name,
+                            "error_code": code, "message": message,
+                            "severity": rule.severity,
+                        })
+
+            results.append({
+                "rule_id": str(rule.id), "code": rule.code, "name": rule.name,
+                "field": field_name, "severity": rule.severity,
+                "status": "evaluated", "records_evaluated": evaluated_count,
+                "issue_records": issue_count,
+            })
+
+    return {"rules": results, "errors": errors, "error_limit": error_limit}
