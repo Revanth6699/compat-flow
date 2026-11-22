@@ -1,3 +1,4 @@
+import asyncio
 import io
 
 import pytest
@@ -12,8 +13,7 @@ from app.services.file_storage import (
 )
 
 
-@pytest.mark.asyncio
-async def test_local_development_storage_round_trips_without_loading_whole_file(
+def test_local_development_storage_round_trips_without_loading_whole_file(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(settings, "app_env", "development")
@@ -24,7 +24,7 @@ async def test_local_development_storage_round_trips_without_loading_whole_file(
 
     payload = b"sku,name\nA-1,Widget\n"
     upload = UploadFile(filename="catalog.csv", file=io.BytesIO(payload))
-    key = await save_import_file(upload)
+    key = asyncio.run(save_import_file(upload))
 
     stored = get_storage_path(key)
     assert stored.read_bytes() == payload
@@ -34,8 +34,7 @@ async def test_local_development_storage_round_trips_without_loading_whole_file(
     assert destination.read_bytes() == payload
 
 
-@pytest.mark.asyncio
-async def test_local_storage_rejects_upload_over_configured_byte_limit(
+def test_local_storage_rejects_upload_over_configured_byte_limit(
     tmp_path, monkeypatch
 ):
     monkeypatch.setattr(settings, "app_env", "development")
@@ -46,13 +45,12 @@ async def test_local_storage_rejects_upload_over_configured_byte_limit(
 
     upload = UploadFile(filename="catalog.csv", file=io.BytesIO(b"12345"))
     with pytest.raises(FileStorageError, match="upload limit"):
-        await save_import_file(upload)
+        asyncio.run(save_import_file(upload))
 
     assert list(tmp_path.iterdir()) == []
 
 
-@pytest.mark.asyncio
-async def test_production_refuses_local_storage_fallback(monkeypatch):
+def test_production_refuses_local_storage_fallback(monkeypatch):
     monkeypatch.setattr(settings, "app_env", "production")
     monkeypatch.setattr(settings, "supabase_url", "")
     monkeypatch.setattr(settings, "supabase_service_role_key", "")
