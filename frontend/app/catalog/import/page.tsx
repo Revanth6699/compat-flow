@@ -105,7 +105,7 @@ export default function CatalogImportPage() {
 
   async function handleValidate() {
     if (!file || loading || !user) return;
-    setLoading(true); setError(""); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null);
+    setLoading(true); setError(""); setJsonRecordPathOptions([]); setResult(null); setDatasetResult(null); setMultiResult(null); setIndustryResult(null);
     try {
       const formData = new FormData();
       formData.append("file", file);
