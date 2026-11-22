@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/components/auth-provider";
+import { RequestDemoLink } from "@/components/request-demo-link";
 import { getCurrentProfile } from "@/lib/auth-client";
 import { useEffect, useState } from "react";
 
@@ -33,6 +34,7 @@ export function SiteHeader() {
               <Link href="/catalog/import">Catalog</Link>
               <Link href="/catalog/sources">Data sources</Link>
               <Link href="/reviews/write">Write a review</Link>
+              <RequestDemoLink />
               {!isPlatformAdmin && <Link href="/pricing">Plans</Link>}
               {isPlatformAdmin && <Link href="/platform-admin">Platform admin</Link>}
             </>
