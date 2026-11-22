@@ -33,11 +33,14 @@ from app.schemas import (
     InventorySnapshotResponse,
     ProductIdentifierCreateRequest,
     ProductIdentifierResponse,
+    ValidationProfileCreateRequest, ValidationProfileResponse,
+    ValidationRuleCreateRequest, ValidationRuleUpdateRequest, ValidationRuleResponse,
 )
 from app.services.ingestion_adapters import IngestionParseError, parse_source
 from app.services.record_import import RecordMappingError, validate_parsed_records
 from app.services.catalog_ingestion import persist_validated_import
-from app.services.dataset_rules import profile_dataset_rules\nfrom app.services.custom_validation import CustomRuleError, validate_rule_config
+from app.services.dataset_rules import profile_dataset_rules
+from app.services.custom_validation import CustomRuleError, validate_rule_config
 from app.services.industry_catalog import IndustryCSVError, validate_industry_records
 from app.services.catalog_csv import (
     CatalogCSVValidationError,
