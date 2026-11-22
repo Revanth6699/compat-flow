@@ -274,6 +274,7 @@ export default function ValidationProfilesPage() {
           </form>
           {evaluation && <>
             <p>{evaluation.filename} · {evaluation.total_records.toLocaleString()} records</p>
+            <p className="import-description">Required rules evaluate every row, including blank values. Other rule types skip missing values; those skipped rows are shown separately and are not counted as passes or failures.</p>
             <div className="table-scroll"><table className="preview-table"><thead><tr><th>Rule</th><th>Status</th><th>Records evaluated</th><th>Missing skipped</th><th>Issues</th></tr></thead><tbody>{evaluation.rules.map((rule) => <tr key={rule.code}><td>{rule.name}</td><td>{rule.status === "not_evaluated" ? "Not evaluated" : "Evaluated"}</td><td>{rule.records_evaluated.toLocaleString()}</td><td>{(rule.records_skipped_missing ?? 0).toLocaleString()}</td><td>{rule.issue_records === null ? "—" : rule.issue_records.toLocaleString()}</td></tr>)}</tbody></table></div>
             {evaluation.errors.length > 0 && <div className="table-scroll"><table className="preview-table"><thead><tr><th>Source location</th><th>Field</th><th>Severity</th><th>Issue</th></tr></thead><tbody>{evaluation.errors.map((issue, index) => <tr key={index}><td>{issue.source_location}</td><td>{issue.field}</td><td>{issue.severity}</td><td>{issue.message}</td></tr>)}</tbody></table></div>}
           </>}
