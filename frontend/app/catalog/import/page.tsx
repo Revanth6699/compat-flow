@@ -12,6 +12,7 @@ type DatasetProfile = {
   total_cells: number; populated_cells: number; missing_cells: number; completeness_pct: number;
   complete_records: number | null; incomplete_records: number | null; complete_records_pct: number | null;
   duplicate_rows: number; duplicate_rate_pct: number; is_product_catalog: boolean; persisted: false; field_mappings?: Record<string, string>;
+  issue_details?: { row_number: number; product_id: string; field: string; source_value: string; code: string; title: string; severity: string; recommendation: string }[];
   columns: { name: string; populated: number; missing: number; completeness_pct: number; distinct_values: number; inferred_type: string; minimum: number | string | null; maximum: number | string | null; average: number | null; top_values: { value: string; count: number; pct: number }[] }[];
   categorical_distributions: { name: string; values: { value: string; count: number; pct: number }[] }[];
   date_columns: string[]; numeric_columns: string[];
@@ -202,6 +203,9 @@ export default function CatalogImportPage() {
         [],
         ["Finding severity", "Finding", "Details"],
         ...datasetResult.findings.map(f => [f.severity,f.title,f.detail]),
+        [],
+        ["Record-level product issue", "Source row", "Product ID", "Source field", "Original source value", "Code", "Severity", "Recommended action"],
+        ...(datasetResult.issue_details ?? []).map(issue => [issue.title, issue.row_number, issue.product_id, issue.field, issue.source_value, issue.code, issue.severity, issue.recommendation]),
         [],
         ["Default validation rule", "Code", "Category", "Severity", "Status", "Records evaluated", "Issues", "Finding", "Recommendation"],
         ...(datasetResult.validation_rules ?? []).map(rule => [rule.title,rule.code,rule.category,rule.severity,rule.status,rule.records_evaluated,rule.issue_records ?? "",rule.detail,rule.recommendation]),
