@@ -60,9 +60,9 @@ def profile_dataset_rules(headers: list[str], rows: list[dict[str, Any]]) -> dic
     if dataset_type == "orders / transactions":
         status_col = header("order_status", "status")
         if status_col:
-            allowed = {"created", "pending", "approved", "processing", "shipped", "delivered", "cancelled", "canceled", "returned", "refunded", "completed", "paid", "invoiced"}
+            allowed = {"created", "pending", "approved", "processing", "shipped", "delivered", "cancelled", "canceled", "returned", "refunded", "completed", "paid", "invoiced", "unavailable", "sent"}
             unknown = sum(1 for row in rows if row.get(status_col) not in (None, "") and str(row[status_col]).strip().casefold() not in allowed)
-            add_check("UNRECOGNIZED_ORDER_STATUS", "Unrecognized order statuses", unknown, f"{unknown} rows contain statuses outside the common status vocabulary. Review these values against your business workflow.", "Confirm the allowed order-status vocabulary and normalize inconsistent values.")
+            add_check("UNRECOGNIZED_ORDER_STATUS", "Unrecognized order statuses", unknown, f"{unknown} rows contain statuses outside the recognized order-status vocabulary. Review these values against your business workflow.", "Confirm the allowed order-status vocabulary and normalize inconsistent values.")
         start = header("order_purchase_timestamp", "purchase_date", "order_date", "created_at")
         end = header("order_delivered_customer_date", "delivered_at", "delivery_date", "delivered_date")
         if start and end:
