@@ -16,7 +16,7 @@ export function SiteFooter() {
    {!user && <Link href="/contact?intent=demo">Request a demo</Link>}<RequestDemoLink /> <Link href="/pricing">Pricing</Link><Link href="/about">About Us</Link>{!user && <Link href="/reviews">Customer reviews</Link>}
   </div></div>
   <div className="footer-column"><strong>Information</strong><div className="footer-links">
-   <Link href="/contact">Contact Us</Link><Link href="/privacy">Privacy Policy</Link><Link href="/terms">Terms &amp; Conditions</Link><Link href="/help/account">Account help</Link>
+   <Link href="/contact">Contact Us</Link><Link href="/privacy">Privacy Policy</Link><Link href="/terms">Terms &amp; Conditions</Link><Link href="/refund-cancellation">Refund &amp; Cancellation Policy</Link><Link href="/help/account">Account help</Link>
   </div></div>
   <span className="footer-copyright">© {new Date().getFullYear()} CompatFlow</span>
  </div></footer>;
