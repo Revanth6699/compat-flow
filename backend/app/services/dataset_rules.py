@@ -28,7 +28,7 @@ def _number(value: Any) -> float | None:
         return None
 
 
-def profile_dataset_rules(headers: list[str], rows: list[dict[str, Any]]) -> dict[str, Any]:
+def profile_dataset_rules(\n    headers: list[str], rows: list[dict[str, Any]],\n    *, missing_cells: int | None = None, duplicate_rows: int | None = None,\n) -> dict[str, Any]:
     """Return a conservative dataset classification and applicable rule findings."""
     by_name = {_norm(header): header for header in headers}
     names = set(by_name)
@@ -115,16 +115,22 @@ def profile_dataset_rules(headers: list[str], rows: list[dict[str, Any]]) -> dic
     # A stable rule catalogue is returned for every dataset, not only when a
     # domain-specific rule happens to match. This makes applicability explicit
     # and prevents an absent check from being mistaken for a successful check.
-    missing_cells = sum(
-        1 for row in rows for column in headers
-        if row.get(column) is None or str(row.get(column)).strip() == ""
-    )
-    row_keys = [
-        json.dumps([row.get(column) for column in headers], ensure_ascii=False,
-                   sort_keys=True, separators=(",", ":"), default=str)
-        for row in rows
-    ]
-    duplicate_rows = sum(count - 1 for count in Counter(row_keys).values() if count > 1)
+    if missing_cells is None:
+        missing_cells = sum(
+            1 for row in rows for column in headers
+            if row.get(column) is None or str(row.get(column)).strip() == ""
+        )
+    if duplicate_rows is None:
+        row_counts: Counter[str] = Counter()
+        duplicate_rows = 0
+        for row in rows:
+            key = json.dumps(
+                [row.get(column) for column in headers],
+                ensure_ascii=False, separators=(",", ":"), default=str,
+            )
+            row_counts[key] += 1
+            if row_counts[key] > 1:
+                duplicate_rows += 1
 
     evaluated = {item["code"]: item for item in checks}
     rule_definitions = [
