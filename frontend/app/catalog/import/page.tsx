@@ -17,6 +17,7 @@ type DatasetProfile = {
   date_columns: string[]; numeric_columns: string[];
   relationship_checks: { name: string; from_column: string; to_column: string; matched_records: number; average_days: number | null; minimum_days: number | null; maximum_days: number | null; negative_duration_records: number }[];
   domain_checks?: { code: string; title: string; issue_records: number; severity: string; detail: string; recommendation: string }[];
+  validation_rules?: { code: string; title: string; category: string; severity: string; status: "evaluated" | "not_applicable" | "not_evaluated"; records_evaluated: number; issue_records: number | null; detail: string; recommendation: string }[];
   findings: { severity: string; title: string; detail: string }[];
   preview: Record<string, unknown>[];
 };
@@ -199,6 +200,9 @@ export default function CatalogImportPage() {
         ["Finding severity", "Finding", "Details"],
         ...datasetResult.findings.map(f => [f.severity,f.title,f.detail]),
         [],
+        ["Default validation rule", "Code", "Category", "Severity", "Status", "Records evaluated", "Issues", "Finding", "Recommendation"],
+        ...(datasetResult.validation_rules ?? []).map(rule => [rule.title,rule.code,rule.category,rule.severity,rule.status,rule.records_evaluated,rule.issue_records ?? "",rule.detail,rule.recommendation]),
+        [],
         ["Dataset-specific check", "Code", "Severity", "Records flagged", "Finding", "Recommendation"],
         ...(datasetResult.domain_checks ?? []).map(check => [check.title,check.code,check.severity,check.issue_records,check.detail,check.recommendation]),
         [],
@@ -305,6 +309,7 @@ export default function CatalogImportPage() {
           <h1>{demoApproved ? "Explore your approved demo" : "Validate your catalog data"}</h1>
           <p>{demoApproved ? "Use the limited, stateless demo workflow. Access is checked by the backend on every upload." : "Validate product data using the file formats and limits available to your organization. Review field completeness, duplicates and actionable issues."}</p>
           {user && <p className="import-description"><a href="/catalog/sources">Connect a REST API, SFTP server or SQL Server source →</a></p>}
+          {user && <p className="import-description"><a href="/catalog/validations">Manage reusable validation profiles and custom rules →</a></p>}
         </div>
 
         <section className="panel import-panel">

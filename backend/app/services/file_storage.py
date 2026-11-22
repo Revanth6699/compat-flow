@@ -10,13 +10,36 @@ from app.core.config import settings
 
 
 CHUNK_SIZE = 64 * 1024
+SUPPORTED_IMPORT_EXTENSIONS = {
+    ".csv", ".xls", ".xlsx", ".json", ".xml",
+}
 STORAGE_KEY_PATTERN = re.compile(
-    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.csv$"
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    r"\.(?:csv|xls|xlsx|json|xml)$"
 )
 
 
 class FileStorageError(ValueError):
     pass
+
+
+def _extension(filename: str) -> str:
+    extension = Path(filename).suffix.lower()
+    if extension not in SUPPORTED_IMPORT_EXTENSIONS:
+        supported = ", ".join(sorted(item.lstrip(".").upper() for item in SUPPORTED_IMPORT_EXTENSIONS))
+        raise FileStorageError(f"Unsupported import file type. Supported formats: {supported}.")
+    return extension
+
+
+def _content_type(extension: str) -> str:
+    known = {
+        ".csv": "text/csv",
+        ".xls": "application/vnd.ms-excel",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".json": "application/json",
+        ".xml": "application/xml",
+    }
+    return known[extension]
 
 
 def _supabase_storage_configured() -> bool:
@@ -52,12 +75,14 @@ def get_storage_path(storage_key: str) -> Path:
     return get_storage_directory() / storage_key
 
 
-async def _upload_to_supabase(upload: UploadFile, storage_key: str, total_bytes: int) -> None:
+async def _upload_to_supabase(
+    upload: UploadFile, storage_key: str, total_bytes: int, content_type: str
+) -> None:
     url = _storage_url(storage_key)
     headers = {
         "apikey": settings.supabase_service_role_key,
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
-        "Content-Type": "text/csv",
+        "Content-Type": content_type,
         "Content-Length": str(total_bytes),
         "x-upsert": "false",
     }
@@ -77,17 +102,13 @@ async def _upload_to_supabase(upload: UploadFile, storage_key: str, total_bytes:
 
 async def save_import_file(upload: UploadFile) -> str:
     filename = (upload.filename or "").strip()
-    if Path(filename).suffix.lower() != ".csv":
-        await upload.close()
-        raise FileStorageError("Only CSV files are supported by this import worker.")
-
-    max_bytes = settings.import_max_upload_bytes
-    if max_bytes <= 0:
-        await upload.close()
-        raise FileStorageError("Invalid upload size configuration.")
-
-    storage_key = f"{uuid.uuid4()}.csv"
     try:
+        extension = _extension(filename)
+        max_bytes = settings.import_max_upload_bytes
+        if max_bytes <= 0:
+            raise FileStorageError("Invalid upload size configuration.")
+
+        storage_key = f"{uuid.uuid4()}{extension}"
         # UploadFile is already spooled by Starlette; inspect its length without
         # loading the complete payload into application memory.
         upload.file.seek(0, 2)
@@ -99,7 +120,9 @@ async def save_import_file(upload: UploadFile) -> str:
             raise FileStorageError(f"File exceeds the {max_bytes}-byte upload limit.")
 
         if _supabase_storage_configured():
-            await _upload_to_supabase(upload, storage_key, total_bytes)
+            await _upload_to_supabase(
+                upload, storage_key, total_bytes, _content_type(extension)
+            )
         else:
             if settings.app_env.lower() == "production":
                 raise FileStorageError(

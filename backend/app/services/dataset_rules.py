@@ -5,6 +5,7 @@ source columns are present and never claim external/reference validation.
 """
 from __future__ import annotations
 
+import json
 import re
 from collections import Counter
 from datetime import datetime
@@ -27,7 +28,10 @@ def _number(value: Any) -> float | None:
         return None
 
 
-def profile_dataset_rules(headers: list[str], rows: list[dict[str, Any]]) -> dict[str, Any]:
+def profile_dataset_rules(
+    headers: list[str], rows: list[dict[str, Any]],
+    *, missing_cells: int | None = None, duplicate_rows: int | None = None,
+) -> dict[str, Any]:
     """Return a conservative dataset classification and applicable rule findings."""
     by_name = {_norm(header): header for header in headers}
     names = set(by_name)
@@ -57,7 +61,29 @@ def profile_dataset_rules(headers: list[str], rows: list[dict[str, Any]]) -> dic
     def header(*candidates: str) -> str | None:
         return next((by_name[name] for name in candidates if name in by_name), None)
 
-    if dataset_type == "orders / transactions":
+    if dataset_type == "product catalog":
+        sku_col = header("sku", "product_sku", "item_sku", "product_code")
+        if sku_col:
+            missing_skus = sum(1 for row in rows if row.get(sku_col) in (None, "") or not str(row.get(sku_col)).strip())
+            add_check(
+                "MISSING_PRODUCT_SKU", "Missing product SKUs", missing_skus,
+                f"{missing_skus} product records have no seller SKU.",
+                "Provide the seller-assigned SKU or use a different source profile when the source identifier is not a seller SKU.",
+                "critical",
+            )
+            sku_values = [
+                str(row.get(sku_col)).strip().casefold()
+                for row in rows
+                if row.get(sku_col) not in (None, "") and str(row.get(sku_col)).strip()
+            ]
+            duplicate_skus = sum(count - 1 for count in Counter(sku_values).values() if count > 1)
+            add_check(
+                "DUPLICATE_PRODUCT_SKU", "Duplicate product SKUs", duplicate_skus,
+                f"{duplicate_skus} product records repeat a seller SKU.",
+                "Confirm whether repeated SKUs are duplicate products or legitimate variant/location records; choose the matching dataset grain.",
+                "critical",
+            )
+    elif dataset_type == "orders / transactions":
         status_col = header("order_status", "status")
         if status_col:
             allowed = {"created", "pending", "approved", "processing", "shipped", "delivered", "cancelled", "canceled", "returned", "refunded", "completed", "paid", "invoiced", "unavailable", "sent"}
@@ -95,6 +121,29 @@ def profile_dataset_rules(headers: list[str], rows: list[dict[str, Any]]) -> dic
         if moq_col:
             invalid = sum(1 for row in rows if _number(row.get(moq_col)) is not None and _number(row.get(moq_col)) <= 0)
             add_check("INVALID_MINIMUM_ORDER_QUANTITY", "Invalid minimum order quantities", invalid, f"{invalid} offers have a minimum order quantity of zero or less.", "Set a positive MOQ or explicitly define how non-positive values should be handled.")
+        currency_col = header("currency", "currency_code")
+        if price_col and currency_col:
+            missing_currency = sum(
+                1 for row in rows
+                if row.get(price_col) not in (None, "")
+                and row.get(currency_col) in (None, "")
+            )
+            add_check(
+                "PRICE_WITHOUT_CURRENCY", "Price missing currency", missing_currency,
+                f"{missing_currency} priced offers do not specify a currency.",
+                "Provide the ISO 4217 currency code; do not infer currency from locale or supplier location.",
+                "critical",
+            )
+            invalid_currency = sum(
+                1 for row in rows
+                if row.get(currency_col) not in (None, "")
+                and not re.fullmatch(r"[A-Z]{3}", str(row[currency_col]).strip().upper())
+            )
+            add_check(
+                "INVALID_CURRENCY_FORMAT", "Invalid currency code format", invalid_currency,
+                f"{invalid_currency} offers contain a currency value that is not a three-letter code.",
+                "Normalize currency values to ISO 4217 codes and verify the code is supported.",
+            )
     elif dataset_type == "financial transactions":
         amount_col = header("amount", "total", "total_amount", "transaction_amount")
         if amount_col:
@@ -111,4 +160,89 @@ def profile_dataset_rules(headers: list[str], rows: list[dict[str, Any]]) -> dic
             duplicate_count = sum(count - 1 for count in Counter(ids).values() if count > 1)
             add_check("DUPLICATE_CUSTOMER_IDENTIFIER", "Duplicate customer identifiers", duplicate_count, f"{duplicate_count} repeated customer identifier values were found.", "Confirm whether repeated IDs represent duplicate customer records or legitimate multiple transactions.")
 
-    return {"dataset_type": dataset_type, "domain_checks": checks, "domain_issues": issues}
+    # A stable rule catalogue is returned for every dataset, not only when a
+    # domain-specific rule happens to match. This makes applicability explicit
+    # and prevents an absent check from being mistaken for a successful check.
+    if missing_cells is None:
+        missing_cells = sum(
+            1 for row in rows for column in headers
+            if row.get(column) is None or str(row.get(column)).strip() == ""
+        )
+    if duplicate_rows is None:
+        row_counts: Counter[str] = Counter()
+        duplicate_rows = 0
+        for row in rows:
+            key = json.dumps(
+                [row.get(column) for column in headers],
+                ensure_ascii=False, separators=(",", ":"), default=str,
+            )
+            row_counts[key] += 1
+            if row_counts[key] > 1:
+                duplicate_rows += 1
+
+    evaluated = {item["code"]: item for item in checks}
+    rule_definitions = [
+        ("MISSING_VALUES", "Missing values", "structural", "warning", None),
+        ("EXACT_DUPLICATE_ROWS", "Exact duplicate rows", "structural", "warning", None),
+        ("MISSING_PRODUCT_SKU", "Missing product SKUs", "product catalog", "critical", "product catalog"),
+        ("DUPLICATE_PRODUCT_SKU", "Duplicate product SKUs", "product catalog", "critical", "product catalog"),
+        ("PRICE_WITHOUT_CURRENCY", "Price missing currency", "supplier offers", "critical", "supplier offers"),
+        ("INVALID_CURRENCY_FORMAT", "Invalid currency code format", "supplier offers", "warning", "supplier offers"),
+        ("UNRECOGNIZED_ORDER_STATUS", "Unrecognized order statuses", "orders / transactions", "warning", "orders / transactions"),
+        ("DELIVERY_BEFORE_PURCHASE", "Delivery date precedes purchase date", "orders / transactions", "critical", "orders / transactions"),
+        ("NEGATIVE_INVENTORY_QUANTITY", "Negative inventory quantities", "inventory", "critical", "inventory"),
+        ("INVENTORY_BALANCE_MISMATCH", "Available stock does not reconcile", "inventory", "warning", "inventory"),
+        ("NON_POSITIVE_SUPPLIER_PRICE", "Non-positive supplier prices", "supplier offers", "warning", "supplier offers"),
+        ("INVALID_MINIMUM_ORDER_QUANTITY", "Invalid minimum order quantities", "supplier offers", "warning", "supplier offers"),
+        ("NEGATIVE_TRANSACTION_AMOUNT", "Negative transaction amounts", "financial transactions", "warning", "financial transactions"),
+        ("INVALID_EMAIL_FORMAT", "Malformed email addresses", "customer records", "warning", "customer records"),
+        ("DUPLICATE_CUSTOMER_IDENTIFIER", "Duplicate customer identifiers", "customer records", "warning", "customer records"),
+    ]
+    validation_rules = []
+    for code, title, category, severity, required_dataset in rule_definitions:
+        if code == "MISSING_VALUES":
+            validation_rules.append({
+                "code": code, "title": title, "category": category,
+                "severity": severity, "status": "evaluated",
+                "records_evaluated": len(rows), "issue_records": missing_cells,
+                "detail": f"{missing_cells} empty cells were found across the dataset.",
+                "recommendation": "Review missing values against the fields required by your business process.",
+            })
+        elif code == "EXACT_DUPLICATE_ROWS":
+            validation_rules.append({
+                "code": code, "title": title, "category": category,
+                "severity": severity, "status": "evaluated",
+                "records_evaluated": len(rows), "issue_records": duplicate_rows,
+                "detail": f"{duplicate_rows} rows repeat an earlier exact row.",
+                "recommendation": "Confirm whether repeated rows are accidental duplicates or legitimate repeated events.",
+            })
+        elif required_dataset != dataset_type:
+            validation_rules.append({
+                "code": code, "title": title, "category": category,
+                "severity": severity, "status": "not_applicable",
+                "records_evaluated": 0, "issue_records": None,
+                "detail": f"This check applies to {required_dataset} datasets, not {dataset_type}.",
+                "recommendation": "No action required unless the dataset is reclassified.",
+            })
+        else:
+            result = evaluated.get(code)
+            if result is None:
+                validation_rules.append({
+                    "code": code, "title": title, "category": category,
+                    "severity": severity, "status": "not_evaluated",
+                    "records_evaluated": 0, "issue_records": None,
+                    "detail": "The required source columns were not available, so this check could not run.",
+                    "recommendation": "Provide the relevant source columns or review the dataset profile.",
+                })
+            else:
+                validation_rules.append({
+                    **result, "category": category, "status": "evaluated",
+                    "records_evaluated": len(rows),
+                })
+
+    return {
+        "dataset_type": dataset_type,
+        "domain_checks": checks,
+        "domain_issues": issues,
+        "validation_rules": validation_rules,
+    }
