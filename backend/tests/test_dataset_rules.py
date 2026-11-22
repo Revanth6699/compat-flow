@@ -172,3 +172,43 @@ def test_product_relationship_checks_are_not_evaluated_without_reference_columns
     assert rules["ORPHAN_PRODUCT_PARENT"]["issue_records"] is None
     assert rules["ORPHAN_REPLACEMENT_SKU"]["status"] == "not_evaluated"
     assert rules["ORPHAN_REPLACEMENT_SKU"]["issue_records"] is None
+
+def test_olist_product_master_is_classified_without_mislabeling_product_id_as_sku():
+    headers = [
+        "product_id",
+        "product_category_name",
+        "product_name_lenght",
+        "product_description_lenght",
+        "product_photos_qty",
+        "product_weight_g",
+        "product_length_cm",
+        "product_height_cm",
+        "product_width_cm",
+    ]
+    rows = [{
+        "product_id": "P-001",
+        "product_category_name": "perfumaria",
+        "product_name_lenght": "40",
+        "product_description_lenght": "287",
+        "product_photos_qty": "1",
+        "product_weight_g": "225",
+        "product_length_cm": "16",
+        "product_height_cm": "10",
+        "product_width_cm": "14",
+    }]
+    result = profile_dataset_rules(headers, rows)
+    rules = {item["code"]: item for item in result["validation_rules"]}
+
+    assert result["dataset_type"] == "product catalog"
+    # product_id is a source identity, not proof of a seller-assigned SKU.
+    assert rules["MISSING_PRODUCT_SKU"]["status"] == "not_evaluated"
+    assert rules["DUPLICATE_PRODUCT_SKU"]["status"] == "not_evaluated"
+    assert rules["ORPHAN_PRODUCT_PARENT"]["status"] == "not_evaluated"
+    assert rules["MISSING_VALUES"]["status"] == "evaluated"
+
+
+def test_product_id_alone_does_not_force_product_catalog_classification():
+    result = profile_dataset_rules(["product_id", "created_at"], [
+        {"product_id": "X1", "created_at": "2026-01-01"}
+    ])
+    assert result["dataset_type"] == "general dataset"
