@@ -442,7 +442,7 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
             "completeness_pct": round(count / total * 100, 2) if total else 100.0,
         })
     relevant_columns = len(headers)
-    mapped_column_count = sum(len(value["source_headers"]) for value in ambiguous_mappings) * 0 + len(mapped)
+    mapped_column_count = len(mapped)
     mapping_coverage = round(mapped_column_count / relevant_columns * 100, 2) if relevant_columns else 0.0
     total_issue_count = sum(issue_counts_by_severity.values())
     rows_with_any_issue = rows_with_critical_issues | rows_with_warning_issues
