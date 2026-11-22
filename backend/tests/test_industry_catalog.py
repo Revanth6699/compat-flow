@@ -281,3 +281,13 @@ def test_generic_lead_time_is_not_silently_converted_to_days():
     fields = mapped(result)
     assert fields["lead_time"] == "lead_time"
     assert fields["lead_time_days"] == "lead_time_days"
+
+
+def test_currency_validation_does_not_claim_iso_registry_membership():
+    result = validate_industry_csv(
+        "title,price,currency\\nWidget,10.00,ZZZ\\n",
+        profile_id="ecommerce",
+    )
+
+    assert not any(issue["error_code"] == "INVALID_CURRENCY_CODE" for issue in result["issues"])
+    assert "ISO 4217 registry membership is not verified" in result["currency_validation_scope"]
