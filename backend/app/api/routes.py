@@ -102,6 +102,8 @@ def update_validation_profile(
     if profile is None:
         raise HTTPException(status_code=404, detail="Validation profile not found.")
     changes = payload.model_dump(exclude_unset=True)
+    if any(changes.get(key) is None for key in ("name", "dataset_type", "is_active") if key in changes):
+        raise HTTPException(status_code=422, detail="Profile name, dataset type and active state cannot be null.")
     for key, value in changes.items():
         if key == "name" and value is not None:
             value = value.strip()
@@ -199,6 +201,8 @@ def update_validation_rule(
     if rule is None:
         raise HTTPException(status_code=404, detail="Validation rule not found.")
     changes = payload.model_dump(exclude_unset=True)
+    if any(changes.get(key) is None for key in ("name", "field_name", "severity", "enabled", "config") if key in changes):
+        raise HTTPException(status_code=422, detail="Rule fields cannot be set to null.")
     if "config" in changes:
         try:
             changes["config"] = validate_rule_config(rule.rule_type, changes["config"])
