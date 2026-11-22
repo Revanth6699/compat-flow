@@ -441,3 +441,21 @@ def test_supply_chain_product_profile_maps_supplier_and_stock_levels():
     assert result["field_mappings"]["product_selling_price"] == "Price"
     rules = {item["code"]: item for item in result["validation_rules"]}
     assert rules["NEGATIVE_INVENTORY_QUANTITY"]["status"] == "evaluated"
+
+
+
+def test_marketplace_product_listing_fields_keep_merchant_and_cluster_identity_separate():
+    result = profile_dataset_rules(
+        ["Product ID", "Product Title", "Merchant ID", "Cluster ID", "Cluster Label", "Category ID", "Category Label"],
+        [{"Product ID": "P-1", "Product Title": "Phone", "Merchant ID": "M-1",
+          "Cluster ID": "C-1", "Cluster Label": "Phone family", "Category ID": "CAT-1",
+          "Category Label": "Mobile"}],
+    )
+    assert result["dataset_type"] == "product catalog"
+    mappings = result["field_mappings"]
+    assert mappings["source_product_id"] == "Product ID"
+    assert mappings["merchant_id"] == "Merchant ID"
+    assert mappings["product_cluster_id"] == "Cluster ID"
+    assert mappings["product_cluster_label"] == "Cluster Label"
+    assert mappings["product_category_id"] == "Category ID"
+    assert mappings["product_category"] == "Category Label"
