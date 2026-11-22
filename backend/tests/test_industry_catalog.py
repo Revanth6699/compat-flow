@@ -190,9 +190,9 @@ def test_zepto_price_discount_and_stock_consistency_issues_are_reported():
 
 
 def test_industry_issue_metrics_count_all_findings_even_when_details_are_capped():
-    rows = "".join(f"S-{index},Widget,not-a-price,USD\\n" for index in range(600))
+    rows = "".join(f"S-{index},Widget,not-a-price,USD\n" for index in range(600))
     result = validate_industry_csv(
-        "sku,title,price,currency\\n" + rows,
+        "sku,title,price,currency\n" + rows,
         profile_id="ecommerce",
     )
 
@@ -208,7 +208,7 @@ def test_industry_issue_metrics_count_all_findings_even_when_details_are_capped(
 
 def test_industry_warning_only_rows_remain_valid_but_are_counted_for_review():
     result = validate_industry_csv(
-        "title,mrp,discountedSellingPrice,currency\\nWidget,10,12,USD\\n",
+        "title,mrp,discountedSellingPrice,currency\nWidget,10,12,USD\n",
         profile_id="ecommerce",
     )
 
@@ -221,7 +221,7 @@ def test_industry_warning_only_rows_remain_valid_but_are_counted_for_review():
 
 def test_duplicate_aliases_are_explicitly_reported_as_ambiguous_not_auto_mapped():
     result = validate_industry_csv(
-        "sku,seller_sku,title\\nS-1,S-1,Widget\\n",
+        "sku,seller_sku,title\nS-1,S-1,Widget\n",
         profile_id="ecommerce",
     )
 
@@ -245,13 +245,16 @@ def test_industry_detection_explains_weak_and_tied_evidence():
     assert weak["decision_reason"] == "insufficient_industry_signals"
     assert weak["confidence_method"] == "heuristic_signal_score_not_probability"
 
-    tied = detect_industry(["manufacturer", "mpn", "material", "diameter", "pressure_rating", "standard"])
-    assert tied["needs_confirmation"] is False or tied["decision_reason"] == "ambiguous_tied_profiles"
+    tied = detect_industry(["unit_price", "currency", "quantity"])
+    assert tied["needs_confirmation"] is True
+    assert tied["profile_id"] is None
+    assert tied["decision_reason"] == "ambiguous_tied_profiles"
+    assert {item["profile_id"] for item in tied["top_candidates"]} == {"ecommerce", "wholesale"}
 
 
 def test_findings_include_potential_impact_without_claiming_measured_loss():
     result = validate_industry_csv(
-        "sku,title,price\\nS-1,Widget,12.50\\n",
+        "sku,title,price\nS-1,Widget,12.50\n",
         profile_id="ecommerce",
     )
     issue = next(item for item in result["issues"] if item["error_code"] == "PRICE_CURRENCY_MISSING")
@@ -271,7 +274,7 @@ def test_industry_alias_registry_has_no_cross_field_collisions():
 
 def test_generic_lead_time_is_not_silently_converted_to_days():
     result = validate_industry_csv(
-        "supplier_sku,lead_time,lead_time_days\\nS-1,2,3\\n",
+        "supplier_sku,lead_time,lead_time_days\nS-1,2,3\n",
         profile_id="wholesale",
     )
 
