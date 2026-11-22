@@ -106,12 +106,16 @@ async def save_import_file(upload: UploadFile) -> str:
                     "Private import object storage is not configured for production."
                 )
             destination = get_storage_path(storage_key)
-            with destination.open("xb") as stored_file:
-                while True:
-                    chunk = await upload.read(CHUNK_SIZE)
-                    if not chunk:
-                        break
-                    stored_file.write(chunk)
+            try:
+                with destination.open("xb") as stored_file:
+                    while True:
+                        chunk = await upload.read(CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        stored_file.write(chunk)
+            except Exception:
+                destination.unlink(missing_ok=True)
+                raise
 
         return storage_key
     except httpx.HTTPError as exc:
