@@ -131,6 +131,27 @@ def _valid_iso_date(value: str) -> bool:
         return False
 
 
+POTENTIAL_IMPACT_BY_CODE = {
+    "PROFILE_REQUIRED_FIELD_MISSING": "May cause rejection by the selected destination profile or incomplete listings.",
+    "INVALID_NONNEGATIVE_NUMBER": "May cause numeric attributes, prices or quantities to be rejected or misinterpreted.",
+    "DUPLICATE_IDENTIFIER": "May cause records to collide or be matched to the wrong product or supplier offer.",
+    "DUPLICATE_GTIN": "May make barcode-based product matching ambiguous.",
+    "INVALID_GTIN_CHECK_DIGIT": "May fail barcode lookup and downstream catalog matching.",
+    "INVALID_HTTP_URL": "May prevent connected systems or customers from retrieving linked product content.",
+    "PRICE_CURRENCY_MISSING": "May make a price ambiguous across currencies or markets.",
+    "INVALID_CURRENCY_CODE": "May cause price interpretation or market validation to fail.",
+    "INVENTORY_QUANTITY_MISMATCH": "May cause available-stock values to disagree with on-hand and reserved quantities.",
+    "RESERVED_EXCEEDS_ON_HAND": "May create negative available stock or an overselling risk.",
+    "SELLING_PRICE_ABOVE_LIST_PRICE": "May display a discount incorrectly or fail destination pricing checks.",
+    "OUT_OF_STOCK_WITH_POSITIVE_AVAILABILITY": "May show an item as unavailable while stock is still reported as available.",
+    "IN_STOCK_WITH_ZERO_AVAILABILITY": "May show an item as available when no sellable stock is reported.",
+    "DATE_RANGE_INVALID": "May cause the product or offer validity window to be interpreted incorrectly.",
+    "MEASUREMENT_MUST_BE_POSITIVE": "May make shipping, fitment or engineering calculations unusable.",
+    "INTEGER_VALUE_REQUIRED": "May cause quantity or count fields to fail destination validation.",
+    "TEXT_LENGTH_MISMATCH": "May cause content-feed validation errors where declared text lengths are consumed.",
+}
+
+
 class IndustryCSVError(ValueError):
     pass
 
@@ -275,7 +296,15 @@ def validate_industry_csv(content: str, profile_id: str | None = None, max_rows:
         elif severity == "warning":
             rows_with_warning_issues.add(row_number)
         if len(issues) < ERROR_LIMIT:
-            issues.append({"row_number": row_number, "field": field, "error_code": code, "message": message, "severity": severity})
+            issues.append({
+                "row_number": row_number, "field": field, "error_code": code,
+                "message": message, "severity": severity,
+                "potential_impact": POTENTIAL_IMPACT_BY_CODE.get(
+                    code,
+                    "May affect acceptance or interpretation by downstream systems; confirm against the destination's own rules.",
+                ),
+                "impact_basis": "potential_downstream_effect_not_measured",
+            })
 
     for line_number, values in enumerate(reader, start=2):
         if not values or all(not str(v).strip() for v in values):
