@@ -90,7 +90,7 @@ p { margin-top: 0; }
   background: #fff; border-bottom: 1px solid var(--line);
 }
 .header-inner {
-  min-height: 76px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+  min-height: 108px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center; gap: 24px;
 }
 .brand {
@@ -1760,27 +1760,28 @@ h1, h2, h3, h4, .editorial-heading {
 }
 .brand img {
   display: block;
-  width: 92px;
-  height: 64px;
+  width: 128px;
+  height: 97px;
   object-fit: contain;
 }
 .footer-logo-link {
   display: inline-flex;
   width: max-content;
-  padding: 5px 8px;
+  padding: 4px 6px;
   border-radius: 7px;
   background: #fff;
 }
 .footer-logo-link img {
   display: block;
-  width: 112px;
-  height: 77px;
+  width: 140px;
+  height: 106px;
   object-fit: contain;
 }
 .footer-brand { align-items: flex-start; }
 @media (max-width: 760px) {
-  .brand img { width: 76px; height: 53px; }
-  .header-inner { min-height: 68px; gap: 12px; }
+  .brand img { width: 104px; height: 79px; }
+  .header-inner { min-height: 0; gap: 12px; }
+  .footer-logo-link img { width: 126px; height: 95px; }
 }
 
 
