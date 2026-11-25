@@ -88,8 +88,6 @@ class Settings(BaseSettings):
             raise ValueError("ALLOWED_HOSTS contains an invalid hostname.")
         if self.app_debug:
             raise ValueError("APP_DEBUG must be false in production.")
-        if not self.migration_database_url:
-            raise ValueError("MIGRATION_DATABASE_URL must be configured separately in production.")
-        if self.database_url == self.migration_database_url:
+        if self.migration_database_url and self.database_url == self.migration_database_url:
             raise ValueError("DATABASE_URL must use a separate restricted runtime role.")
         return self
