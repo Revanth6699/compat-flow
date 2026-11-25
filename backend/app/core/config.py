@@ -24,10 +24,13 @@ class Settings(BaseSettings):
     gmail_oauth_redirect_uri: str = ""
     contact_notification_secret: str = ""
 
+    # DATABASE_URL is the least-privileged application login. Alembic alone
+    # uses MIGRATION_DATABASE_URL, which must never be used by request workers.
     database_url: str = (
         "postgresql+psycopg://compatflow_local:"
         "local-only-change-this-password@localhost:5432/compatflow"
     )
+    migration_database_url: str = ""
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
@@ -43,88 +46,50 @@ class Settings(BaseSettings):
     razorpay_webhook_secret: str = ""
     razorpay_plan_ids_json: str = "{}"
 
-    model_config = SettingsConfigDict(
-        env_file="../.env",
-        extra="ignore",
-    )
+    model_config = SettingsConfigDict(env_file="../.env", extra="ignore")
 
     @model_validator(mode="after")
     def validate_settings(self):
         if self.import_max_upload_bytes <= 0:
             raise ValueError("IMPORT_MAX_UPLOAD_BYTES must be positive.")
-
         if self.import_max_upload_bytes > 100 * 1024 * 1024:
             raise ValueError("IMPORT_MAX_UPLOAD_BYTES cannot exceed 100 MB.")
         if self.connector_rate_limit_per_minute < 1 or self.connector_rate_limit_per_minute > 1000:
             raise ValueError("CONNECTOR_RATE_LIMIT_PER_MINUTE must be between 1 and 1000.")
-
         if self.app_env.lower() != "production":
             return self
-
         if (
             len(self.app_secret_key) < 32
             or self.app_secret_key in {
-                "local-only-change-me",
-                "local-development-only-change-me",
-                "change-me",
-                "secret",
+                "local-only-change-me", "local-development-only-change-me", "change-me", "secret"
             }
         ):
             raise ValueError(
-                "APP_SECRET_KEY must be a strong, randomly generated "
-                "secret of at least 32 characters in production."
+                "APP_SECRET_KEY must be a strong, randomly generated secret of at least 32 characters in production."
             )
-
-        origins = [
-            value.strip()
-            for value in self.frontend_origin.split(",")
-            if value.strip()
-        ]
-
+        origins = [value.strip() for value in self.frontend_origin.split(",") if value.strip()]
         if not origins:
             raise ValueError("FRONTEND_ORIGIN must contain an HTTPS origin.")
-
         for origin in origins:
             parsed = urlsplit(origin)
-
             if (
-                parsed.scheme != "https"
-                or not parsed.hostname
-                or parsed.username
-                or parsed.password
-                or parsed.path not in ("", "/")
-                or parsed.query
-                or parsed.fragment
+                parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
+                or parsed.path not in ("", "/") or parsed.query or parsed.fragment
             ):
-                raise ValueError(
-                    "FRONTEND_ORIGIN must contain valid public HTTPS origins."
-                )
-
-        hosts = [
-            value.strip().lower()
-            for value in self.allowed_hosts.split(",")
-            if value.strip()
-        ]
-
+                raise ValueError("FRONTEND_ORIGIN must contain valid public HTTPS origins.")
+        hosts = [value.strip().lower() for value in self.allowed_hosts.split(",") if value.strip()]
         hostname_pattern = re.compile(
-            r"^(?=.{1,253}$)"
-            r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*"
+            r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*"
             r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
         )
-
         if not hosts or "*" in hosts:
-            raise ValueError(
-                "ALLOWED_HOSTS must contain explicit public API hostnames."
-            )
-
+            raise ValueError("ALLOWED_HOSTS must contain explicit public API hostnames.")
         if any(not hostname_pattern.fullmatch(host) for host in hosts):
-            raise ValueError(
-                "ALLOWED_HOSTS contains an invalid hostname."
-            )
-
+            raise ValueError("ALLOWED_HOSTS contains an invalid hostname.")
         if self.app_debug:
             raise ValueError("APP_DEBUG must be false in production.")
-
+        if self.migration_database_url and self.database_url == self.migration_database_url:
+            raise ValueError("DATABASE_URL must use a separate restricted runtime role.")
         return self
 
 
