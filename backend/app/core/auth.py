@@ -14,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_db, set_rls_identity, set_rls_organization
 from app.models import DemoAccessRequest, RolePermission, Subscription, SubscriptionPlan, User
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -87,6 +87,8 @@ def get_current_user(
     identity: SupabaseIdentity = Depends(get_supabase_identity),
     db: Session = Depends(get_db),
 ) -> AuthenticatedUser:
+    # Bootstrap RLS using only the verified Supabase JWT subject.
+    set_rls_identity(db, identity.auth_user_id)
     profile = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
     if profile is None:
         raise HTTPException(
@@ -97,6 +99,8 @@ def get_current_user(
         raise HTTPException(status_code=403, detail="This CompatFlow account is inactive.")
     if profile.email.lower() != identity.email:
         raise HTTPException(status_code=403, detail="The authenticated email does not match the authorized account.")
+    # Tenant scope is derived from the trusted CompatFlow user row, never request input.
+    set_rls_organization(db, profile.organization_id)
     return AuthenticatedUser(identity=identity, profile=profile)
 
 
