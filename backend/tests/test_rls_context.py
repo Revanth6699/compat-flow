@@ -89,3 +89,34 @@ def test_new_transaction_clears_unset_tenant_context():
     _restore_rls_context(SimpleNamespace(info={}), transaction=None, connection=FakeConnection())
 
     assert calls == [{"auth_user_id": ""}, {"organization_id": ""}]
+
+
+def test_postgres_context_survives_commit_and_new_transaction():
+    from sqlalchemy import text
+
+    from app.core.database import SessionLocal, engine
+
+    if engine.dialect.name != "postgresql":
+        pytest.skip("Requires PostgreSQL transaction-local settings.")
+
+    auth_user_id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+    organization_id = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
+    db = SessionLocal()
+    try:
+        set_rls_identity(db, auth_user_id)
+        set_rls_organization(db, organization_id)
+
+        before_commit = db.execute(
+            text("SELECT current_setting('app.auth_user_id', true), current_setting('app.organization_id', true)")
+        ).one()
+        assert before_commit == (str(auth_user_id), str(organization_id))
+
+        db.commit()
+
+        after_commit = db.execute(
+            text("SELECT current_setting('app.auth_user_id', true), current_setting('app.organization_id', true)")
+        ).one()
+        assert after_commit == (str(auth_user_id), str(organization_id))
+    finally:
+        db.rollback()
+        db.close()
