@@ -1,12 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 680" role="img" aria-labelledby="title">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 120" role="img" aria-labelledby="title">
 <title id="title">CompatFlow</title>
-<g transform="translate(90 0) scale(0.8)">
-  <path fill="#2582c5" fill-rule="evenodd" d="M337 18h48l7 47 30 13 36-29 34 34-29 36 13 30 47 7v48l-47 7-13 30 29 36-34 34-36-29-30 13-7 47h-48l-7-47-30-13-36 29-34-34 29-36-13-30-47-7v-48l47-7 13-30-29-36 34-34 36 29 30-13z M361 111a68 68 0 1 0 0 136a68 68 0 1 0 0-136"/>
-  <path fill="#0a2e49" d="M215 482h58v110h-58zM315 450q28-7 58-18v160h-58zM415 416q30-14 58-32v208h-58zM515 349q30-27 58-60v303h-58z"/>
-  <path d="M198 430C380 445 536 364 650 110" fill="none" stroke="#2582c5" stroke-width="43" stroke-linecap="round"/>
-  <path d="M633 88l61-31 9 69" fill="none" stroke="#2582c5" stroke-width="25" stroke-linecap="round" stroke-linejoin="round"/>
-  <path fill="#2582c5" d="M690 52l-3 78-64-38z"/>
+<g transform="translate(5 8)">
+  <path d="M12 51 L101 9 L133 42 L198 1 L192 26 L134 66 L101 34 L18 75 Z" fill="#49bd16"/>
+  <path d="M52 55 L52 86 L73 102 L73 48 Z" fill="#08a4d4"/>
+  <path d="M88 39 L88 105 Q105 108 122 105 L122 54 L103 34 Z" fill="#0878bd"/>
+  <path d="M143 59 L143 101 L177 79 L177 34 Z" fill="#075da0"/>
+  <path d="M5 53 C3 95 39 117 83 117 C122 117 154 99 170 75 C145 98 112 105 83 99 C42 91 15 68 12 27 Z" fill="#555"/>
 </g>
-<text x="0" y="650" font-family="Arial, Helvetica, sans-serif" font-size="142" font-weight="900" font-style="italic" letter-spacing="-9" fill="#000">Compat</text>
-<text x="570" y="650" font-family="Arial, Helvetica, sans-serif" font-size="142" font-weight="900" font-style="italic" letter-spacing="-9" fill="#2582c5">flow</text>
+<g transform="translate(198 0)">
+  <path d="M14 42 h22 v8 c0 7 8 10 13 5 l6 -6 14 14 -6 6 c-5 5 -2 13 5 13 h8 v22 h-8 c-7 0 -10 8 -5 13 l6 6 -14 14 -6 -6 c-5 -5 -13 -2 -13 5 v8 H14 v-8 c0 -7 -8 -10 -13 -5 l-6 6 -14 -14 6 -6 c5 -5 2 -13 -5 -13 h-8 V82 h8 c7 0 10 -8 5 -13 l-6 -6 14 -14 6 6 c5 5 13 2 13 -5z" fill="#35414c" transform="translate(10 -5) scale(.78)"/>
+  <text x="32" y="86" font-family="Arial, sans-serif" font-size="68" font-style="italic" font-weight="700" fill="#4abb17">Com</text>
+  <text x="174" y="86" font-family="Arial, sans-serif" font-size="68" font-style="italic" font-weight="700" fill="#555">pat</text>
+  <text x="300" y="86" font-family="Arial, sans-serif" font-size="68" font-style="italic" font-weight="800" fill="#0874b8">Flow</text>
+</g>
 </svg>
