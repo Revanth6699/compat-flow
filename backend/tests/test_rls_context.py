@@ -61,11 +61,12 @@ def test_new_transaction_restores_both_transaction_local_settings():
     })
     _restore_rls_context(session, transaction=None, connection=FakeConnection())
 
-    assert len(calls) == 2
-    assert "app.auth_user_id" in calls[0][0]
-    assert calls[0][1]["auth_user_id"] == session.info["rls_auth_user_id"]
-    assert "app.organization_id" in calls[1][0]
-    assert calls[1][1]["organization_id"] == session.info["rls_organization_id"]
+    assert len(calls) == 8
+    settings = {params["setting"]: params["value"] for _, params in calls}
+    assert settings["app.auth_user_id"] == session.info["rls_auth_user_id"]
+    assert settings["app.organization_id"] == session.info["rls_organization_id"]
+    assert settings["app.user_email"] == ""
+    assert settings["app.is_platform_admin"] == ""
 
 
 def test_new_transaction_clears_unset_tenant_context():
@@ -81,4 +82,4 @@ def test_new_transaction_clears_unset_tenant_context():
             calls.append(parameters)
 
     _restore_rls_context(SimpleNamespace(info={}), transaction=None, connection=FakeConnection())
-    assert calls == [{"auth_user_id": ""}, {"organization_id": ""}]
+    assert len(calls) == 8 and all(value == "" for call in calls for value in call.values())
