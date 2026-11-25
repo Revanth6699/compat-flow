@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import AuthenticatedUser, get_current_user, is_platform_admin, require_roles
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_db, set_rls_verified_payment_webhook
 from app.models import Payment, PaymentWebhookEvent, Subscription, SubscriptionPlan
 from app.services.subscription_period import subscription_period_end
 from app.services.razorpay_client import (
@@ -279,6 +279,7 @@ async def razorpay_webhook(
     raw_body = bytes(raw_chunks)
     if not verify_webhook_signature(raw_body, x_razorpay_signature or ""):
         raise HTTPException(status_code=400, detail="Razorpay webhook signature verification failed.")
+    set_rls_verified_payment_webhook(db)
 
     try:
         import json

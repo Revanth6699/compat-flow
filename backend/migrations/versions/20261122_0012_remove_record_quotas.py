@@ -13,6 +13,8 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # This migration may run after tenant RLS has already been enabled on staging.
+    op.execute("SELECT set_config('app.is_platform_admin', 'true', true)")
     # File-size entitlements remain plan-specific. Record processing is governed
     # by one system-level safety ceiling, not commercial plan quotas.
     op.execute(
