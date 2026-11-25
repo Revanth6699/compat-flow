@@ -14,7 +14,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.database import get_db, set_rls_identity, set_rls_organization
+from app.core.database import (
+    get_db,
+    set_rls_identity,
+    set_rls_organization,
+    set_rls_user_email,
+    set_rls_platform_admin,
+)
 from app.models import DemoAccessRequest, RolePermission, Subscription, SubscriptionPlan, User
 
 bearer_scheme = HTTPBearer(auto_error=False)
