@@ -8,7 +8,7 @@ export function SiteFooter() {
  const { user } = useAuth();
  return <footer className="site-footer"><div className="container footer">
   <div className="footer-brand">
-   <Link className="footer-logo-link" href="/" aria-label="CompatFlow home"><Image src="/compatflow-logo.png" alt="CompatFlow" width={90} height={90} /></Link>
+   <Link className="footer-logo-link" href="/" aria-label="CompatFlow home"><Image src="/compatflow-logo.svg" alt="CompatFlow" width={90} height={90} /></Link>
    <span>Supplier catalog operations</span>
    <p className="footer-summary">A product in development focused on helping commerce teams work with more consistent supplier catalog data.</p>
   </div>
