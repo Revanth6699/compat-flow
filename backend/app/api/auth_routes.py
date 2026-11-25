@@ -21,7 +21,7 @@ from app.core.auth import (
     is_platform_admin,
     require_verified_supabase_email,
 )
-from app.core.database import get_db
+from app.core.database import get_db, set_rls_identity, set_rls_organization, set_rls_onboarding
 from app.core.config import settings
 from app.services.razorpay_client import razorpay_request
 from app.models import Organization, Payment, PaymentWebhookEvent, Subscription, SubscriptionPlan, User, UserInvitation
@@ -73,6 +73,7 @@ def delete_account(
     db: Session = Depends(get_db),
 ):
     """Delete the authenticated identity; owners delete their entire organization and its history."""
+    set_rls_identity(db, identity.auth_user_id)
     profile = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
     if profile is None:
         if payload.confirmation != "DELETE MY ACCOUNT":
@@ -146,9 +147,11 @@ def create_organization_for_current_user(
 ):
     """Create one organization for a verified Supabase identity during self-service onboarding."""
     require_verified_supabase_email(identity)
+    set_rls_identity(db, identity.auth_user_id)
     existing = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
     if existing is not None:
         raise HTTPException(status_code=409, detail="This account is already linked to a CompatFlow organization.")
+    set_rls_onboarding(db)
     organization = Organization(id=uuid4(), name=payload.name.strip())
     profile = User(
         id=uuid4(),
