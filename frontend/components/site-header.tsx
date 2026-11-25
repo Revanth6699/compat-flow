@@ -24,7 +24,7 @@ export function SiteHeader() {
     <header className="site-header">
       <div className="container header-inner">
         <Link className="brand" href="/" aria-label="CompatFlow home">
-          <Image src="/compatflow-logo.png" alt="CompatFlow" width={72} height={72} priority />
+          <Image src="/compatflow-logo.svg" alt="CompatFlow" width={72} height={72} priority />
         </Link>
         <nav className="nav header-main-nav" aria-label="Main navigation">
           {user ? (
