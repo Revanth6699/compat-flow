@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     siteName: "CompatFlow",
     title: "CompatFlow — Supplier Catalog Change Operations",
     description: "Keep supplier-driven product catalog changes organized and controlled.",
-    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "CompatFlow supplier catalog operations" }],
+    images: [{ url: "/opengraph-image", width: 520, height: 120, alt: "CompatFlow" }],
   },
   twitter: {
     card: "summary_large_image",
