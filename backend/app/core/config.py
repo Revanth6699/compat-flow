@@ -79,7 +79,7 @@ class Settings(BaseSettings):
                 raise ValueError("FRONTEND_ORIGIN must contain valid public HTTPS origins.")
         hosts = [value.strip().lower() for value in self.allowed_hosts.split(",") if value.strip()]
         hostname_pattern = re.compile(
-            r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)*"
+            r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)*"
             r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"
         )
         if not hosts or "*" in hosts:
