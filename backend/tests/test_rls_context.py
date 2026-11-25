@@ -43,7 +43,7 @@ def test_organization_context_cannot_be_switched_within_a_session(db):
         set_rls_organization(db, UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"))
 
 
-def test_new_transaction_restores_both_transaction_local_settings():
+def test_new_transaction_restores_all_transaction_local_settings():
     from types import SimpleNamespace
     from app.core.database import _restore_rls_context
 
