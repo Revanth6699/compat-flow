@@ -21,7 +21,7 @@ from app.core.auth import (
     is_platform_admin,
     require_verified_supabase_email,
 )
-from app.core.database import get_db, set_rls_identity, set_rls_organization, set_rls_onboarding
+from app.core.database import get_db, set_rls_identity, set_rls_organization, set_rls_onboarding, set_rls_user_email
 from app.core.config import settings
 from app.services.razorpay_client import razorpay_request
 from app.models import Organization, Payment, PaymentWebhookEvent, Subscription, SubscriptionPlan, User, UserInvitation
@@ -155,6 +155,7 @@ def create_organization_for_current_user(
         raise HTTPException(status_code=409, detail="This account is already linked to a CompatFlow organization.")
     set_rls_onboarding(db)
     organization = Organization(id=uuid4(), name=payload.name.strip())
+    set_rls_organization(db, organization.id)
     profile = User(
         id=uuid4(),
         organization_id=organization.id,
@@ -409,6 +410,8 @@ def accept_invitation(
     db: Session = Depends(get_db),
 ):
     require_verified_supabase_email(identity)
+    set_rls_identity(db, identity.auth_user_id)
+    set_rls_user_email(db, identity.email)
 
     token_hash = sha256(payload.token.encode("utf-8")).hexdigest()
     invitation = db.scalar(
@@ -419,6 +422,7 @@ def accept_invitation(
     now = datetime.now(timezone.utc)
     if invitation is None or invitation.revoked_at is not None or invitation.accepted_at is not None:
         raise HTTPException(status_code=400, detail="This invitation is invalid, revoked, or already used.")
+    set_rls_organization(db, invitation.organization_id)
     # Serialize acceptance against other acceptances and new invitations in
     # this organization so concurrent requests cannot oversubscribe seats.
     db.scalar(
