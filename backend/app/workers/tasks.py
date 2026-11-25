@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.dialects.postgresql import insert
 
-from app.core.database import SessionLocal
+from app.core.database import SessionLocal, set_rls_worker_organization
 from app.models import ImportJob, ImportRowError, Product
 from app.services.catalog_csv import parse_catalog_csv
 from app.services.file_storage import get_storage_path
@@ -16,11 +16,11 @@ def health_check_task() -> str:
 
 
 @celery_app.task(name="compatflow.process_catalog_import")
-def process_catalog_import(job_id: str) -> dict:
+def process_catalog_import(job_id: str, organization_id: str) -> dict:
     db = SessionLocal()
 
     try:
-        job = db.get(ImportJob, uuid.UUID(job_id))
+        job = db.scalar(select(ImportJob).where(ImportJob.id == uuid.UUID(job_id), ImportJob.organization_id == tenant_id))
 
         if job is None:
             return {"status": "not_found", "job_id": job_id}
@@ -122,7 +122,7 @@ def process_catalog_import(job_id: str) -> dict:
         db.rollback()
 
         try:
-            job = db.get(ImportJob, uuid.UUID(job_id))
+            job = db.scalar(select(ImportJob).where(ImportJob.id == uuid.UUID(job_id), ImportJob.organization_id == tenant_id))
 
             if job is not None:
                 job.status = "failed"
