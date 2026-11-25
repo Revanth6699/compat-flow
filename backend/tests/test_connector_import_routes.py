@@ -216,6 +216,15 @@ async def test_connector_rate_limit_is_enforced_per_organization(monkeypatch):
             return self.value
 
     class FakeSession:
+        info = {}
+
+        def get_bind(self):
+            from types import SimpleNamespace
+            return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+        def in_transaction(self):
+            return False
+
         def execute(self, statement, params):
             if "INSERT INTO connector_rate_limits" in str(statement):
                 calls["count"] += 1
@@ -236,7 +245,7 @@ async def test_connector_rate_limit_is_enforced_per_organization(monkeypatch):
     monkeypatch.setattr(routes, "SessionLocal", FakeSession)
     monkeypatch.setattr(settings, "connector_rate_limit_per_minute", 1)
     organization_id = uuid4()
-    await routes._enforce_connector_rate_limit(organization_id)
+    await routes._enforce_connector_rate_limit(organization_id, uuid4())
     with pytest.raises(Exception) as exc:
         await routes._enforce_connector_rate_limit(organization_id)
     assert getattr(exc.value, "status_code", None) == 429
@@ -255,6 +264,15 @@ async def test_connector_rate_limit_fails_closed_when_postgres_is_unavailable(mo
     calls = {"rolled_back": False, "closed": False}
 
     class FakeSession:
+        info = {}
+
+        def get_bind(self):
+            from types import SimpleNamespace
+            return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+        def in_transaction(self):
+            return False
+
         def execute(self, *args, **kwargs):
             raise SQLAlchemyError("database unavailable")
 
