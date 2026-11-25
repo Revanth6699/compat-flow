@@ -303,7 +303,7 @@ async def commit_connector_import(
     _plan: AuthenticatedUser = Depends(require_plan_feature("supplier_catalogs")),
     db: Session = Depends(get_db),
 ):
-    await _enforce_connector_rate_limit(current.profile.organization_id)
+    await _enforce_connector_rate_limit(current.profile.organization_id, current.identity.auth_user_id)
     try:
         raw, filename = await _load_source(payload)
         parsed, result = _prepare(payload, raw, filename)
