@@ -105,7 +105,7 @@ def test_authenticated_connector_preview_runs_validation_without_persisting(monk
             "supplier.json",
         )
     monkeypatch.setattr(routes, "_load_source", fake_load_source)
-    monkeypatch.setattr(routes, "_enforce_connector_rate_limit", lambda organization_id: _async_noop())
+    monkeypatch.setattr(routes, "_enforce_connector_rate_limit", lambda organization_id, auth_user_id: _async_noop())
     try:
         response = TestClient(app).post(
             "/api/v1/catalog/import/connectors/preview",
@@ -132,7 +132,7 @@ def test_authenticated_connector_commit_persists_for_authenticated_tenant(monkey
         calls.update(kwargs)
         return {"status": "completed", "imported_records": 1}
     monkeypatch.setattr(routes, "_load_source", fake_load_source)
-    monkeypatch.setattr(routes, "_enforce_connector_rate_limit", lambda organization_id: _async_noop())
+    monkeypatch.setattr(routes, "_enforce_connector_rate_limit", lambda organization_id, auth_user_id: _async_noop())
     monkeypatch.setattr(routes, "persist_validated_import", fake_persist)
     try:
         response = TestClient(app).post(
@@ -216,6 +216,16 @@ async def test_connector_rate_limit_is_enforced_per_organization(monkeypatch):
             return self.value
 
     class FakeSession:
+        def __init__(self):
+            self.info = {}
+
+        def get_bind(self):
+            from types import SimpleNamespace
+            return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+        def in_transaction(self):
+            return False
+
         def execute(self, statement, params):
             if "INSERT INTO connector_rate_limits" in str(statement):
                 calls["count"] += 1
@@ -236,9 +246,9 @@ async def test_connector_rate_limit_is_enforced_per_organization(monkeypatch):
     monkeypatch.setattr(routes, "SessionLocal", FakeSession)
     monkeypatch.setattr(settings, "connector_rate_limit_per_minute", 1)
     organization_id = uuid4()
-    await routes._enforce_connector_rate_limit(organization_id)
+    await routes._enforce_connector_rate_limit(organization_id, uuid4())
     with pytest.raises(Exception) as exc:
-        await routes._enforce_connector_rate_limit(organization_id)
+        await routes._enforce_connector_rate_limit(organization_id, uuid4())
     assert getattr(exc.value, "status_code", None) == 429
     assert calls["count"] == 2
     assert calls["closed"] == 2
@@ -255,6 +265,15 @@ async def test_connector_rate_limit_fails_closed_when_postgres_is_unavailable(mo
     calls = {"rolled_back": False, "closed": False}
 
     class FakeSession:
+        info = {}
+
+        def get_bind(self):
+            from types import SimpleNamespace
+            return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+        def in_transaction(self):
+            return False
+
         def execute(self, *args, **kwargs):
             raise SQLAlchemyError("database unavailable")
 
@@ -266,7 +285,7 @@ async def test_connector_rate_limit_fails_closed_when_postgres_is_unavailable(mo
 
     monkeypatch.setattr(routes, "SessionLocal", FakeSession)
     with pytest.raises(Exception) as exc:
-        await routes._enforce_connector_rate_limit(uuid4())
+        await routes._enforce_connector_rate_limit(uuid4(), uuid4())
     assert getattr(exc.value, "status_code", None) == 503
     assert calls["rolled_back"] is True
     assert calls["closed"] is True
