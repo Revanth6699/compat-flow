@@ -183,6 +183,17 @@ def upgrade() -> None:
             FOR DELETE USING ({ADMIN})"""
         )
 
+    if "user_invitations" in tables:
+        op.execute(
+            f"""CREATE POLICY user_invitations_invitee_read ON public.user_invitations
+            FOR SELECT USING (lower(email) = {EMAIL} OR organization_id = {ORG} OR {ADMIN})"""
+        )
+        op.execute(
+            f"""CREATE POLICY user_invitations_invitee_accept ON public.user_invitations
+            FOR UPDATE USING (lower(email) = {EMAIL} OR organization_id = {ORG} OR {ADMIN})
+            WITH CHECK (lower(email) = {EMAIL} OR organization_id = {ORG} OR {ADMIN})"""
+        )
+
     if "subscription_plans" in tables:
         op.execute("ALTER TABLE public.subscription_plans ENABLE ROW LEVEL SECURITY")
         op.execute("ALTER TABLE public.subscription_plans FORCE ROW LEVEL SECURITY")
