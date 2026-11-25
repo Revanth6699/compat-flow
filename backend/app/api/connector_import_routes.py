@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import AuthenticatedUser, resolve_import_limits, require_permission, require_plan_feature
 from app.core.config import settings
-from app.core.database import SessionLocal, get_db
+from app.core.database import SessionLocal, get_db, set_rls_identity, set_rls_organization
 from app.models import ImportJob, ImportRowError, ImportRecordLineage
 from app.services.catalog_ingestion import persist_validated_import
 from app.services.ingestion_adapters import IngestionParseError, parse_source
@@ -69,12 +69,14 @@ class ConnectorImportRequest(BaseModel):
 
 
 
-async def _enforce_connector_rate_limit(organization_id: UUID) -> None:
+async def _enforce_connector_rate_limit(organization_id: UUID, auth_user_id: UUID) -> None:
     """Enforce an atomic per-organization fixed-window limit using PostgreSQL."""
     window_start = datetime.datetime.now(datetime.timezone.utc).replace(
         second=0, microsecond=0
     )
     db = SessionLocal()
+    set_rls_identity(db, auth_user_id)
+    set_rls_organization(db, organization_id)
     try:
         # The unique organization/window pair serializes concurrent requests.
         # No Redis service or process-local counter is required.
@@ -281,7 +283,7 @@ async def preview_connector_import(
     db: Session = Depends(get_db),
 ):
     limits = resolve_import_limits(_current, db)
-    await _enforce_connector_rate_limit(_current.profile.organization_id)
+    await _enforce_connector_rate_limit(_current.profile.organization_id, _current.identity.auth_user_id)
     try:
         raw, filename = await _load_source(payload, limits)
         parsed, result = _prepare(payload, raw, filename, limits)
@@ -307,7 +309,7 @@ async def commit_connector_import(
     db: Session = Depends(get_db),
 ):
     limits = resolve_import_limits(current, db)
-    await _enforce_connector_rate_limit(current.profile.organization_id)
+    await _enforce_connector_rate_limit(current.profile.organization_id, current.identity.auth_user_id)
     try:
         raw, filename = await _load_source(payload, limits)
         parsed, result = _prepare(payload, raw, filename, limits)
