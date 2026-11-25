@@ -87,7 +87,9 @@ def get_current_user(
     identity: SupabaseIdentity = Depends(get_supabase_identity),
     db: Session = Depends(get_db),
 ) -> AuthenticatedUser:
-    # Bootstrap RLS using only the verified Supabase JWT subject.\n    set_rls_identity(db, identity.auth_user_id)\n    profile = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
+    # Bootstrap RLS using only the verified Supabase JWT subject.
+    set_rls_identity(db, identity.auth_user_id)
+    profile = db.scalar(select(User).where(User.auth_user_id == identity.auth_user_id))
     if profile is None:
         raise HTTPException(
             status_code=404,
@@ -97,7 +99,9 @@ def get_current_user(
         raise HTTPException(status_code=403, detail="This CompatFlow account is inactive.")
     if profile.email.lower() != identity.email:
         raise HTTPException(status_code=403, detail="The authenticated email does not match the authorized account.")
-    # Tenant scope is derived from the trusted CompatFlow user row, never request input.\n    set_rls_organization(db, profile.organization_id)\n    return AuthenticatedUser(identity=identity, profile=profile)
+    # Tenant scope is derived from the trusted CompatFlow user row, never request input.
+    set_rls_organization(db, profile.organization_id)
+    return AuthenticatedUser(identity=identity, profile=profile)
 
 
 def require_roles(*roles: str):
