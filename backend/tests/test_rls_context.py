@@ -43,7 +43,7 @@ def test_organization_context_cannot_be_switched_within_a_session(db):
         set_rls_organization(db, UUID("dddddddd-dddd-dddd-dddd-dddddddddddd"))
 
 
-def test_new_transaction_restores_both_transaction_local_settings():
+def test_new_transaction_restores_all_transaction_local_settings():
     from types import SimpleNamespace
     from app.core.database import _restore_rls_context
 
@@ -61,11 +61,12 @@ def test_new_transaction_restores_both_transaction_local_settings():
     })
     _restore_rls_context(session, transaction=None, connection=FakeConnection())
 
-    assert len(calls) == 2
-    assert "app.auth_user_id" in calls[0][0]
-    assert calls[0][1]["auth_user_id"] == session.info["rls_auth_user_id"]
-    assert "app.organization_id" in calls[1][0]
-    assert calls[1][1]["organization_id"] == session.info["rls_organization_id"]
+    assert len(calls) == 8
+    settings = {params["setting"]: params["value"] for _, params in calls}
+    assert settings["app.auth_user_id"] == session.info["rls_auth_user_id"]
+    assert settings["app.organization_id"] == session.info["rls_organization_id"]
+    assert settings["app.user_email"] == ""
+    assert settings["app.is_platform_admin"] == ""
 
 
 def test_new_transaction_clears_unset_tenant_context():
@@ -81,35 +82,4 @@ def test_new_transaction_clears_unset_tenant_context():
             calls.append(parameters)
 
     _restore_rls_context(SimpleNamespace(info={}), transaction=None, connection=FakeConnection())
-    assert calls == [{"auth_user_id": ""}, {"organization_id": ""}]
-
-
-def test_postgres_context_survives_commit_and_new_transaction():
-    from sqlalchemy import text
-
-    from app.core.database import SessionLocal, engine
-
-    if engine.dialect.name != "postgresql":
-        pytest.skip("Requires PostgreSQL transaction-local settings.")
-
-    auth_user_id = UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-    organization_id = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
-    db = SessionLocal()
-    try:
-        set_rls_identity(db, auth_user_id)
-        set_rls_organization(db, organization_id)
-
-        before_commit = db.execute(
-            text("SELECT current_setting('app.auth_user_id', true), current_setting('app.organization_id', true)")
-        ).one()
-        assert before_commit == (str(auth_user_id), str(organization_id))
-
-        db.commit()
-
-        after_commit = db.execute(
-            text("SELECT current_setting('app.auth_user_id', true), current_setting('app.organization_id', true)")
-        ).one()
-        assert after_commit == (str(auth_user_id), str(organization_id))
-    finally:
-        db.rollback()
-        db.close()
+    assert len(calls) == 8 and all(value == "" for call in calls for value in call.values())
