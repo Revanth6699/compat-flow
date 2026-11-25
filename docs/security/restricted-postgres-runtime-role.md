@@ -10,7 +10,7 @@ Set these variables on the backend service:
 - `RUNTIME_DATABASE_PASSWORD`: a newly generated strong password stored only as a Render secret.
 - `STAGING_AUTO_MIGRATE=true` for staging or `PRODUCTION_AUTO_MIGRATE=true` for production when intentionally applying the migration release.
 
-`MIGRATION_DATABASE_URL` is the preferred explicit owner connection string. If it is omitted, the entrypoint treats the existing `DATABASE_URL` as the owner connection for the migration step, derives a separate runtime URL by replacing only its username and password, and exports that runtime URL before starting the API. This supports a production service that currently has only its owner `DATABASE_URL` configured without copying the database secret into a second environment variable.
+`MIGRATION_DATABASE_URL` is the preferred explicit owner connection string. If it is omitted, the entrypoint treats the existing `DATABASE_URL` as the owner connection for the migration step, derives a separate runtime URL by replacing its role and password, preserves a Supabase pooler project-ref username suffix when present, and exports that runtime URL before starting the API. This supports a production service that currently has only its owner `DATABASE_URL` configured without copying the database secret into a second environment variable.
 
 If both `MIGRATION_DATABASE_URL` and `DATABASE_URL` are supplied, they must be different connections. `DATABASE_URL` must authenticate as the restricted runtime role; `MIGRATION_DATABASE_URL` must authenticate as the owner/migration role.
 

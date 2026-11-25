@@ -19,8 +19,13 @@ run_database_migrations() {
 import os
 from sqlalchemy.engine import make_url
 url = make_url(os.environ["MIGRATION_DATABASE_URL"])
+owner_username = url.username or ""
+runtime_username = os.environ["RUNTIME_DATABASE_ROLE"]
+# Supabase session/transaction pooler usernames include the project ref suffix.
+if "." in owner_username:
+    runtime_username = f"{runtime_username}.{owner_username.rsplit('.', 1)[1]}"
 print(url.set(
-    username=os.environ["RUNTIME_DATABASE_ROLE"],
+    username=runtime_username,
     password=os.environ["RUNTIME_DATABASE_PASSWORD"],
 ).render_as_string(hide_password=False))
 PY
