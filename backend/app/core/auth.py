@@ -107,6 +107,9 @@ def get_current_user(
         raise HTTPException(status_code=403, detail="The authenticated email does not match the authorized account.")
     # Tenant scope is derived from the trusted CompatFlow user row, never request input.
     set_rls_organization(db, profile.organization_id)
+    set_rls_user_email(db, identity.email)
+    allowed_emails = {email.strip().lower() for email in settings.platform_admin_email.split(",") if email.strip()}
+    set_rls_platform_admin(db, identity.email in allowed_emails)
     return AuthenticatedUser(identity=identity, profile=profile)
 
 
