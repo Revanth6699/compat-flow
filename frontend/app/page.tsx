@@ -2,144 +2,53 @@
 
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
-import { RequestDemoLink } from "@/components/request-demo-link";
 
 const capabilities = [
-  {
-    number: "01",
-    title: "Validate supplier data",
-    description: "Check required product fields, inconsistent values, malformed rows and duplicate SKUs before data reaches your catalog.",
-    status: "Available",
-  },
-  {
-    number: "02",
-    title: "Normalize incoming files",
-    description: "Bring supplier files with different column names and structures into a consistent product-data workflow.",
-    status: "Available by plan",
-  },
-  {
-    number: "03",
-    title: "Connect source systems",
-    description: "Prepare catalog data from approved REST APIs, SFTP locations and SQL Server sources without manual file handoffs.",
-    status: "Connector access by plan",
-  },
+  ["01 / INGEST", "Bring supplier data together", "Import supplier catalogs and keep incoming product data organized by workflow."],
+  ["02 / VALIDATE", "Find catalog issues earlier", "Check structure, required fields, product attributes and data consistency."],
+  ["03 / REVIEW", "Turn findings into action", "Inspect exceptions, recommendations and validation outcomes in one workspace."],
+];
+const steps = [
+  ["01", "Connect or import", "Bring supplier catalogs through the available file and source workflows."],
+  ["02", "Normalize and validate", "Map incoming fields and check product data against a validation profile."],
+  ["03", "Review the results", "Inspect issues, recommendations and validation outcomes."],
+  ["04", "Act with confidence", "Use reviewed output to guide catalog operations and supplier follow-up."],
 ];
 
-const steps = [
-  ["01", "Connect or upload", "Request demo access or use an authenticated workspace to access the input methods included in your plan."],
-  ["02", "Validate and inspect", "Review field completeness, duplicate identifiers, rejected records and actionable validation issues."],
-  ["03", "Decide what moves forward", "Use the validation output to correct supplier data before it is committed to your catalog workflow."],
-];
+function ProductPreview() {
+  return <div className="editorial-preview" aria-label="Illustrative CompatFlow workspace preview">
+    <div className="preview-topbar"><div className="preview-brand"><span className="preview-brand-mark">C</span> COMPATFLOW / WORKSPACE</div><span className="preview-status"><i /> WORKSPACE OVERVIEW</span></div>
+    <div className="preview-content">
+      <div className="preview-heading"><div><span className="preview-kicker">CATALOG OPERATIONS</span><h3>Supplier data overview</h3><p>One place to inspect incoming catalog work.</p></div><span className="preview-date">CURRENT WORKSPACE</span></div>
+      <div className="preview-metrics"><div><span>WORKFLOW</span><strong>Import → Validate</strong><small>Structured catalog review</small></div><div><span>DATA SOURCES</span><strong>Connected inputs</strong><small>Files and configured sources</small></div><div><span>OUTPUT</span><strong>Review-ready</strong><small>Issues and recommendations</small></div></div>
+      <div className="preview-table-wrap"><div className="preview-table-title"><strong>Workflow stages</strong><span>PROCESS OVERVIEW</span></div>
+        {[[ "01", "Import", "Supplier catalog intake", "Input" ],["02","Validation","Structure and attribute checks","Checks"],["03","Review","Exceptions and recommendations","Action"]].map(row=><div className="preview-table-row" key={row[0]}><span><b className="preview-index">{row[0]}</b> {row[1]}</span><span>{row[2]}</span><em>{row[3]}</em></div>)}
+      </div>
+    </div><div className="preview-bottom"><span>SUPPLIER CATALOG CHANGE OPERATIONS</span><span>COMPATFLOW</span></div>
+  </div>;
+}
 
 export default function HomePage() {
   const { user } = useAuth();
-  return (
-    <main id="main" className="home-page">
-      <section className="home-hero">
-        <div className="container home-hero-grid">
-          <div className="home-hero-copy">
-            <div className="eyebrow">Supplier catalog operations</div>
-            <h1>Make supplier product data reliable before it reaches your catalog.</h1>
-            <p className="home-hero-description">
-              CompatFlow gives commerce and operations teams a structured way
-              to validate supplier files, identify data-quality problems and
-              manage catalog inputs across teams and source systems.
-            </p>
-            <div className="home-hero-actions">
-              {user ? <Link className="button" href="/workspace">Open workspace</Link> : <Link className="button" href="/contact?intent=demo">Request demo access</Link>}
-              {user ? <Link className="button button-secondary" href="/catalog/import">Validate catalog</Link> : <Link className="button button-secondary" href="/pricing">Explore plans</Link>}
-              {user && <RequestDemoLink className="button button-secondary" /> }
-            </div>
-            <p className="home-hero-note">{user ? "You are signed in. Open your workspace to manage your organization and catalog operations." : "Request demo access. Demo access is reviewed and granted individually."}</p>
-          </div>
-          <div className="home-visual" aria-label="CompatFlow workflow overview">
-            <div className="home-visual-top">
-              <span className="home-visual-title">COMPATFLOW / WORKFLOW</span>
-              <span className="home-visual-live"><span className="home-visual-dot" />Data quality operations</span>
-            </div>
-            <div className="home-visual-body">
-              <div className="eyebrow">Supplier data lifecycle</div>
-              <h2 className="home-visual-metric">From source to review</h2>
-              <p className="home-visual-caption">One controlled workflow for incoming catalog data.</p>
-              <div className="home-steps-grid">
-                <article className="home-step"><div className="home-card-number">01 / INPUT</div><h3>Supplier sources</h3><p>Files, APIs and databases</p></article>
-                <article className="home-step"><div className="home-card-number">02 / CHECK</div><h3>Validation</h3><p>Structure and data quality</p></article>
-                <article className="home-step"><div className="home-card-number">03 / REVIEW</div><h3>Clear outcomes</h3><p>Issues and next actions</p></article>
-              </div>
-            </div>
-            <div className="home-visual-footer"><span>Built for product-data operations</span><span>Access depends on plan</span></div>
-          </div>
-        </div>
-      </section>
-
-      <div className="home-proof-strip" aria-label="Platform focus">
-        <span>Supplier catalogs</span><span>Data validation</span><span>Source integrations</span><span>Operational control</span>
-      </div>
-
-      <section className="home-section" id="capabilities">
-        <div className="container">
-          <div className="home-section-heading">
-            <div className="eyebrow">Platform capabilities</div>
-            <h2>Control the quality of catalog inputs.</h2>
-            <p>CompatFlow is organized around the practical work required to receive, validate and review supplier product data.</p>
-          </div>
-          <div className="home-capability-grid">
-            {capabilities.map(item => (
-              <article className="home-capability-card" key={item.number}>
-                <div className="home-card-number">{item.number}</div>
-                <h3>{item.title}</h3>
-                <p>{item.description}</p>
-                <span className="home-capability-status">{item.status}</span>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="home-section" id="workflow">
-        <div className="container">
-          <div className="home-section-heading">
-            <div className="eyebrow">How it works</div>
-            <h2>A consistent process for every supplier input.</h2>
-          </div>
-          <div className="home-steps-grid">
-            {steps.map(([number, title, description]) => (
-              <article className="home-step" key={number}>
-                <div className="home-card-number">STEP {number}</div>
-                <h3>{title}</h3>
-                <p>{description}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {!user && (
-      <section className="home-section">
-        <div className="container">
-          <div className="home-demo-cta">
-            <div>
-              <div className="eyebrow">Start with a real workflow</div>
-              <h2>Request access to supplier CSV validation.</h2>
-              <p>Submit a demo request. If approved, you will receive access to the limited CSV validation workflow.</p>
-            </div>
-            <Link className="button home-cta-button" href="/contact?intent=demo">Request demo access</Link>
-          </div>
-        </div>
-      </section>
-      )}
-
-      <section className="home-final-cta">
-        <div className="container">
-          <div className="eyebrow">Move beyond manual supplier checks</div>
-          <h2>Bring supplier data into a workflow your team can trust.</h2>
-          <p>Compare plan access or tell us about the catalog workflow you need to support.</p>
-          <div className="home-hero-actions">
-            <Link className="button" href="/pricing">Compare plans</Link>
-            {!user && <Link className="button button-secondary" href="/contact?intent=demo">Request a guided demo</Link>}
-          </div>
-        </div>
-      </section>
-    </main>
-  );
+  const primaryHref = user ? "/workspace" : "/contact?intent=demo";
+  const primaryText = user ? "Open workspace" : "Request a demo";
+  return <main id="main" className="editorial-home">
+    <section className="editorial-hero">
+      <div className="editorial-eyebrow"><span /> SUPPLIER CATALOG CHANGE OPERATIONS</div>
+      <h1>Bring every product catalog into focus.</h1>
+      <p className="editorial-lede">A structured workspace to import supplier data, validate product information and review catalog issues before they become operational problems.</p>
+      <div className="editorial-actions"><Link className="editorial-button editorial-button-dark" href={primaryHref}>{primaryText}<span>↗</span></Link><Link className="editorial-text-link" href="#workflow">Explore the workflow <span>↓</span></Link></div>
+      <div className="editorial-hero-visual"><ProductPreview /></div>
+    </section>
+    <section className="editorial-trust"><span>BUILT AROUND THE WORK THAT MATTERS</span><div><b>Supplier catalogs</b><b>Product attributes</b><b>Data validation</b><b>Catalog review</b></div></section>
+    <section className="editorial-collage"><div className="collage-center"><span className="collage-mark">C</span><strong>One clear view<br/>of catalog quality.</strong></div><div className="collage-card collage-card-a"><span>01 / INPUT</span><strong>Supplier files</strong><p>Bring product data into a consistent starting point.</p><div className="file-lines"><i/><i/><i/></div></div><div className="collage-card collage-card-b"><span>02 / QUALITY</span><strong>Validation checks</strong><p>Identify missing, inconsistent and malformed attributes.</p><div className="quality-bars"><i/><i/><i/></div></div><div className="collage-orbit">↗</div></section>
+    <section className="editorial-manifesto"><span className="editorial-eyebrow">THE PROBLEM WE SOLVE</span><h2>Supplier data arrives in different shapes. Your catalog workflow should not have to.</h2><p>CompatFlow gives product and commerce teams a repeatable process for receiving, checking and reviewing supplier catalog changes—without losing sight of the data behind each decision.</p></section>
+    <section className="editorial-feature-section" id="capabilities">
+      <div className="editorial-feature-visual"><div className="feature-window"><div className="feature-window-head"><span>CATALOG REVIEW</span><span>● READY TO INSPECT</span></div><div className="feature-window-body"><div className="feature-file-icon">▤</div><strong>Supplier catalog</strong><p>Incoming product information</p><div className="feature-rule"/><div className="feature-list"><span><i/> Field structure</span><span><i/> Required attributes</span><span><i/> Data consistency</span><span><i/> Review findings</span></div></div></div></div>
+      <div className="editorial-feature-copy"><span className="editorial-eyebrow">A PRACTICAL FOUNDATION</span><h2>Catalog operations, with more clarity at every step.</h2><div className="editorial-feature-list">{capabilities.map(([n,title,body])=><article key={n}><span>{n}</span><div><h3>{title}</h3><p>{body}</p></div></article>)}</div></div>
+    </section>
+    <section className="editorial-workflow" id="workflow"><div className="editorial-section-heading"><span className="editorial-eyebrow">HOW COMPATFLOW WORKS</span><h2>From supplier input to informed review.</h2><p>A clear sequence for the recurring work of product-data teams.</p></div><div className="editorial-step-grid">{steps.map(([n,title,body])=><article key={n}><span>STEP {n}</span><div className="step-symbol">{n === "01" ? "⇧" : n === "02" ? "⌁" : n === "03" ? "◫" : "↗"}</div><h3>{title}</h3><p>{body}</p></article>)}</div></section>
+    <section className="editorial-teams"><div className="editorial-section-heading"><span className="editorial-eyebrow">DESIGNED FOR CATALOG TEAMS</span><h2>Useful across the product data lifecycle.</h2></div><div className="editorial-team-grid"><article><span>01</span><h3>Ecommerce operations</h3><p>Keep product listings and supplier updates organized before publication.</p></article><article><span>02</span><h3>Product information teams</h3><p>Review attribute completeness and consistency across incoming catalogs.</p></article><article><span>03</span><h3>Supplier management</h3><p>Make data gaps and follow-up requirements easier to identify.</p></article><article><span>04</span><h3>Data operations</h3><p>Establish a repeatable validation process across catalog inputs.</p></article></div></section>
+    <section className="editorial-cta"><div className="cta-mark">C</div><span className="editorial-eyebrow">SEE THE WORKFLOW IN CONTEXT</span><h2>Make supplier catalog work easier to see—and easier to manage.</h2><p>Explore CompatFlow or request a guided walkthrough of the current product workflows.</p><div className="editorial-actions"><Link className="editorial-button editorial-button-light" href={primaryHref}>{primaryText}<span>↗</span></Link><Link className="editorial-cta-link" href="/pricing">View plans</Link></div></section>
+  </main>;
 }
