@@ -29,10 +29,16 @@ _RLS_CONTEXT_KEYS = {
 
 def _set_context(db: Session, setting: str, value: str, *, immutable: bool = True) -> None:
     key = _RLS_CONTEXT_KEYS[setting]
-    existing = db.info.get(key)
+    info = getattr(db, "info", None)
+    if info is None:
+        info = {}
+        setattr(db, "info", info)
+    existing = info.get(key)
     if immutable and existing is not None and existing != value:
+        if setting == "app.auth_user_id":
+            raise RuntimeError("A database session cannot be reused for another authenticated identity.")
         raise RuntimeError(f"Database context {setting} cannot be rebound within a session.")
-    db.info[key] = value
+    info[key] = value
     _apply_rls_context(db)
 
 
@@ -82,7 +88,11 @@ def set_rls_worker_organization(db: Session, organization_id: UUID) -> None:
 
 def _apply_rls_context(db: Session) -> None:
     """Apply transaction-local settings immediately when a transaction is active."""
-    if db.get_bind().dialect.name != "postgresql" or not db.in_transaction():
+    get_bind = getattr(db, "get_bind", None)
+    in_transaction = getattr(db, "in_transaction", None)
+    if get_bind is None or in_transaction is None:
+        return
+    if get_bind().dialect.name != "postgresql" or not in_transaction():
         return
     for setting, key in _RLS_CONTEXT_KEYS.items():
         db.execute(
