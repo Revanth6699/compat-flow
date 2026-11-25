@@ -91,3 +91,6 @@ class Settings(BaseSettings):
         if self.migration_database_url and self.database_url == self.migration_database_url:
             raise ValueError("DATABASE_URL must use a separate restricted runtime role.")
         return self
+
+
+settings = Settings()
