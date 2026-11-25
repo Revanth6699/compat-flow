@@ -35,6 +35,8 @@ PY
     alembic upgrade head
     echo "Provisioning least-privilege runtime database role."
     python ./scripts/bootstrap_runtime_role.py
+    # Do not pass the owner credential into the long-lived API process.
+    unset MIGRATION_DATABASE_URL
 }
 
 if [ "${APP_ENV:-}" = "staging" ] && [ "${STAGING_AUTO_MIGRATE:-}" = "true" ]; then

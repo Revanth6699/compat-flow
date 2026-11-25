@@ -25,7 +25,7 @@ When the staging or production auto-migration flag is explicitly enabled, the en
 3. Provisions/reconciles the runtime role with only schema usage, table DML, and sequence usage/select.
 4. Starts Uvicorn with the restricted `DATABASE_URL`.
 
-The API engine uses `DATABASE_URL` only. The migration connection is not used by request handlers. If migration or role provisioning fails, the API process does not start.
+The API engine uses `DATABASE_URL` only. After migrations and role provisioning, the entrypoint removes `MIGRATION_DATABASE_URL` from the environment before starting the long-lived API process. If migration or role provisioning fails, the API process does not start.
 
 ## Promotion gates
 
