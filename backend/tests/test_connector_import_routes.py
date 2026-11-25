@@ -216,7 +216,8 @@ async def test_connector_rate_limit_is_enforced_per_organization(monkeypatch):
             return self.value
 
     class FakeSession:
-        info = {}
+        def __init__(self):
+            self.info = {}
 
         def get_bind(self):
             from types import SimpleNamespace
