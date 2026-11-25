@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.core.auth import AuthenticatedUser, get_current_user, is_platform_admin, resolve_import_limits, require_verified_supabase_email
 from app.core.config import settings
-from app.core.database import get_db
+from app.core.database import get_db, set_rls_public_demo_request
 from app.models import DemoAccessRequest, Organization, Review, Subscription, User
 from app.api.gmail_notifications import notify_demo_request
 
@@ -130,6 +130,7 @@ async def sync_demo_request_to_supabase(
 @router.post("/demo-requests", response_model=DemoRequestResponse, status_code=201)
 async def submit_demo_request(payload: DemoRequestPayload, db: Session = Depends(get_db)):
     email = str(payload.email).strip().lower()
+    set_rls_public_demo_request(db, email)
     pending = db.scalar(select(DemoAccessRequest).where(
         DemoAccessRequest.email == email,
         DemoAccessRequest.status == "pending",
