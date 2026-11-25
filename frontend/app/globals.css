@@ -2673,3 +2673,87 @@ h1, h2, h3, h4, .editorial-heading {
 .nav a { font-size: 12px; }
 .nav a::after { bottom: -6px; }
 html { scroll-padding-top: 78px; }
+
+
+/* Final header refinement: compact, balanced and consistent with the existing layout */
+.site-header {
+  background: rgba(255, 255, 255, .96);
+  border-bottom: 1px solid #e7edf3;
+  box-shadow: 0 3px 14px rgba(28, 55, 82, .045);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.header-inner {
+  min-height: 72px;
+  gap: 18px;
+}
+.brand {
+  align-self: center;
+  flex: 0 0 auto;
+}
+.brand img {
+  width: 88px;
+  height: 66px;
+  object-fit: contain;
+}
+.nav {
+  align-items: center;
+  gap: 17px;
+}
+.nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  color: #52677f;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .005em;
+  white-space: nowrap;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+.nav a::after {
+  bottom: 1px;
+  height: 2px;
+  border-radius: 2px;
+}
+.nav a:hover,
+.nav a[aria-current="page"] {
+  color: #0b8179;
+}
+.header-main-nav { gap: 17px; }
+.header-account-nav { gap: 14px; }
+.header-account-nav .nav-get-started {
+  min-height: 34px;
+  padding: 0 13px;
+  border: 1px solid #24527d;
+  border-radius: 6px;
+  background: #24527d;
+  color: #fff;
+  font-weight: 700;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.header-account-nav .nav-get-started::after { display: none; }
+.header-account-nav .nav-get-started:hover {
+  transform: translateY(-1px);
+  border-color: #173f66;
+  background: #173f66;
+  color: #fff;
+}
+@media (max-width: 1100px) and (min-width: 761px) {
+  .header-inner { gap: 12px; }
+  .brand img { width: 78px; height: 60px; }
+  .nav, .header-main-nav { gap: 12px; }
+  .nav a { font-size: 11px; }
+}
+@media (max-width: 760px) {
+  .header-inner {
+    min-height: 0;
+    gap: 8px;
+    padding: 9px 0 10px;
+  }
+  .brand img { width: 82px; height: 62px; }
+  .nav { gap: 7px 15px; }
+  .nav a { min-height: 30px; font-size: 11px; }
+  .nav a::after { bottom: 0; }
+  .header-account-nav .nav-get-started { min-height: 30px; }
+}
