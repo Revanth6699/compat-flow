@@ -1,12 +1,16 @@
+import tempfile
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
+from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy import select
 
 from app.core.database import SessionLocal, set_rls_worker_organization
 from app.models import ImportJob, ImportRowError, Product
 from app.services.catalog_csv import parse_catalog_csv
-from app.services.file_storage import get_storage_path
+from app.services.file_storage import download_import_file
 from app.workers.celery_app import celery_app
 
 
@@ -17,30 +21,48 @@ def health_check_task() -> str:
 
 @celery_app.task(name="compatflow.process_catalog_import")
 def process_catalog_import(job_id: str, organization_id: str) -> dict:
+    # The organization ID must be carried by the trusted enqueueing path.
+    # Never discover tenant scope by querying a tenant table before RLS context.
+    tenant_id = uuid.UUID(organization_id)
+    parsed_job_id = uuid.UUID(job_id)
     db = SessionLocal()
+    advisory_lock_acquired = False
 
     try:
-        job = db.scalar(select(ImportJob).where(ImportJob.id == uuid.UUID(job_id), ImportJob.organization_id == tenant_id))
+        set_rls_worker_organization(db, tenant_id)
+        advisory_lock_acquired = bool(
+            db.execute(
+                text("SELECT pg_try_advisory_lock(hashtextextended(:job_id, 0))"),
+                {"job_id": job_id},
+            ).scalar_one()
+        )
+        if not advisory_lock_acquired:
+            return {"status": "already_processing", "job_id": job_id}
 
+        job = db.scalar(
+            select(ImportJob).where(
+                ImportJob.id == parsed_job_id,
+                ImportJob.organization_id == tenant_id,
+            )
+        )
         if job is None:
             return {"status": "not_found", "job_id": job_id}
-
         if job.status in {"completed", "completed_with_errors"}:
             return {"status": job.status, "job_id": job_id}
-
-        job.status = "processing"
-        job.started_at = job.started_at or datetime.now(timezone.utc)
-        job.error_message = None
-        db.commit()
-
         if not job.storage_key:
             raise ValueError("Import job has no storage key.")
 
-        file_path = get_storage_path(job.storage_key)
-        raw = file_path.read_bytes()
-        content = raw.decode("utf-8-sig")
+        job.status = "processing"
+        job.started_at = job.started_at or datetime.now(timezone.utc)
+        job.completed_at = None
+        job.error_message = None
+        db.commit()
 
-        result = parse_catalog_csv(content)
+        with tempfile.TemporaryDirectory(prefix="compatflow-import-") as temp_dir:
+            local_file = Path(temp_dir) / "source.csv"
+            download_import_file(job.storage_key, local_file)
+            content = local_file.read_text(encoding="utf-8-sig")
+            result = parse_catalog_csv(content)
 
         for error in result.row_errors:
             db.add(
@@ -54,11 +76,7 @@ def process_catalog_import(job_id: str, organization_id: str) -> dict:
             )
 
         inserted_count = 0
-
-        for row, row_number in zip(
-            result.valid_rows,
-            result.valid_row_numbers,
-        ):
+        for row, row_number in zip(result.valid_rows, result.valid_row_numbers):
             statement = (
                 insert(Product)
                 .values(
@@ -72,15 +90,11 @@ def process_catalog_import(job_id: str, organization_id: str) -> dict:
                     replacement_sku=row.replacement_sku or None,
                 )
                 .on_conflict_do_nothing(
-                    index_elements=[
-                        Product.organization_id,
-                        Product.sku,
-                    ]
+                    index_elements=[Product.organization_id, Product.sku]
                 )
                 .returning(Product.id)
             )
             inserted = db.execute(statement)
-
             if inserted.scalar_one_or_none() is not None:
                 inserted_count += 1
             else:
@@ -90,10 +104,7 @@ def process_catalog_import(job_id: str, organization_id: str) -> dict:
                         row_number=row_number,
                         field="sku",
                         error_code="PRODUCT_SKU_ALREADY_EXISTS",
-                        message=(
-                            f"SKU '{row.sku}' already exists "
-                            "in this organization's catalog."
-                        ),
+                        message=f"SKU '{row.sku}' already exists in this organization's catalog.",
                     )
                 )
 
@@ -101,15 +112,9 @@ def process_catalog_import(job_id: str, organization_id: str) -> dict:
         job.valid_rows = inserted_count
         job.invalid_rows = result.total_rows - inserted_count
         job.processed_rows = result.total_rows
-        job.status = (
-            "completed"
-            if job.invalid_rows == 0
-            else "completed_with_errors"
-        )
+        job.status = "completed" if job.invalid_rows == 0 else "completed_with_errors"
         job.completed_at = datetime.now(timezone.utc)
-
         db.commit()
-
         return {
             "job_id": job_id,
             "status": job.status,
@@ -120,19 +125,28 @@ def process_catalog_import(job_id: str, organization_id: str) -> dict:
 
     except Exception as exc:
         db.rollback()
-
         try:
-            job = db.scalar(select(ImportJob).where(ImportJob.id == uuid.UUID(job_id), ImportJob.organization_id == tenant_id))
-
-            if job is not None:
+            job = db.scalar(
+                select(ImportJob).where(
+                    ImportJob.id == parsed_job_id,
+                    ImportJob.organization_id == tenant_id,
+                )
+            )
+            if job is not None and job.status not in {"completed", "completed_with_errors"}:
                 job.status = "failed"
                 job.error_message = str(exc)[:2000]
                 job.completed_at = datetime.now(timezone.utc)
                 db.commit()
         except Exception:
             db.rollback()
-
         raise
-
     finally:
+        if advisory_lock_acquired:
+            try:
+                db.execute(
+                    text("SELECT pg_advisory_unlock(hashtextextended(:job_id, 0))"),
+                    {"job_id": job_id},
+                )
+            except Exception:
+                db.rollback()
         db.close()
