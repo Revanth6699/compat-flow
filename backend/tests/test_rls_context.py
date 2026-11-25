@@ -82,4 +82,4 @@ def test_new_transaction_clears_unset_tenant_context():
             calls.append(parameters)
 
     _restore_rls_context(SimpleNamespace(info={}), transaction=None, connection=FakeConnection())
-    assert len(calls) == 8 and all(value == "" for call in calls for value in call.values())
+    assert len(calls) == 8 and all(call["value"] == "" for call in calls)
