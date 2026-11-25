@@ -81,6 +81,8 @@ def delete_account(
         _delete_supabase_user(identity.auth_user_id)
         return {"deleted": True, "scope": "account"}
 
+    set_rls_organization(db, profile.organization_id)
+
     if profile.role == "owner":
         if payload.confirmation != "DELETE ORGANIZATION":
             raise HTTPException(status_code=422, detail="As the organization owner, type DELETE ORGANIZATION to remove the company workspace and all associated data.")
